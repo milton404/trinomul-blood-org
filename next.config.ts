@@ -26,7 +26,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  output: "standalone",
+
   transpilePackages: ["motion"],
   serverExternalPackages: ["better-sqlite3", "pg", "leaflet", "msedge-tts"],
 
