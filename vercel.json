@@ -13,32 +13,50 @@
     "app/api/auth/login/route.ts": {
       "maxDuration": 30
     },
-    "app/api/auth/register/route.ts": {
-      "maxDuration": 30
+    "app/api/auth/me/route.ts": {
+      "maxDuration": 10
     },
-    "app/api/blood-requests/route.ts": {
-      "maxDuration": 30
+    "app/api/auth/logout/route.ts": {
+      "maxDuration": 10
     },
-    "app/api/ai/insights/route.ts": {
+    "app/api/cloudinary/sign/route.ts": {
+      "maxDuration": 10
+    },
+    "app/api/correct-address/route.ts": {
       "maxDuration": 60
     },
-    "app/api/ai/forecast/route.ts": {
-      "maxDuration": 60
-    },
-    "app/api/ai/anomaly/route.ts": {
-      "maxDuration": 60
-    },
-    "app/api/voice-chat/route.ts": {
-      "maxDuration": 300
-    },
-    "app/api/admin/bulk-*/**/*.ts": {
+    "app/api/donors/route.ts": {
       "maxDuration": 30
+    },
+    "app/api/leaderboard/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/requests/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/requests/[id]/view/route.ts": {
+      "maxDuration": 10
+    },
+    "app/api/feed/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/feed/like/route.ts": {
+      "maxDuration": 15
+    },
+    "app/api/feed/comment/route.ts": {
+      "maxDuration": 15
+    },
+    "app/api/feed/share/route.ts": {
+      "maxDuration": 15
+    },
+    "app/api/feed/[id]/route.ts": {
+      "maxDuration": 15
     }
   },
   "crons": [
     {
       "path": "/api/health",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 3 * * *"
     }
   ],
   "headers": [
