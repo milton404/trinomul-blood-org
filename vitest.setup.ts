@@ -1,4 +1,5 @@
 import "@testing-library/jest-dom/vitest";
+import { createElement } from "react";
 import { vi } from "vitest";
 
 vi.mock("next-intl", () => ({
@@ -8,9 +9,7 @@ vi.mock("next-intl", () => ({
 }));
 
 vi.mock("@/i18n/routing", () => ({
-  Link: function MockLink({ children, ...props }: any) {
-    return { type: "a", props: { ...props, children } };
-  },
+  Link: (props: any) => createElement("a", props),
   useRouter: () => ({
     push: vi.fn(),
     replace: vi.fn(),

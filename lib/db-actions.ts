@@ -949,8 +949,8 @@ export async function serverChatWithAssistant(
 
   // Rate limit AI chat per IP to protect LLM cost (30 msgs / 5 min, 10 min lockout).
   // Skipped in development for easier testing.
+  let rateKey = "ai-chat:unknown";
   if (process.env.NODE_ENV === "production") {
-    let rateKey = "ai-chat:unknown";
     try {
       const { getVisitorFingerprint } = await import("./auth/visitor");
       const { ip } = await getVisitorFingerprint();

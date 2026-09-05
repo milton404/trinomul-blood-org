@@ -4,14 +4,15 @@ import { getSession } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getSession();
     if (!session) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const postId = parseInt(params.id);
+    const { id } = await params;
+    const postId = parseInt(id);
     if (!postId) {
       return NextResponse.json({ error: "Invalid post ID" }, { status: 400 });
     }
@@ -24,14 +25,15 @@ export async function DELETE(req: Request, { params }: { params: { id: string } 
   }
 }
 
-export async function PATCH(req: Request, { params }: { params: { id: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await getSession();
     if (!session) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
-    const postId = parseInt(params.id);
+    const { id } = await params;
+    const postId = parseInt(id);
     const body = await req.json();
 
     const changes = await serverUpdatePost(postId, {

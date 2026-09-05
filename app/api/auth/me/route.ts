@@ -11,7 +11,7 @@ export async function GET() {
       return NextResponse.json({ user: null });
     }
 
-    const profile = getProfileByEmail(session.email);
+    const profile = getProfileByEmail(session.email) as Record<string, unknown> | undefined;
     if (!profile) {
       return NextResponse.json({ user: null });
     }

@@ -77,7 +77,7 @@ export async function POST(req: Request) {
     const { randomBytes: rb2 } = await import("crypto");
     const tempPassword = rb2(16).toString("hex");
     // Set a session for the new user
-    await createSession({ id, email, role: "donor" }, false);
+    await createSession({ sub: String(id), email, role: "donor" }, false);
 
     return NextResponse.json({
       user: {

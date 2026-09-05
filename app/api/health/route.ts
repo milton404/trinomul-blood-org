@@ -34,7 +34,10 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  const checks: Record<string, { status: string; error?: string; latencyMs?: number }> = {};
+  const checks: Record<
+    string,
+    { status: string; error?: string; latencyMs?: number; applied?: number; pending?: number }
+  > = {};
 
   const dbStart = Date.now();
   const dbType = process.env.DATABASE_TYPE || "auto";

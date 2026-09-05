@@ -24,7 +24,7 @@ describe("assistant workflow", () => {
     expect(result.state?.flow).toBe("donor_search");
     expect(result.state?.values.bloodGroup).toBe("B+");
     expect(result.state?.pendingField).toBe("location");
-    expect(result.reply).toContain("কোন এলাকায়");
+    expect(result.reply.normalize("NFC")).toContain("কোন এলাকায়".normalize("NFC"));
   });
 
   it("uses Bangla replies for Banglish and English replies for English", () => {
@@ -233,7 +233,7 @@ describe("assistant workflow", () => {
       values: {},
     };
 
-    const result = advanceAssistantWorkflow("REQ-ABC123", state);
+    const result = advanceAssistantWorkflow("TBB-2026-ABC123", state);
 
     expect(result.shouldTrackRequest).toBe(true);
     expect(result.state?.pendingField).toBe("trackingCode");

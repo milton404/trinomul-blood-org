@@ -45,8 +45,7 @@ export async function getCache<T = unknown>(
   } catch (err) {
     logger.logError(
       err instanceof Error ? err : new Error(String(err)),
-      "Cache get failed",
-      { key },
+      { key, op: "get" },
     );
     return null;
   }
@@ -72,8 +71,7 @@ export async function setCache(
   } catch (err) {
     logger.logError(
       err instanceof Error ? err : new Error(String(err)),
-      "Cache set failed",
-      { key },
+      { key, ttl, op: "set" },
     );
   }
 }
@@ -95,8 +93,7 @@ export async function deleteCache(
   } catch (err) {
     logger.logError(
       err instanceof Error ? err : new Error(String(err)),
-      "Cache delete failed",
-      { key },
+      { key, op: "delete" },
     );
   }
 }
@@ -114,6 +111,8 @@ export async function clearCachePattern(
 
   try {
     const client = getRedisClient();
+    if (!client) return;
+
     const keys = await client.keys(cachePattern);
 
     if (keys.length > 0) {
@@ -123,8 +122,7 @@ export async function clearCachePattern(
   } catch (err) {
     logger.logError(
       err instanceof Error ? err : new Error(String(err)),
-      "Cache clear failed",
-      { pattern },
+      { pattern, op: "clear" },
     );
   }
 }

@@ -2,7 +2,7 @@ import { createLogger } from "@/lib/logging/logger";
 
 const logger = createLogger("redis");
 
-let redisClient: unknown = null;
+let redisClient: RedisClient | null = null;
 
 interface RedisConfig {
   url?: string;
@@ -14,21 +14,28 @@ interface RedisConfig {
   tls?: Record<string, unknown>;
 }
 
-export function getRedisClient(_config: RedisConfig = {}) {
+interface RedisClient {
+  isOpen: boolean;
+  connect: () => Promise<void>;
+  quit: () => Promise<void>;
+  on: (event: string, callback: (...args: unknown[]) => void) => void;
+  get: (key: string) => Promise<string | null>;
+  set: (key: string, value: string) => Promise<void>;
+  setEx: (key: string, seconds: number, value: string) => Promise<void>;
+  del: (...keys: string[]) => Promise<number>;
+  incr: (key: string) => Promise<number>;
+  expire: (key: string, seconds: number) => Promise<void>;
+  keys: (pattern: string) => Promise<string[]>;
+  eval: (
+    script: string,
+    options: { keys: string[]; arguments: string[] },
+  ) => Promise<unknown>;
+  ping: () => Promise<string>;
+}
+
+export function getRedisClient(_config: RedisConfig = {}): RedisClient | null {
   if (redisClient) {
-    return redisClient as {
-      isOpen: boolean;
-      connect: () => Promise<void>;
-      quit: () => Promise<void>;
-      on: (event: string, callback: Function) => void;
-      get: (key: string) => Promise<string | null>;
-      set: (key: string, value: string) => Promise<void>;
-      setEx: (key: string, seconds: number, value: string) => Promise<void>;
-      del: (key: string) => Promise<void>;
-      incr: (key: string) => Promise<number>;
-      expire: (key: string, seconds: number) => Promise<void>;
-      ping: () => Promise<string>;
-    };
+    return redisClient;
   }
 
   logger.warn("Redis is not available. Install redis to enable.");
@@ -161,10 +168,13 @@ export async function getAndIncrement(
   const windowStart = Math.floor(now / windowMs) * windowMs;
   const windowKey = `${key}:${windowStart}`;
 
-  const count = await client.eval({
-    keys: [windowKey],
-    arguments: [String(Math.ceil(windowMs / 1000))],
-  }) as number;
+  const count = (await client.eval(
+    "local c = redis.call('INCR', KEYS[1]); if c == 1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end; return c;",
+    {
+      keys: [windowKey],
+      arguments: [String(Math.ceil(windowMs / 1000))],
+    },
+  )) as number;
 
   return {
     count,

@@ -63,10 +63,13 @@ export default function AdminSavedPatientsPage() {
   }, [adminCtx]);
 
   const fetchPatients = async () => {
+    if (!adminCtx?.id) {
+      setPatients([]);
+      return;
+    }
     setIsLoading(true);
     try {
-      const ownerId = adminCtx?.id;
-      const data = (await serverGetSavedPatients(ownerId)) as SavedPatient[];
+      const data = (await serverGetSavedPatients(adminCtx.id)) as SavedPatient[];
       setPatients(data || []);
       setTotalPages(Math.ceil((data?.length || 0) / itemsPerPage));
     } catch (error) {
@@ -95,8 +98,8 @@ export default function AdminSavedPatientsPage() {
     if (!confirm(t('confirm_delete_patient'))) return;
 
     try {
-      const ownerId = adminCtx?.id;
-      await serverDeleteSavedPatient(patient.id, ownerId);
+      if (!adminCtx?.id) return;
+      await serverDeleteSavedPatient(patient.id, adminCtx.id);
       toast.success(t('patient_deleted'));
       fetchPatients();
     } catch (error: any) {

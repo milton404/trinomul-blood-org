@@ -23,7 +23,7 @@ export interface RateLimitResult {
   retryAfterMs?: number;
 }
 
-const DEFAULT_OPTIONS: Required<Omit<RedisRateLimitOptions, "keyPrefix">> = {
+const DEFAULT_OPTIONS: Required<RedisRateLimitOptions> = {
   maxAttempts: 10,
   windowMs: 15 * 60 * 1000,
   lockoutMs: 15 * 60 * 1000,
@@ -45,10 +45,11 @@ function getLockoutKey(prefix: string, identifier: string): string {
 
 export async function checkRedisRateLimit(
   identifier: string,
-  options: RedisRateLimitOptions = {},
+  options: Partial<RedisRateLimitOptions> = {},
 ): Promise<RateLimitResult> {
   const config = { ...DEFAULT_OPTIONS, ...options };
-  const { maxAttempts, windowMs, lockoutMs, keyPrefix } = config;
+  const { maxAttempts, windowMs, lockoutMs } = config;
+  const keyPrefix = config.keyPrefix ?? DEFAULT_OPTIONS.keyPrefix;
 
   if (!isRedisConnected()) {
     logger.warn("Redis not connected, using fallback", { identifier });
@@ -61,6 +62,15 @@ export async function checkRedisRateLimit(
   }
 
   const client = getRedisClient();
+  if (!client) {
+    return {
+      allowed: true,
+      remainingAttempts: maxAttempts - 1,
+      resetTime: Date.now() + windowMs,
+      lockedUntil: null,
+    };
+  }
+
   const lockoutKey = getLockoutKey(keyPrefix, identifier);
 
   try {
@@ -119,8 +129,7 @@ export async function checkRedisRateLimit(
   } catch (err) {
     logger.logError(
       err instanceof Error ? err : new Error(String(err)),
-      "Rate limit check failed",
-      { identifier },
+      { identifier, op: "check" },
     );
 
     return {
@@ -134,10 +143,11 @@ export async function checkRedisRateLimit(
 
 export async function recordFailedAttempt(
   identifier: string,
-  options: RedisRateLimitOptions = {},
+  options: Partial<RedisRateLimitOptions> = {},
 ): Promise<RateLimitResult> {
   const config = { ...DEFAULT_OPTIONS, ...options };
-  const { maxAttempts, windowMs, lockoutMs, keyPrefix } = config;
+  const { maxAttempts, windowMs, lockoutMs } = config;
+  const keyPrefix = config.keyPrefix ?? DEFAULT_OPTIONS.keyPrefix;
 
   if (!isRedisConnected()) {
     return {
@@ -158,11 +168,13 @@ export async function recordFailedAttempt(
     const client = getRedisClient();
     const lockoutKey = getLockoutKey(keyPrefix, identifier);
 
-    await client.setEx(
-      lockoutKey,
-      Math.ceil((lockoutMs || windowMs) / 1000),
-      String(lockoutUntil),
-    );
+    if (client) {
+      await client.setEx(
+        lockoutKey,
+        Math.ceil((lockoutMs || windowMs) / 1000),
+        String(lockoutUntil),
+      );
+    }
 
     return {
       allowed: false,
@@ -182,13 +194,15 @@ export async function recordFailedAttempt(
 
 export async function clearRateLimit(
   identifier: string,
-  options: RedisRateLimitOptions = {},
+  options: Partial<RedisRateLimitOptions> = {},
 ): Promise<void> {
-  const { keyPrefix = "ratelimit" } = options;
+  const keyPrefix = options.keyPrefix ?? DEFAULT_OPTIONS.keyPrefix;
 
   if (!isRedisConnected()) return;
 
   const client = getRedisClient();
+  if (!client) return;
+
   const lockoutKey = getLockoutKey(keyPrefix, identifier);
 
   try {
@@ -202,8 +216,7 @@ export async function clearRateLimit(
   } catch (err) {
     logger.logError(
       err instanceof Error ? err : new Error(String(err)),
-      "Failed to clear rate limit",
-      { identifier },
+      { identifier, op: "clear" },
     );
   }
 }
