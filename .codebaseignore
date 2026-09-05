@@ -1,0 +1,72 @@
+# .codebaseignore — keep AI code-context focused on the *app*, not on the 25k skill/rule files
+#
+# The 6 installed skill/rule repos under .skills-repos/ collectively contain
+# ~24,889 files / ~11,519 dirs. Trae's Grep/SearchCodebase/experience scans, and
+# downstream AI context builders, should NOT by-default walk these, because:
+#   1) they are prompt-engineering rules, not application code;
+#   2) their sheer size would swamp app-code context and slow every search;
+#   3) they are consulted explicitly via .skills-repos/skills-installed.json
+#      priority paths only when the user's task matches a SKILL.md / rule.
+#
+# Any future tooling that honors .codebaseignore semantics should skip patterns
+# below. If a tool does NOT honor this file, apply equivalent exclusions at the
+# tool boundary (e.g. Grep path prefix = app source folders only, SearchCodebase
+# target_directories = [components|app|lib|…]).
+
+# -----------------------------------------------------------------------------
+# 1) The whole skills folder tree is rules, not application code.
+# -----------------------------------------------------------------------------
+.skills-repos/
+
+# -----------------------------------------------------------------------------
+# 2) Usual node-level noise (defense in depth — some skill repos ship these
+#    and we never want them in app-code context even outside .skills-repos).
+# -----------------------------------------------------------------------------
+node_modules/
+dist/
+build/
+.next/
+.nuxt/
+.turbo/
+.cache/
+.parcel-cache/
+
+# -----------------------------------------------------------------------------
+# 3) Lockfiles / binaries / large serialized outputs in ANY folder.
+# -----------------------------------------------------------------------------
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+bun.lockb
+*.log
+*.sqlite
+*.db
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.ico
+*.woff
+*.woff2
+*.ttf
+*.eot
+*.otf
+*.mp4
+*.mp3
+*.wav
+*.zip
+*.tar
+*.gz
+*.tgz
+
+# -----------------------------------------------------------------------------
+# 4) Tooling config / test snapshots we do NOT need to reason about app code.
+# -----------------------------------------------------------------------------
+coverage/
+.nyc_output/
+snapshots/
+__snapshots__/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

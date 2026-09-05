@@ -1,0 +1,239 @@
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+/* Extra-small breakpoint for map controls */
+@theme {
+  --breakpoint-xs: 400px;
+  --font-sans: var(--font-hind-siliguri), ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+.leaflet-container {
+  font-family: inherit;
+}
+
+.custom-popup .leaflet-popup-content-wrapper {
+  border-radius: 20px;
+  padding: 0;
+  overflow: hidden;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+/* Ensure popups render ABOVE the search bar (z-[1002]) and other overlays */
+.leaflet-popup {
+  z-index: 1100 !important;
+}
+
+/* Phone: fluid width that never overflows small screens.
+   !important beats the inline width Leaflet's JS sets on the element. */
+.custom-popup .leaflet-popup-content {
+  margin: 0;
+  padding: 10px 12px;
+  width: min(232px, calc(100vw - 72px)) !important;
+  max-width: calc(100vw - 72px) !important;
+  line-height: 1.45;
+}
+
+/* PC / tablet: comfortable fixed width with roomier padding */
+@media (min-width: 640px) {
+  .custom-popup .leaflet-popup-content {
+    width: 276px !important;
+    max-width: 276px !important;
+    padding: 12px 14px;
+  }
+}
+
+/* Bigger close button — easy to tap on phones */
+.custom-popup .leaflet-popup-close-button {
+  width: 28px !important;
+  height: 28px !important;
+  font-size: 18px !important;
+  line-height: 28px !important;
+  top: 4px !important;
+  right: 6px !important;
+  color: #64748b !important;
+}
+
+.custom-popup .leaflet-popup-tip-container {
+  display: none;
+}
+
+.label-popup .leaflet-popup-content-wrapper {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(4px);
+  border-radius: 8px;
+  padding: 2px 8px;
+  box-shadow: none;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.label-popup .leaflet-popup-content {
+  margin: 0;
+}
+
+.label-popup .leaflet-popup-tip-container {
+  display: none;
+}
+
+/* Chatbot heartbeat pulse animation */
+@keyframes chatbot-heartbeat {
+  0%, 100% { transform: scale(1); }
+  12% { transform: scale(1.08); }
+  20% { transform: scale(1); }
+  32% { transform: scale(1.05); }
+  40% { transform: scale(1); }
+}
+
+/* Chatbot hint message fade */
+@keyframes hint-fade {
+  0% { opacity: 0; transform: translateY(6px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Hero title rotation fade */
+@keyframes fadeIn {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* Voice call wave bars */
+@keyframes voice-wave {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+
+/* Pulsing animation for the user-location GPS dot. */
+@keyframes userloc-ping {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.7;
+  }
+  80%,
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+/* Skeleton shimmer animation */
+@keyframes skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(226, 232, 240, 0.6) 25%,
+    rgba(203, 213, 225, 0.8) 37%,
+    rgba(226, 232, 240, 0.6) 63%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+/* ── Blood Drop loading animation ─────────────────────────────── */
+
+/* Liquid fills the drop from bottom to top, holds, then drains. */
+@keyframes blood-fill {
+  0% { transform: translateY(120%); }
+  38% { transform: translateY(0); }
+  55%, 80% { transform: translateY(0); }
+  100% { transform: translateY(120%); }
+}
+
+/* Gentle heartbeat pulse on the drop itself. */
+@keyframes blood-pulse {
+  0%, 100% { transform: scale(1); }
+  32% { transform: scale(1.06); }
+  58% { transform: scale(0.98); }
+}
+
+/* A tiny bead drips off the tip while the liquid drains. */
+@keyframes blood-drip {
+  0% { transform: translateY(-2px) scale(0.9); opacity: 0; }
+  12% { opacity: 1; }
+  60% { transform: translateY(10px) scale(0.95); opacity: 1; }
+  100% { transform: translateY(14px) scale(0.8); opacity: 0; }
+}
+
+/* Expanding radar ring behind the drop. */
+@keyframes blood-ripple {
+  0% { transform: scale(0.35); opacity: 0.8; }
+  100% { transform: scale(1.7); opacity: 0; }
+}
+
+/* Trailing progress bar sweeping under the label. */
+@keyframes blood-progress {
+  0% { transform: translateX(-100%); }
+  50% { transform: translateX(0); }
+  100% { transform: translateX(100%); }
+}
+
+/* Three bouncing dots beside the loading label. */
+@keyframes blood-dot {
+  0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+  40% { transform: translateY(-4px); opacity: 1; }
+}
+
+.blood-drop-svg {
+  animation: blood-pulse 2.6s ease-in-out infinite;
+}
+
+.blood-drop-fill {
+  animation: blood-fill 2.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+.blood-drop-bead {
+  animation: blood-drip 2.6s ease-in-out infinite;
+}
+
+.blood-ripple-ring {
+  animation: blood-ripple 2.6s ease-out infinite;
+}
+
+.blood-progress-track {
+  position: relative;
+  overflow: hidden;
+}
+.blood-progress-track::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 50%;
+  background: linear-gradient(90deg, transparent, #dc2626, transparent);
+  animation: blood-progress 2.6s ease-in-out infinite;
+}
+
+.blood-loading-dot {
+  animation: blood-dot 1.4s ease-in-out infinite;
+}
+
+/* DivIcon markers should not show a default white background. */
+.blood-request-pin,
+.donor-cluster-pin,
+.user-location-pin {
+  background: transparent;
+  border: none;
+}
+
+/* Direction tooltip on blood request markers */
+.direction-tooltip {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.direction-tooltip::before {
+  display: none !important;
+}

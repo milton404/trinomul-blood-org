@@ -1,0 +1,105 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "next build",
+  "devCommand": "next dev",
+  "installCommand": "npm install",
+  "outputDirectory": ".next",
+  "regions": ["sin1"],
+  "functions": {
+    "app/api/health/route.ts": {
+      "maxDuration": 10
+    },
+    "app/api/auth/login/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/auth/register/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/blood-requests/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/ai/insights/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/ai/forecast/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/ai/anomaly/route.ts": {
+      "maxDuration": 60
+    },
+    "app/api/voice-chat/route.ts": {
+      "maxDuration": 300
+    },
+    "app/api/admin/bulk-*/**/*.ts": {
+      "maxDuration": 30
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/health",
+      "schedule": "*/5 * * * *"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "X-XSS-Protection", "value": "1; mode=block" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(self), geolocation=(self)" },
+        { "key": "X-DNS-Prefetch-Control", "value": "on" },
+        { "key": "Strict-Transport-Security", "value": "max-age=63072000; includeSubDomains; preload" }
+      ]
+    },
+    {
+      "source": "/sw.js",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" },
+        { "key": "Service-Worker-Allowed", "value": "/" }
+      ]
+    },
+    {
+      "source": "/manifest.json",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=86400" }
+      ]
+    },
+    {
+      "source": "/icons/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/admin",
+      "destination": "/en/admin",
+      "permanent": false
+    },
+    {
+      "source": "/login",
+      "destination": "/en/login",
+      "permanent": false
+    },
+    {
+      "source": "/register",
+      "destination": "/en/register",
+      "permanent": false
+    },
+    {
+      "source": "/profile",
+      "destination": "/en/profile",
+      "permanent": false
+    }
+  ],
+  "cleanUrls": true,
+  "trailingSlash": false,
+  "github": {
+    "silent": false,
+    "autoAlias": true
+  }
+}
