@@ -1,20 +1,29 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Trinomul Blood Bank — Rangpur
 
-# Run and deploy your AI Studio app
+A blood bank and donor management platform for Rangpur, Bangladesh. Donor registration and search, blood requests, donor leaderboard, community feed, admin panel, and bilingual interface (English / Bangla).
 
-This contains everything you need to run your app locally.
+## Tech Stack
 
-View your app in AI Studio: https://ai.studio/apps/9895be3d-8767-40c2-a4ea-deda5961a2f5
+- Next.js 16 (App Router) + React 19 + TypeScript
+- Tailwind CSS 4
+- Supabase (PostgreSQL) with custom JWT auth
+- Cloudinary (photo uploads), Resend (transactional email)
+- PWA via Serwist, i18n via next-intl
 
 ## Run Locally
 
-**Prerequisites:**  Node.js
-
+**Prerequisites:** Node.js 20+
 
 1. Install dependencies:
    `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+2. Copy `.env.example` to `.env` and fill in the values (`DATABASE_URL`, `AUTH_SECRET`, etc. — see comments in the file)
 3. Run the app:
-   `npm run dev`
+   `npm run dev` → http://localhost:3000
+
+## Deploy
+
+Hosted on Vercel — every push to `main` auto-deploys to production. Deployment config lives in `vercel.json` (Singapore region, security headers, redirects, cron).
+
+## Mobile App
+
+`mobile-app/` contains the Expo (React Native) app.
