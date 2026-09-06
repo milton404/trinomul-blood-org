@@ -1,4 +1,17 @@
-export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://trinomul.org").replace(/\/$/, "");
+function resolveSiteUrl(): string {
+  const raw = (process.env.NEXT_PUBLIC_SITE_URL || "https://trinomul.org")
+    .trim()
+    .replace(/^["']|["']$/g, "")
+    .replace(/\/$/, "");
+  try {
+    new URL(raw);
+    return raw;
+  } catch {
+    return "https://trinomul.org";
+  }
+}
+
+export const SITE_URL = resolveSiteUrl();
 
 export const SITE_NAME = "Trinomul Blood Bank Rangpur";
 export const SITE_NAME_SHORT = "Trinomul";
