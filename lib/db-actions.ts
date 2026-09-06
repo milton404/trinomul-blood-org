@@ -1553,6 +1553,99 @@ export async function getDonorsWithStatsPg() {
   });
 }
 
+export async function getDonorByIdWithStatsPg(id: number) {
+  const { rows } = await pgQuery(
+    `
+    WITH per_type AS (
+      SELECT donor_id,
+        MAX(CASE WHEN donation_type = 'whole_blood' OR donation_type IS NULL THEN donation_date END) as last_wb,
+        MAX(CASE WHEN donation_type = 'platelets' THEN donation_date END) as last_pl,
+        MAX(CASE WHEN donation_type = 'plasma' THEN donation_date END) as last_pm
+      FROM donations GROUP BY donor_id
+    ),
+    donor_stats AS (
+      SELECT donor_id, COUNT(*) as donation_count, SUM(units) as unit_count, MAX(donation_date) as last_donation
+      FROM donations GROUP BY donor_id
+    ),
+    ref_stats AS (
+      SELECT referrer_profile_id, COUNT(*) as referral_count
+      FROM donations WHERE referrer_profile_id IS NOT NULL
+      GROUP BY referrer_profile_id
+    )
+    SELECT p.*,
+      COALESCE(ds.donation_count, 0) as total_donations,
+      COALESCE(ds.unit_count, 0) as total_units,
+      ds.last_donation as donation_last_date,
+      COALESCE(p.last_donation_type, 'whole_blood') as donation_type,
+      COALESCE(pt.last_wb::text, CASE WHEN NULLIF(p.last_donation_date,'') IS NOT NULL AND COALESCE(p.last_donation_type,'whole_blood') = 'whole_blood' THEN p.last_donation_date END) as eff_last_wb,
+      COALESCE(pt.last_pl::text, CASE WHEN NULLIF(p.last_donation_date,'') IS NOT NULL AND p.last_donation_type = 'platelets' THEN p.last_donation_date END) as eff_last_pl,
+      COALESCE(pt.last_pm::text, CASE WHEN NULLIF(p.last_donation_date,'') IS NOT NULL AND p.last_donation_type = 'plasma' THEN p.last_donation_date END) as eff_last_pm,
+      COALESCE(r.referral_count, 0) as referral_count
+    FROM profiles p
+    LEFT JOIN per_type pt ON p.id = pt.donor_id
+    LEFT JOIN donor_stats ds ON p.id = ds.donor_id
+    LEFT JOIN ref_stats r ON p.id = r.referrer_profile_id
+    WHERE p.id = $1 AND p.role = 'donor'
+  `,
+    [id],
+  );
+
+  if (rows.length === 0) return null;
+  const d: any = rows[0];
+  const daysWb = daysSinceDonation(d.eff_last_wb);
+  const daysPl = daysSinceDonation(d.eff_last_pl);
+  const daysPm = daysSinceDonation(d.eff_last_pm);
+  const eligible_whole_blood = daysWb == null || daysWb >= 90;
+  const eligible_platelets = daysPl == null || daysPl >= 14;
+  const eligible_plasma = daysPm == null || daysPm >= 30;
+  const eligible_types_count =
+    (eligible_whole_blood ? 1 : 0) + (eligible_platelets ? 1 : 0) + (eligible_plasma ? 1 : 0);
+
+  let next_eligible_date: string | null = null;
+  if (eligible_types_count === 0) {
+    const candidates: Date[] = [];
+    if (d.eff_last_wb) candidates.push(new Date(new Date(d.eff_last_wb).getTime() + 90 * 86_400_000));
+    if (d.eff_last_pl) candidates.push(new Date(new Date(d.eff_last_pl).getTime() + 14 * 86_400_000));
+    if (d.eff_last_pm) candidates.push(new Date(new Date(d.eff_last_pm).getTime() + 30 * 86_400_000));
+    const min = candidates
+      .filter((c) => !isNaN(c.getTime()))
+      .sort((a, b) => a.getTime() - b.getTime())[0];
+    next_eligible_date = min ? min.toISOString().slice(0, 10) : null;
+  }
+
+  const hb_status =
+    d.hb_level == null
+      ? "not_tested"
+      : (d.sex === "female" && d.hb_level < 12.5) || (d.sex !== "female" && d.hb_level < 13.0)
+        ? "low_hb"
+        : "eligible";
+
+  const coords = resolveCoordsLocal(null, null, d.district, d.upazila, d.union_name);
+
+  return {
+    ...d,
+    donation_last_date: d.donation_last_date ? new Date(d.donation_last_date).toISOString() : null,
+    is_active: d.is_active === true,
+    is_eligible: eligible_types_count > 0,
+    eligible_whole_blood,
+    eligible_platelets,
+    eligible_plasma,
+    eligible_types_count,
+    total_referrals: d.referral_count || 0,
+    next_eligible_date,
+    hb_status,
+    badges: computeBadgesLocal(d.total_donations || 0, d.referral_count || 0),
+    lat: coords.lat,
+    lng: coords.lng,
+  };
+}
+
+export async function serverGetDonorByIdWithStats(id: number) {
+  if (isSupabaseAvailable()) return getDonorByIdWithStatsPg(id);
+  const all = getDonorsWithStats();
+  return all.find((d: any) => d.id === id) || null;
+}
+
 export async function serverGetTopDonors(limit: number = 20) {
   if (isSupabaseAvailable()) {
     const { rows } = await pgQuery(

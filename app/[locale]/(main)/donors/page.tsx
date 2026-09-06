@@ -32,6 +32,7 @@ import ModernSelect, { type SelectOption } from "@/components/ui/ModernSelect";
 import { useLocale } from "next-intl";
 import { fetchDonorsData } from "@/lib/public-reads";
 import { serverParseSearchQuery } from "@/lib/ai/search-parser";
+
 import { useUserLocation, haversineKm } from "@/hooks/use-user-location";
 import AiThinkingBadge from "@/components/common/AiThinkingBadge";
 import {
@@ -234,15 +235,29 @@ function DonorsContent() {
 
   // When the URL has ?donor=ID (e.g. from a shared link), find that donor
   // in the fetched list and pop up a detail modal with a close button.
+  // If the donor isn't in the list (filtered out by eligibility/active filters),
+  // fetch the donor directly by ID so the shared link always works.
   useEffect(() => {
     const donorId = searchParams.get("donor");
-    if (!donorId || isLoading || donors.length === 0) {
+    if (!donorId) {
       setHighlightDonor(null);
       return;
     }
+    if (isLoading) return;
     const numericId = Number(donorId);
     const found = donors.find((d) => d.id === numericId);
-    setHighlightDonor(found || null);
+    if (found) {
+      setHighlightDonor(found);
+    } else if (donors.length > 0) {
+      let cancelled = false;
+      fetch(`/api/donors/${numericId}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((d) => {
+          if (!cancelled && d && !d.error) setHighlightDonor(d);
+        })
+        .catch(() => {});
+      return () => { cancelled = true; };
+    }
   }, [searchParams, donors, isLoading]);
 
   const closeDonorModal = () => {
