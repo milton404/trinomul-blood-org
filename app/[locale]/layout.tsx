@@ -58,7 +58,7 @@ export async function generateMetadata({
       apple: '/apple-touch-icon.png',
 
     },
-    manifest: '/manifest.json',
+    manifest: '/manifest.webmanifest',
     openGraph: {
       type: 'website',
       url: `${SITE_URL}/${locale}`,
