@@ -360,7 +360,14 @@
     "image_left": "Move left",
     "image_right": "Move right",
     "image_down": "Move down",
-    "image_reset": "Reset position"
+    "image_reset": "Reset position",
+    "hb_level": "Hemoglobin Level (g/dL)",
+    "hb_hint": "Optional — below 12.5 (female) or 13.0 (male) temporarily defers you",
+    "last_hb_test_date": "Last Hb Test Date",
+    "hb_reminder_title": "Hb Test Reminder",
+    "hb_reminder_body": "Please get your hemoglobin level tested before your next donation, then update it in your profile.",
+    "email": "Email",
+    "emergency_contact_hint": "For emergency situations"
   },
   "request": {
     "title": "Request Blood",
