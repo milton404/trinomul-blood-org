@@ -5,6 +5,10 @@ import { validateSupabaseConfig, testSupabaseConnection, isSupabaseAvailable } f
 import { checkRedisHealth, isRedisConnected, isRedisAvailable } from "@/lib/redis";
 import { getMigrationStatus } from "@/lib/migrations";
 import { runRequestLifecycleSweep, purgeOldArchivedRequests } from "@/lib/db";
+import {
+  runRequestLifecycleSweepPg,
+  purgeOldArchivedRequestsPg,
+} from "@/lib/pg/requests";
 
 const logger = createLogger("health");
 
@@ -22,8 +26,15 @@ export async function GET(request: NextRequest) {
   // when there is no traffic.
   let maintenance = { archived: 0, purged: 0 };
   try {
-    const archived = runRequestLifecycleSweep();
-    const purged = purgeOldArchivedRequests(48);
+    let archived: number;
+    let purged: number;
+    if (isSupabaseAvailable()) {
+      archived = await runRequestLifecycleSweepPg();
+      purged = await purgeOldArchivedRequestsPg(48);
+    } else {
+      archived = runRequestLifecycleSweep();
+      purged = purgeOldArchivedRequests(48);
+    }
     if (archived || purged) {
       maintenance = { archived, purged };
       logger.info("Lifecycle maintenance", { archived, purged });

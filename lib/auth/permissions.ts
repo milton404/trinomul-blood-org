@@ -1,5 +1,6 @@
 import { getSession } from "./session";
 import { getProfileByUserId } from "../db";
+import { isSupabaseAvailable, query as pgQuery } from "@/lib/supabase/client";
 import { RANGPUR_DISTRICTS } from "@/lib/constants/rangpur";
 
 /**
@@ -54,8 +55,14 @@ export async function getAdminContext(): Promise<AdminContext | null> {
   if (!session) return null;
   if (session.role !== "admin" && session.role !== "super_admin") return null;
 
-  const profile = (await getProfileByUserId(Number(session.sub))) as any;
-  if (!profile || profile.is_active === 0) return null;
+  let profile: any;
+  if (isSupabaseAvailable()) {
+    const { rows } = await pgQuery("SELECT * FROM profiles WHERE id = $1", [Number(session.sub)]);
+    profile = rows[0] || null;
+  } else {
+    profile = await getProfileByUserId(Number(session.sub));
+  }
+  if (!profile || profile.is_active === 0 || profile.is_active === false) return null;
 
   const assignedDistrict: string | null =
     session.role === "admin" ? profile.assigned_district || null : null;

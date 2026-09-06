@@ -144,6 +144,21 @@ import {
   getEmailSettingInt,
 } from "./email/template-settings";
 import { isSupabaseAvailable, query as pgQuery } from "@/lib/supabase/client";
+import {
+  getVisibleBloodRequestsPg,
+  getActiveBloodRequestsPg,
+  getAllBloodRequestsPg,
+  getBloodRequestByIdPg,
+  getBloodRequestByTrackingCodePg,
+  createBloodRequestPg,
+  runRequestLifecycleSweepPg,
+  purgeOldArchivedRequestsPg,
+  getHomepageStatsPg,
+  getPublicTransparencyStatsPg,
+  getDonorOfTheMonthPg,
+  getDonationImpactStatsPg,
+  getTopReferrersPg,
+} from "@/lib/pg/requests";
 
 // Profile actions
 export async function serverGetProfileByUserId(userId: number) {
@@ -579,10 +594,12 @@ export async function serverSetAdminAssignment(
 
 // Blood Request actions
 export async function serverGetActiveBloodRequests(limit?: number) {
+  if (isSupabaseAvailable()) return getActiveBloodRequestsPg(limit);
   return getActiveBloodRequests(limit);
 }
 
 export async function serverGetAllBloodRequests() {
+  if (isSupabaseAvailable()) return getAllBloodRequestsPg();
   return getAllBloodRequests();
 }
 
@@ -598,11 +615,14 @@ export async function serverSearchBloodRequests(filters?: {
 }
 
 export async function serverCreateBloodRequest(request: Record<string, any>) {
-  const requestId = dbCreateBloodRequest(request);
+  const usePg = isSupabaseAvailable();
+  const requestId = usePg
+    ? await createBloodRequestPg(request)
+    : dbCreateBloodRequest(request);
 
   setTimeout(async () => {
     try {
-      const req = (await getBloodRequestById(requestId)) as any;
+      const req = (await (usePg ? serverGetBloodRequestById(requestId) : getBloodRequestById(requestId))) as any;
       if (!req) return;
       const result = await serverTranslateShareText({
         patient_name: req.patient_name,
@@ -964,6 +984,7 @@ export async function serverGetAnalyticsStats() {
 }
 
 export async function serverGetDonorsWithStats() {
+  if (isSupabaseAvailable()) return getDonorsWithStatsPg();
   return getDonorsWithStats();
 }
 
@@ -984,6 +1005,7 @@ export async function serverGetWeeklyStats(weeks?: number) {
 }
 
 export async function serverGetHomepageStats() {
+  if (isSupabaseAvailable()) return getHomepageStatsPg();
   return getHomepageStats();
 }
 
@@ -1053,10 +1075,12 @@ export async function serverGetStatusLogs(requestId: number) {
 }
 
 export async function serverGetBloodRequestByTrackingCode(code: string) {
+  if (isSupabaseAvailable()) return getBloodRequestByTrackingCodePg(code);
   return getBloodRequestByTrackingCode(code);
 }
 
 export async function serverGetBloodRequestById(id: number) {
+  if (isSupabaseAvailable()) return getBloodRequestByIdPg(id);
   return getBloodRequestById(id);
 }
 
@@ -1068,6 +1092,7 @@ export async function serverGetBloodRequestById(id: number) {
  */
 export async function serverRunLifecycleSweep(): Promise<number> {
   try {
+    if (isSupabaseAvailable()) return await runRequestLifecycleSweepPg();
     return runRequestLifecycleSweep();
   } catch {
     return 0;
@@ -1079,6 +1104,7 @@ export async function serverPurgeOldArchivedRequests(
   retentionHours: number = 48,
 ): Promise<number> {
   try {
+    if (isSupabaseAvailable()) return await purgeOldArchivedRequestsPg(retentionHours);
     return purgeOldArchivedRequests(retentionHours);
   } catch {
     return 0;
@@ -1092,6 +1118,7 @@ export async function serverGenerateTrackingCode() {
 // ── Phase 5.1: Public Transparency Dashboard ──────────────────────────
 
 export async function serverGetPublicTransparencyStats() {
+  if (isSupabaseAvailable()) return getPublicTransparencyStatsPg();
   return getPublicTransparencyStats();
 }
 
@@ -1286,10 +1313,12 @@ export async function serverGetTopDonors(limit: number = 20) {
 }
 
 export async function serverGetDonorOfTheMonth() {
+  if (isSupabaseAvailable()) return getDonorOfTheMonthPg();
   return getDonorOfTheMonth();
 }
 
 export async function serverGetDonationImpactStats() {
+  if (isSupabaseAvailable()) return getDonationImpactStatsPg();
   return getDonationImpactStats();
 }
 
@@ -2319,6 +2348,7 @@ export async function serverAdminCreateBloodRequest(
 
 /** Top referrers leaderboard (registered users + free-text helpers). */
 export async function serverGetTopReferrers(limit: number = 20) {
+  if (isSupabaseAvailable()) return getTopReferrersPg(limit);
   return getTopReferrers(limit);
 }
 

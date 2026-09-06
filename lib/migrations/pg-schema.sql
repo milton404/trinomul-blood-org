@@ -132,6 +132,7 @@ CREATE TABLE IF NOT EXISTS blood_requests (
   tracking_code TEXT UNIQUE,
   current_status TEXT NOT NULL DEFAULT 'submitted',
   boosted_at TEXT,
+  view_count INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

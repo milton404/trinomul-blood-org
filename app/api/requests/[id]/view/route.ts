@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { incrementRequestView } from "@/lib/db";
+import { isSupabaseAvailable } from "@/lib/supabase/client";
+import { incrementRequestViewPg } from "@/lib/pg/requests";
 
 export const dynamic = "force-dynamic";
 
@@ -12,7 +14,9 @@ export async function POST(
   if (!Number.isFinite(numericId) || numericId <= 0) {
     return NextResponse.json({ error: "Invalid id" }, { status: 400 });
   }
-  const changes = incrementRequestView(numericId);
+  const changes = isSupabaseAvailable()
+    ? await incrementRequestViewPg(numericId)
+    : incrementRequestView(numericId);
   if (changes === 0) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }

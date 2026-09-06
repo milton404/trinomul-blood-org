@@ -1,15 +1,23 @@
 import { NextResponse } from "next/server";
+import { isSupabaseAvailable } from "@/lib/supabase/client";
 import {
   getVisibleBloodRequests,
   createBloodRequest,
   getBloodRequestById,
 } from "@/lib/db";
+import {
+  getVisibleBloodRequestsPg,
+  createBloodRequestPg,
+  getBloodRequestByIdPg,
+} from "@/lib/pg/requests";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const requests = getVisibleBloodRequests();
+    const requests = isSupabaseAvailable()
+      ? await getVisibleBloodRequestsPg()
+      : getVisibleBloodRequests();
     return NextResponse.json(requests);
   } catch (err) {
     console.error("[api/requests]", err);
@@ -24,7 +32,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    const requestId = createBloodRequest({
+    const input = {
       requesterId: body.requesterId ?? null,
       requesterType: body.requesterType ?? "guest",
       patientName: body.patientName,
@@ -50,9 +58,17 @@ export async function POST(req: Request) {
       status: "active",
       ipAddress: body.ipAddress ?? null,
       userAgent: body.userAgent ?? "mobile-app",
-    });
+    };
 
-    const created = getBloodRequestById(requestId);
+    let requestId: number;
+    let created: Record<string, any> | null;
+    if (isSupabaseAvailable()) {
+      requestId = await createBloodRequestPg(input);
+      created = (await getBloodRequestByIdPg(requestId)) as any;
+    } else {
+      requestId = createBloodRequest(input);
+      created = getBloodRequestById(requestId) as any;
+    }
 
     return NextResponse.json({
       id: requestId,

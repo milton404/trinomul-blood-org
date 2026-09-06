@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { getProfileByEmail } from "@/lib/db";
+import { isSupabaseAvailable, query as pgQuery } from "@/lib/supabase/client";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +12,16 @@ export async function GET() {
       return NextResponse.json({ user: null });
     }
 
-    const profile = getProfileByEmail(session.email) as Record<string, unknown> | undefined;
+    let profile: Record<string, unknown> | undefined;
+    if (isSupabaseAvailable()) {
+      const { rows } = await pgQuery(
+        "SELECT * FROM profiles WHERE email = $1",
+        [session.email],
+      );
+      profile = rows[0] as Record<string, unknown> | undefined;
+    } else {
+      profile = getProfileByEmail(session.email) as Record<string, unknown> | undefined;
+    }
     if (!profile) {
       return NextResponse.json({ user: null });
     }
