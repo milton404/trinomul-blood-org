@@ -4,6 +4,7 @@ import path from "path";
 import {
   RANGPUR_DISTRICTS,
   RANGPUR_UPAZILAS,
+  RANGPUR_UNIONS,
 } from "@/lib/constants/rangpur";
 import { toValidBangladeshCoordinates } from "@/lib/location-coordinates";
 import { rankDonorCandidates } from "@/lib/donor-ranking";
@@ -24,26 +25,40 @@ function resolveCoords(
   lng: number | null | undefined,
   districtName?: string,
   upazilaName?: string,
+  unionName?: string,
 ): { lat: number; lng: number } {
   const exactCoords = toValidBangladeshCoordinates(lat, lng);
   if (exactCoords) {
     return exactCoords;
   }
-  // Try upazila match by name (EN or BN), case-insensitive
+  // Try union match by id, name (EN or BN), case-insensitive
+  if (unionName) {
+    const lower = unionName.toLowerCase();
+    const union = RANGPUR_UNIONS.find(
+      (u) =>
+        u.id === lower ||
+        u.name_en.toLowerCase() === lower ||
+        u.name_bn === unionName,
+    );
+    if (union) return { lat: union.lat, lng: union.lng };
+  }
+  // Try upazila match by id, name (EN or BN), case-insensitive
   if (upazilaName) {
     const lower = upazilaName.toLowerCase();
     const upazila = RANGPUR_UPAZILAS.find(
       (u) =>
+        u.id === lower ||
         u.name_en.toLowerCase() === lower ||
         u.name_bn === upazilaName,
     );
     if (upazila) return { lat: upazila.lat, lng: upazila.lng };
   }
-  // Try district match by name (EN or BN), case-insensitive
+  // Try district match by id, name (EN or BN), case-insensitive
   if (districtName) {
     const lower = districtName.toLowerCase();
     const district = RANGPUR_DISTRICTS.find(
       (d) =>
+        d.id === lower ||
         d.name_en.toLowerCase() === lower ||
         d.name_bn === districtName,
     );
@@ -62,12 +77,13 @@ function resolveDonorCoords(
   storedLng?: number | null,
   upazilaName?: string,
   districtName?: string,
+  unionName?: string,
 ): { lat: number; lng: number } {
   const exactCoords = toValidBangladeshCoordinates(storedLat, storedLng);
   if (exactCoords) {
     return exactCoords;
   }
-  return resolveCoords(null, null, districtName, upazilaName);
+  return resolveCoords(null, null, districtName, upazilaName, unionName);
 }
 
 export const DONATION_COOLDOWN_DAYS = 120;
@@ -1685,6 +1701,7 @@ export function createBloodRequest(request: Record<string, any>) {
     request.lng,
     request.district,
     request.upazila,
+    request.unionName,
   );
   // Generate a unique tracking code for public status tracking.
   let trackingCode = generateTrackingCode();
@@ -2469,6 +2486,7 @@ export function findMatchingDonors(
         d.lng,
         d.upazila,
         d.district,
+        d.union_name,
       );
       const distance = haversineKm(
         reqCoords.lat,
@@ -3505,7 +3523,7 @@ export function getDonorsWithStats() {
     .all() as any[];
 
   return donors.map((d: any) => {
-    const coords = resolveCoords(null, null, d.district, d.upazila);
+    const coords = resolveCoords(null, null, d.district, d.upazila, d.union_name);
     return {
       ...d,
       is_active: d.is_active === 1,

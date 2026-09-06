@@ -130,7 +130,7 @@ import {
   clearRateLimit,
   incrementRateLimit,
 } from "./auth/rateLimit";
-import { RANGPUR_DISTRICTS, RANGPUR_UPAZILAS } from "./constants/rangpur";
+import { RANGPUR_DISTRICTS, RANGPUR_UPAZILAS, RANGPUR_UNIONS } from "./constants/rangpur";
 import { toValidBangladeshCoordinates } from "./location-coordinates";
 import { callLLM } from "./ai/providers";
 import { hashPassword } from "./auth/password";
@@ -1420,13 +1420,21 @@ function resolveCoordsLocal(
   lng: number | null | undefined,
   districtName?: string | null,
   upazilaName?: string | null,
+  unionName?: string | null,
 ): { lat: number; lng: number } {
   const exactCoords = toValidBangladeshCoordinates(lat, lng);
   if (exactCoords) return exactCoords;
+  if (unionName) {
+    const lower = unionName.toLowerCase();
+    const union = RANGPUR_UNIONS.find(
+      (u) => u.id === lower || u.name_en.toLowerCase() === lower || u.name_bn === unionName,
+    );
+    if (union) return { lat: union.lat, lng: union.lng };
+  }
   if (upazilaName) {
     const lower = upazilaName.toLowerCase();
     const upazila = RANGPUR_UPAZILAS.find(
-      (u) => u.name_en.toLowerCase() === lower || u.name_bn === upazilaName,
+      (u) => u.id === lower || u.name_en.toLowerCase() === lower || u.name_bn === upazilaName,
     );
     if (upazila) return { lat: upazila.lat, lng: upazila.lng };
   }
@@ -1442,6 +1450,7 @@ function resolveCoordsLocal(
   }
   return { lat: 25.7439, lng: 89.2752 };
 }
+
 
 function daysSinceDonation(dateLike: string | Date | null | undefined): number | null {
   if (!dateLike) return null;
@@ -1523,7 +1532,7 @@ export async function getDonorsWithStatsPg() {
           ? "low_hb"
           : "eligible";
 
-    const coords = resolveCoordsLocal(null, null, d.district, d.upazila);
+    const coords = resolveCoordsLocal(null, null, d.district, d.upazila, d.union_name);
 
     return {
       ...d,

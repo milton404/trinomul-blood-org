@@ -9,6 +9,7 @@ import {
 import {
   RANGPUR_DISTRICTS,
   RANGPUR_UPAZILAS,
+  RANGPUR_UNIONS,
 } from "@/lib/constants/rangpur";
 import { toValidBangladeshCoordinates } from "@/lib/location-coordinates";
 
@@ -19,13 +20,21 @@ function resolveCoords(
   lng: number | null | undefined,
   districtName?: string | null,
   upazilaName?: string | null,
+  unionName?: string | null,
 ): { lat: number; lng: number } {
   const exactCoords = toValidBangladeshCoordinates(lat, lng);
   if (exactCoords) return exactCoords;
+  if (unionName) {
+    const lower = unionName.toLowerCase();
+    const union = RANGPUR_UNIONS.find(
+      (u) => u.id === lower || u.name_en.toLowerCase() === lower || u.name_bn === unionName,
+    );
+    if (union) return { lat: union.lat, lng: union.lng };
+  }
   if (upazilaName) {
     const lower = upazilaName.toLowerCase();
     const upazila = RANGPUR_UPAZILAS.find(
-      (u) => u.name_en.toLowerCase() === lower || u.name_bn === upazilaName,
+      (u) => u.id === lower || u.name_en.toLowerCase() === lower || u.name_bn === upazilaName,
     );
     if (upazila) return { lat: upazila.lat, lng: upazila.lng };
   }
@@ -41,6 +50,7 @@ function resolveCoords(
   }
   return { lat: 25.7439, lng: 89.2752 };
 }
+
 
 async function countSql(sql: string, params: unknown[] = []): Promise<number> {
   const { rows } = await query(sql, params);
@@ -875,7 +885,7 @@ export async function findMatchingDonorsPg(
       if (d.blood_group === bloodGroup) { score += 100; reasons.push("exact_blood_match"); }
       else { score += 40; reasons.push("compatible_blood"); }
       if (district && d.district === district) { score += 30; reasons.push("same_district"); }
-      const donorCoords = resolveCoords(d.lat, d.lng, d.upazila, d.district);
+      const donorCoords = resolveCoords(d.lat, d.lng, d.district, d.upazila, d.union_name);
       const distance = haversineKm(reqCoords.lat, reqCoords.lng, donorCoords.lat, donorCoords.lng);
       if (distance < 5) score += 20; else if (distance < 15) score += 15;
       else if (distance < 30) score += 10; else if (distance < 50) score += 5;

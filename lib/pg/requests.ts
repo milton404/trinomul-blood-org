@@ -13,6 +13,7 @@ import {
 import {
   RANGPUR_DISTRICTS,
   RANGPUR_UPAZILAS,
+  RANGPUR_UNIONS,
 } from "@/lib/constants/rangpur";
 import { toValidBangladeshCoordinates } from "@/lib/location-coordinates";
 
@@ -24,13 +25,21 @@ function resolveCoords(
   lng: number | null | undefined,
   districtName?: string,
   upazilaName?: string,
+  unionName?: string,
 ): { lat: number; lng: number } {
   const exactCoords = toValidBangladeshCoordinates(lat, lng);
   if (exactCoords) return exactCoords;
+  if (unionName) {
+    const lower = unionName.toLowerCase();
+    const union = RANGPUR_UNIONS.find(
+      (u) => u.id === lower || u.name_en.toLowerCase() === lower || u.name_bn === unionName,
+    );
+    if (union) return { lat: union.lat, lng: union.lng };
+  }
   if (upazilaName) {
     const lower = upazilaName.toLowerCase();
     const upazila = RANGPUR_UPAZILAS.find(
-      (u) => u.name_en.toLowerCase() === lower || u.name_bn === upazilaName,
+      (u) => u.id === lower || u.name_en.toLowerCase() === lower || u.name_bn === upazilaName,
     );
     if (upazila) return { lat: upazila.lat, lng: upazila.lng };
   }
@@ -209,6 +218,7 @@ export async function createBloodRequestPg(request: Record<string, any>): Promis
     request.lng,
     request.district,
     request.upazila,
+    request.unionName,
   );
 
   let trackingCode = generateTrackingCode();

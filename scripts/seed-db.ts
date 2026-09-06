@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 import {
   RANGPUR_DISTRICTS,
   RANGPUR_UPAZILAS,
+  RANGPUR_UNIONS,
 } from "../lib/constants/rangpur.js";
 
 const RANGPUR_CENTER = { lat: 25.7439, lng: 89.2752 };
@@ -17,11 +18,23 @@ const db = new Database(DB_PATH);
 function resolveCoords(
   districtName?: string,
   upazilaName?: string,
+  unionName?: string,
 ): { lat: number; lng: number } {
+  if (unionName) {
+    const lower = unionName.toLowerCase();
+    const union = RANGPUR_UNIONS.find(
+      (u) =>
+        u.id === lower ||
+        u.name_en.toLowerCase() === lower ||
+        u.name_bn === unionName,
+    );
+    if (union) return { lat: union.lat, lng: union.lng };
+  }
   if (upazilaName) {
     const lower = upazilaName.toLowerCase();
     const upazila = RANGPUR_UPAZILAS.find(
       (u) =>
+        u.id === lower ||
         u.name_en.toLowerCase() === lower ||
         u.name_bn === upazilaName,
     );
@@ -31,6 +44,7 @@ function resolveCoords(
     const lower = districtName.toLowerCase();
     const district = RANGPUR_DISTRICTS.find(
       (d) =>
+        d.id === lower ||
         d.name_en.toLowerCase() === lower ||
         d.name_bn === districtName,
     );

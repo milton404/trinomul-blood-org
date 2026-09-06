@@ -20,6 +20,8 @@ export interface Union {
   upazila_id: string;
   name_en: string;
   name_bn: string;
+  lat: number;
+  lng: number;
 }
 
 export const RANGPUR_DISTRICTS: District[] = [
@@ -125,12 +127,12 @@ export function getUpazilaById(upazilaId: string): Upazila | undefined {
 // Unions under Rangpur Sadar Upazila (per 2022 census: 5 union parishads
 // + Rangpur Cantonment board). Other upazilas have no union breakdown yet.
 export const RANGPUR_SADAR_UNIONS: Union[] = [
-  { id: 'chandanpat', upazila_id: 'rangpur_sadar', name_en: 'Chandanpat', name_bn: 'চন্দনপাট' },
-  { id: 'haridebpur', upazila_id: 'rangpur_sadar', name_en: 'Haridebpur', name_bn: 'হরিদেবপুর' },
-  { id: 'mominpur', upazila_id: 'rangpur_sadar', name_en: 'Mominpur', name_bn: 'মমিনপুর' },
-  { id: 'khaleya', upazila_id: 'rangpur_sadar', name_en: 'Khaleya', name_bn: 'খলেয়া' },
-  { id: 'sabyapushkarni', upazila_id: 'rangpur_sadar', name_en: 'Sabyapushkarni', name_bn: 'সব্যপুষ্কর্ণী' },
-  { id: 'rangpur_cantonment', upazila_id: 'rangpur_sadar', name_en: 'Rangpur Cantonment', name_bn: 'রংপুর ক্যান্টনমেন্ট' },
+  { id: 'chandanpat', upazila_id: 'rangpur_sadar', name_en: 'Chandanpat', name_bn: 'চন্দনপাট', lat: 25.7833, lng: 89.2833 },
+  { id: 'haridebpur', upazila_id: 'rangpur_sadar', name_en: 'Haridebpur', name_bn: 'হরিদেবপুর', lat: 25.6467, lng: 89.2333 },
+  { id: 'mominpur', upazila_id: 'rangpur_sadar', name_en: 'Mominpur', name_bn: 'মমিনপুর', lat: 25.7167, lng: 89.3500 },
+  { id: 'khaleya', upazila_id: 'rangpur_sadar', name_en: 'Khaleya', name_bn: 'খলেয়া', lat: 25.7000, lng: 89.1833 },
+  { id: 'sabyapushkarni', upazila_id: 'rangpur_sadar', name_en: 'Sabyapushkarni', name_bn: 'সব্যপুষ্কর্ণী', lat: 25.8000, lng: 89.2333 },
+  { id: 'rangpur_cantonment', upazila_id: 'rangpur_sadar', name_en: 'Rangpur Cantonment', name_bn: 'রংপুর ক্যান্টনমেন্ট', lat: 25.7333, lng: 89.2667 },
 ];
 
 export const RANGPUR_UNIONS: Union[] = [...RANGPUR_SADAR_UNIONS];
