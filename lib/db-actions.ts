@@ -305,6 +305,38 @@ const PROTECTED_PROFILE_FIELDS = [
   "verification_note",
 ];
 
+const PG_BOOLEAN_COLUMNS = new Set([
+  "is_active",
+  "has_chronic_disease",
+  "show_on_leaderboard",
+  "is_anonymous",
+  "is_approved",
+  "email_opt_in",
+]);
+
+const PG_NUMERIC_COLUMNS = new Set([
+  "weight_kg",
+  "hb_level",
+  "lat",
+  "lng",
+  "patient_hb_level",
+  "response_count",
+  "response_total_ms",
+]);
+
+function coerceProfileValue(key: string, value: any): any {
+  if (PG_BOOLEAN_COLUMNS.has(key)) {
+    if (value === null || value === undefined || value === "") return false;
+    return value === true || value === 1 || value === "1" || value === "true";
+  }
+  if (PG_NUMERIC_COLUMNS.has(key)) {
+    if (value === null || value === undefined || value === "") return null;
+    const n = typeof value === "number" ? value : parseFloat(value);
+    return Number.isNaN(n) ? null : n;
+  }
+  return value === undefined ? null : value;
+}
+
 async function updateProfilePg(id: number, data: Record<string, any>) {
   const keys = Object.keys(data);
   if (keys.length === 0) {
@@ -315,19 +347,22 @@ async function updateProfilePg(id: number, data: Record<string, any>) {
     return rowCount || 0;
   }
   const sets = keys.map((k, i) => `${k} = $${i + 1}`);
-  const params = keys.map((k) => data[k]);
+  const params = keys.map((k) => coerceProfileValue(k, data[k]));
   params.push(id);
   const { rowCount } = await pgQuery(
     `UPDATE profiles SET ${sets.join(", ")}, updated_at = NOW() WHERE id = $${params.length}`,
     params,
   );
   const changes = rowCount || 0;
+  const coerced = Object.fromEntries(
+    keys.map((k) => [k, coerceProfileValue(k, data[k])]),
+  );
 
   if (
     changes > 0 &&
-    data.hb_level != null &&
-    data.role !== "patient" &&
-    data.role !== "hospital"
+    coerced.hb_level != null &&
+    coerced.role !== "patient" &&
+    coerced.role !== "hospital"
   ) {
     const { rows } = await pgQuery(
       "SELECT sex, role, full_name_en FROM profiles WHERE id = $1",
@@ -336,8 +371,8 @@ async function updateProfilePg(id: number, data: Record<string, any>) {
     const profile = rows[0] as any;
     if (profile && profile.role === "donor") {
       const isLow =
-        (profile.sex === "female" && data.hb_level < 12.5) ||
-        (profile.sex !== "female" && data.hb_level < 13.0);
+        (profile.sex === "female" && coerced.hb_level < 12.5) ||
+        (profile.sex !== "female" && coerced.hb_level < 13.0);
       if (isLow) {
         await pgQuery(
           `INSERT INTO activity_log (actor_id, actor_email, action, entity_type, entity_id, details)
@@ -348,7 +383,7 @@ async function updateProfilePg(id: number, data: Record<string, any>) {
             "low_hb_detected",
             "profile",
             String(id),
-            `Donor ${profile.full_name_en || `#${id}`} registered with low Hb: ${data.hb_level} g/dL`,
+            `Donor ${profile.full_name_en || `#${id}`} registered with low Hb: ${coerced.hb_level} g/dL`,
           ],
         );
       }
@@ -1273,7 +1308,7 @@ export async function serverGetDonorAdvice(
   let donationHistory: { donation_date: string; donation_type: string }[] = [];
   if (donorId) {
     try {
-      donationHistory = (getDonationsByDonorId(donorId) as any[]).map((d) => ({
+      donationHistory = ((await serverGetDonationsByDonorId(donorId)) as any[]).map((d) => ({
         donation_date: d.donation_date,
         donation_type: d.donation_type || "whole_blood",
       }));
