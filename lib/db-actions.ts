@@ -142,17 +142,30 @@ import {
   getEmailSettingBool,
   getEmailSettingInt,
 } from "./email/template-settings";
+import { isSupabaseAvailable, query as pgQuery } from "@/lib/supabase/client";
 
 // Profile actions
 export async function serverGetProfileByUserId(userId: number) {
+  if (isSupabaseAvailable()) {
+    const { rows } = await pgQuery("SELECT * FROM profiles WHERE id = $1", [userId]);
+    return rows[0] || null;
+  }
   return getProfileByUserId(userId);
 }
 
 export async function serverGetProfileByEmail(email: string) {
+  if (isSupabaseAvailable()) {
+    const { rows } = await pgQuery("SELECT * FROM profiles WHERE email = $1", [email]);
+    return rows[0] || null;
+  }
   return getProfileByEmail(email);
 }
 
 export async function serverGetProfileByPhone(phone: string) {
+  if (isSupabaseAvailable()) {
+    const { rows } = await pgQuery("SELECT * FROM profiles WHERE phone = $1", [phone]);
+    return rows[0] || null;
+  }
   return getProfileByPhone(phone);
 }
 
@@ -182,8 +195,10 @@ export async function serverQuickCreateDonor(input: {
   if (!fullName) throw new Error("Name is required");
   if (!phone) throw new Error("Phone is required");
 
+  const usePg = isSupabaseAvailable();
+
   // Reuse existing profile by phone — don't create duplicates
-  const existing = (await getProfileByPhone(phone)) as any;
+  const existing = (await (usePg ? serverGetProfileByPhone(phone) : getProfileByPhone(phone))) as any;
   if (existing) {
     return {
       id: existing.id,
@@ -200,35 +215,65 @@ export async function serverQuickCreateDonor(input: {
     ? await hashPassword(input.password)
     : `$2a$10$${Math.random().toString(36).slice(2).padEnd(22, "0")}${Math.random().toString(36).slice(2).padEnd(22, "0")}`;
 
-  const id = dbCreateProfile({
-    email: placeholderEmail,
-    passwordHash: passwordHash,
-    fullNameEn: fullName,
-    fullNameBn: null,
-    phone,
-    bloodGroup: input.bloodGroup,
-    role: "donor",
-    district: input.district || null,
-    upazila: input.upazila || null,
-    hospitalNameEn: null,
-    hospitalNameBn: null,
-    licenseNumber: null,
-    website: null,
-    lat: null,
-    lng: null,
-  });
+  let id: number;
+  if (usePg) {
+    const { rows } = await pgQuery<{ id: number }>(
+      `INSERT INTO profiles (email, password_hash, full_name_en, full_name_bn, phone, blood_group, role, district, upazila)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+      [
+        placeholderEmail,
+        passwordHash,
+        fullName,
+        null,
+        phone,
+        input.bloodGroup,
+        "donor",
+        input.district || null,
+        input.upazila || null,
+      ],
+    );
+    id = rows[0].id;
 
-  try {
-    dbRecordActivityLog({
-      actorId: null,
-      actorEmail: null,
-      action: "donor_quick_created",
-      entityType: "profile",
-      entityId: String(id),
-      details: `Quick-created donor "${fullName}" (${phone}) from donation modal`,
+    try {
+      await pgQuery(
+        `INSERT INTO activity_log (actor_id, actor_email, action, entity_type, entity_id, details)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [null, null, "donor_quick_created", "profile", String(id), `Quick-created donor "${fullName}" (${phone}) from donation modal`],
+      );
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
+  } else {
+    id = dbCreateProfile({
+      email: placeholderEmail,
+      passwordHash: passwordHash,
+      fullNameEn: fullName,
+      fullNameBn: null,
+      phone,
+      bloodGroup: input.bloodGroup,
+      role: "donor",
+      district: input.district || null,
+      upazila: input.upazila || null,
+      hospitalNameEn: null,
+      hospitalNameBn: null,
+      licenseNumber: null,
+      website: null,
+      lat: null,
+      lng: null,
     });
-  } catch (e) {
-    console.error("Failed to record activity log:", e);
+
+    try {
+      dbRecordActivityLog({
+        actorId: null,
+        actorEmail: null,
+        action: "donor_quick_created",
+        entityType: "profile",
+        entityId: String(id),
+        details: `Quick-created donor "${fullName}" (${phone}) from donation modal`,
+      });
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
   }
 
   return {
@@ -260,6 +305,58 @@ const PROTECTED_PROFILE_FIELDS = [
   "verification_note",
 ];
 
+async function updateProfilePg(id: number, data: Record<string, any>) {
+  const keys = Object.keys(data);
+  if (keys.length === 0) {
+    const { rowCount } = await pgQuery(
+      "UPDATE profiles SET updated_at = NOW() WHERE id = $1",
+      [id],
+    );
+    return rowCount || 0;
+  }
+  const sets = keys.map((k, i) => `${k} = $${i + 1}`);
+  const params = keys.map((k) => data[k]);
+  params.push(id);
+  const { rowCount } = await pgQuery(
+    `UPDATE profiles SET ${sets.join(", ")}, updated_at = NOW() WHERE id = $${params.length}`,
+    params,
+  );
+  const changes = rowCount || 0;
+
+  if (
+    changes > 0 &&
+    data.hb_level != null &&
+    data.role !== "patient" &&
+    data.role !== "hospital"
+  ) {
+    const { rows } = await pgQuery(
+      "SELECT sex, role, full_name_en FROM profiles WHERE id = $1",
+      [id],
+    );
+    const profile = rows[0] as any;
+    if (profile && profile.role === "donor") {
+      const isLow =
+        (profile.sex === "female" && data.hb_level < 12.5) ||
+        (profile.sex !== "female" && data.hb_level < 13.0);
+      if (isLow) {
+        await pgQuery(
+          `INSERT INTO activity_log (actor_id, actor_email, action, entity_type, entity_id, details)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [
+            id,
+            "",
+            "low_hb_detected",
+            "profile",
+            String(id),
+            `Donor ${profile.full_name_en || `#${id}`} registered with low Hb: ${data.hb_level} g/dL`,
+          ],
+        );
+      }
+    }
+  }
+  return changes;
+}
+
 export async function serverUpdateProfile(
   id: number,
   data: Record<string, any>,
@@ -267,17 +364,20 @@ export async function serverUpdateProfile(
   const session = await getSession();
   if (!session) throw new Error("Unauthorized");
 
+  const usePg = isSupabaseAvailable();
+
   // Own-profile edit (donor/patient/hospital settings page): allowed, but
   // protected fields are stripped so users can't escalate privileges.
   if (Number(session.sub) === id) {
     const safe = { ...data };
     for (const f of PROTECTED_PROFILE_FIELDS) delete safe[f];
+    if (usePg) return updateProfilePg(id, safe);
     return dbUpdateProfile(id, safe);
   }
 
   // Editing someone else → admin territory.
   const ctx = await requireAdmin();
-  const target = (await getProfileByUserId(id)) as any;
+  const target = (await (usePg ? serverGetProfileByUserId(id) : getProfileByUserId(id))) as any;
   if (!target) throw new Error("Profile not found");
 
   if (ctx.isDistrictAdmin) {
@@ -289,9 +389,11 @@ export async function serverUpdateProfile(
     assertDistrictAllowed(ctx, target.district);
     const safe = { ...data };
     for (const f of PROTECTED_PROFILE_FIELDS) delete safe[f];
+    if (usePg) return updateProfilePg(id, safe);
     return dbUpdateProfile(id, safe);
   }
 
+  if (usePg) return updateProfilePg(id, data);
   return dbUpdateProfile(id, data);
 }
 
@@ -300,6 +402,13 @@ export async function serverGetAllProfiles() {
 }
 
 export async function serverGetProfilesByRole(role: string) {
+  if (isSupabaseAvailable()) {
+    const { rows } = await pgQuery(
+      "SELECT * FROM profiles WHERE role = $1 ORDER BY created_at DESC",
+      [role],
+    );
+    return rows;
+  }
   return getProfilesByRole(role);
 }
 
@@ -600,10 +709,74 @@ export async function serverDeleteRequest(id: number) {
 
 // Donation actions
 export async function serverCreateDonation(donation: Record<string, any>) {
+  if (isSupabaseAvailable()) {
+    const { rows } = await pgQuery(
+      `INSERT INTO donations (donor_id, request_id, blood_group, units, hospital_name, donation_date, donation_type, recipient_type, referrer_profile_id, referrer_name, referrer_phone)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       RETURNING id`,
+      [
+        donation.donorId,
+        donation.requestId ?? null,
+        donation.bloodGroup,
+        donation.units ?? 1,
+        donation.hospitalName ?? null,
+        donation.donationDate,
+        donation.donationType || "whole_blood",
+        donation.recipientType || "Patient",
+        donation.referrerProfileId ?? null,
+        donation.referrerName ?? null,
+        donation.referrerPhone ?? null,
+      ],
+    );
+    const donationId = rows[0].id;
+
+    if (donation.donorId && donation.donationDate) {
+      await pgQuery(
+        `UPDATE profiles
+         SET last_donation_date = $1,
+             last_donation_type = COALESCE($2, 'whole_blood')
+         WHERE id = $3
+           AND ($1 >= COALESCE(NULLIF(last_donation_date, ''), '0000-01-01'))`,
+        [
+          donation.donationDate,
+          donation.donationType || "whole_blood",
+          donation.donorId,
+        ],
+      );
+    }
+
+    const hasReferrer =
+      donation.referrerProfileId != null ||
+      (donation.referrerName && String(donation.referrerName).trim() !== "");
+    if (donation.requestId && hasReferrer) {
+      await pgQuery(
+        `UPDATE blood_requests
+         SET referrer_profile_id = $1,
+             referrer_name = $2,
+             referrer_phone = $3,
+             updated_at = NOW()
+         WHERE id = $4`,
+        [
+          donation.referrerProfileId ?? null,
+          donation.referrerName ?? null,
+          donation.referrerPhone ?? null,
+          donation.requestId,
+        ],
+      );
+    }
+    return donationId;
+  }
   return dbCreateDonation(donation);
 }
 
 export async function serverGetDonationsByDonorId(donorId: number, _cacheBuster?: number) {
+  if (isSupabaseAvailable()) {
+    const { rows } = await pgQuery(
+      "SELECT * FROM donations WHERE donor_id = $1 ORDER BY donation_date DESC",
+      [donorId],
+    );
+    return rows;
+  }
   return getDonationsByDonorId(donorId);
 }
 
@@ -888,7 +1061,62 @@ export async function serverGetPublicTransparencyStats() {
 
 // ── Phase 5.2: Donor Leaderboard & Gamification ───────────────────────
 
+function computeBadgesLocal(count: number, referrals: number = 0): string[] {
+  const badges: string[] = [];
+  if (count >= 1) badges.push("First Drop");
+  if (count >= 3) badges.push("Regular Donor");
+  if (count >= 5) badges.push("Silver");
+  if (count >= 10) badges.push("Gold");
+  if (count >= 25) badges.push("Platinum");
+  if (!count || count === 0) badges.push("Newbie");
+  if (referrals >= 10) badges.push("Super Connector");
+  else if (referrals >= 3) badges.push("Connector");
+  return badges;
+}
+
+const DONOR_CAN_DONATE_TO_LOCAL: Record<string, string[]> = {
+  "O-": ["O-", "O+", "A-", "A+", "B-", "B+", "AB-", "AB+"],
+  "O+": ["O+", "A+", "B+", "AB+"],
+  "A-": ["A-", "A+", "AB-", "AB+"],
+  "A+": ["A+", "AB+"],
+  "B-": ["B-", "B+", "AB-", "AB+"],
+  "B+": ["B+", "AB+"],
+  "AB-": ["AB-", "AB+"],
+  "AB+": ["AB+"],
+};
+
 export async function serverGetTopDonors(limit: number = 20) {
+  if (isSupabaseAvailable()) {
+    const { rows } = await pgQuery(
+      `SELECT
+         p.id,
+         p.full_name_en,
+         p.full_name_bn,
+         p.blood_group,
+         p.district,
+         p.upazila,
+         p.show_on_leaderboard,
+         COALESCE(d.donation_count, 0) as total_donations,
+         COALESCE(d.unit_count, 0) as total_units,
+         d.last_donation as last_donation_date
+       FROM profiles p
+       LEFT JOIN (
+         SELECT donor_id, COUNT(*) as donation_count, SUM(units) as unit_count, MAX(donation_date) as last_donation
+         FROM donations GROUP BY donor_id
+       ) d ON p.id = d.donor_id
+       WHERE p.role = 'donor'
+         AND p.is_active = TRUE
+         AND p.show_on_leaderboard = TRUE
+         AND COALESCE(d.donation_count, 0) > 0
+       ORDER BY total_donations DESC, total_units DESC
+       LIMIT $1`,
+      [limit],
+    );
+    return rows.map((d: any) => ({
+      ...d,
+      badges: computeBadgesLocal(d.total_donations || 0),
+    }));
+  }
   return getTopDonors(limit);
 }
 
@@ -1387,6 +1615,15 @@ export async function serverGetAdminRequests(filters?: {
 
 /** Requests owned by a registered user (profile "My Requests" section). */
 export async function serverGetMyRequests(userId: number) {
+  if (isSupabaseAvailable()) {
+    const { rows } = await pgQuery(
+      `SELECT * FROM blood_requests
+       WHERE requester_id = $1
+       ORDER BY created_at DESC`,
+      [userId],
+    );
+    return rows;
+  }
   return getBloodRequestsByRequester(userId);
 }
 
@@ -1408,10 +1645,26 @@ export async function serverGetHospitalStats(hospitalNameEn: string, hospitalNam
  * (critical > urgent > normal), then newest.
  */
 export async function serverGetRequestsForDonor(donorId: number) {
-  const profile = (await getProfileByUserId(donorId)) as any;
+  const usePg = isSupabaseAvailable();
+  const profile = (await (usePg ? serverGetProfileByUserId(donorId) : getProfileByUserId(donorId))) as any;
   if (!profile?.blood_group) return [];
 
-  const rows = getActiveRequestsForDonor(profile.blood_group, 50);
+  let rows: any[];
+  if (usePg) {
+    const groups = DONOR_CAN_DONATE_TO_LOCAL[profile.blood_group] || [profile.blood_group];
+    const placeholders = groups.map((_, i) => `$${i + 1}`).join(",");
+    const { rows: pgRows } = await pgQuery(
+      `SELECT * FROM blood_requests
+       WHERE archived_at IS NULL AND status = 'active'
+         AND blood_group IN (${placeholders})
+       ORDER BY created_at DESC
+       LIMIT $${groups.length + 1}`,
+      [...groups, 50],
+    );
+    rows = pgRows;
+  } else {
+    rows = getActiveRequestsForDonor(profile.blood_group, 50);
+  }
 
   const districtEntry = RANGPUR_DISTRICTS.find(
     (d) =>
@@ -1436,8 +1689,7 @@ export async function serverGetRequestsForDonor(donorId: number) {
         (r.blood_group === profile.blood_group ? 5 : 0),
     }))
     .sort((a, b) => b._score - a._score)
-    .slice(0, 5)
-    .map(({ _score, ...r }) => r);
+    .slice(0, 5);
 }
 
 /** Units collected so far for a request (fulfillment progress bar). */
@@ -1664,14 +1916,44 @@ export async function serverCreateSavedPatient(patient: {
   if (!patient.name || patient.name.trim().length < 2) {
     throw new Error("Patient name is required");
   }
-  return createSavedPatient({ ...patient, name: patient.name.trim() });
+  const name = patient.name.trim();
+  if (isSupabaseAvailable()) {
+    const { rows } = await pgQuery(
+      `INSERT INTO saved_patients (owner_id, name, age, blood_group, relation, condition_note)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      [
+        patient.ownerId,
+        name,
+        patient.age ?? null,
+        patient.bloodGroup ?? null,
+        patient.relation ?? null,
+        patient.conditionNote ?? null,
+      ],
+    );
+    return rows[0].id;
+  }
+  return createSavedPatient({ ...patient, name });
 }
 
 export async function serverGetSavedPatients(ownerId: number) {
+  if (isSupabaseAvailable()) {
+    const { rows } = await pgQuery(
+      "SELECT * FROM saved_patients WHERE owner_id = $1 ORDER BY created_at ASC",
+      [ownerId],
+    );
+    return rows;
+  }
   return getSavedPatients(ownerId);
 }
 
 export async function serverDeleteSavedPatient(id: number, ownerId: number) {
+  if (isSupabaseAvailable()) {
+    const { rowCount } = await pgQuery(
+      "DELETE FROM saved_patients WHERE id = $1 AND owner_id = $2",
+      [id, ownerId],
+    );
+    return rowCount || 0;
+  }
   return deleteSavedPatient(id, ownerId);
 }
 
@@ -1689,7 +1971,7 @@ export async function serverGetMyProfileLocation(): Promise<{
   try {
     const session = await getSession();
     if (!session) return null;
-    const profile = (await getProfileByEmail(session.email)) as any;
+    const profile = (await (isSupabaseAvailable() ? serverGetProfileByEmail(session.email) : getProfileByEmail(session.email))) as any;
     if (!profile) return null;
 
     if (typeof profile.lat === "number" && typeof profile.lng === "number") {

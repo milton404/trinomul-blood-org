@@ -57,6 +57,32 @@ function profileToUser(profile: any): AuthUser {
   };
 }
 
+async function recordFailedAttemptPg(identifier: string, windowMs: number = 15 * 60 * 1000) {
+  const now = Date.now();
+  const { rows } = await pgQuery<{ attempt_count: number; first_attempt_at: number }>(
+    "SELECT attempt_count, first_attempt_at FROM auth_rate_limits WHERE identifier = $1",
+    [identifier],
+  );
+  const row = rows[0];
+  if (!row || now - row.first_attempt_at > windowMs) {
+    await pgQuery(
+      `INSERT INTO auth_rate_limits (identifier, attempt_count, first_attempt_at, last_attempt_at, locked_until)
+       VALUES ($1, 1, $2, $3, NULL)
+       ON CONFLICT (identifier) DO UPDATE SET
+         attempt_count = 1,
+         first_attempt_at = $2,
+         last_attempt_at = $3,
+         locked_until = NULL`,
+      [identifier, now, now],
+    );
+  } else {
+    await pgQuery(
+      `UPDATE auth_rate_limits SET attempt_count = attempt_count + 1, last_attempt_at = $1 WHERE identifier = $2`,
+      [now, identifier],
+    );
+  }
+}
+
 /**
  * Authenticate a user by email/phone + password, then issue a session cookie.
  * Migrates legacy plaintext passwords to bcrypt hashes on successful login.
@@ -72,35 +98,81 @@ export async function serverLogin(
   expectedAdminScope: "full" | "district" | "any" = "any",
 ): Promise<{ user: AuthUser; redirectTo: string }> {
   const key = `login:${identifier.toLowerCase()}`;
-  const limit = checkRateLimit(key);
-  if (!limit.allowed) {
-    const waitMin = Math.ceil(
-      ((limit.lockedUntil ?? limit.resetTime) - Date.now()) / 60000,
+  const usePg = isSupabaseAvailable();
+
+  // ── Rate limit check ──────────────────────────────────────────────
+  if (usePg) {
+    const now = Date.now();
+    const { rows: rlRows } = await pgQuery<{
+      attempt_count: number;
+      first_attempt_at: number;
+      locked_until: number | null;
+    }>(
+      "SELECT attempt_count, first_attempt_at, locked_until FROM auth_rate_limits WHERE identifier = $1",
+      [key],
     );
-    throw new Error(
-      `Too many attempts. Please try again in ${waitMin} minute(s).`,
-    );
+    const rl = rlRows[0];
+    if (rl?.locked_until && rl.locked_until > now) {
+      const waitMin = Math.ceil((rl.locked_until - now) / 60000);
+      throw new Error(`Too many attempts. Please try again in ${waitMin} minute(s).`);
+    }
+    if (rl && now - rl.first_attempt_at <= 15 * 60 * 1000 && rl.attempt_count >= 5) {
+      const lockedUntil = now + 15 * 60 * 1000;
+      await pgQuery(
+        "UPDATE auth_rate_limits SET locked_until = $1 WHERE identifier = $2",
+        [lockedUntil, key],
+      );
+      const waitMin = Math.ceil((lockedUntil - now) / 60000);
+      throw new Error(`Too many attempts. Please try again in ${waitMin} minute(s).`);
+    }
+  } else {
+    const limit = checkRateLimit(key);
+    if (!limit.allowed) {
+      const waitMin = Math.ceil(
+        ((limit.lockedUntil ?? limit.resetTime) - Date.now()) / 60000,
+      );
+      throw new Error(
+        `Too many attempts. Please try again in ${waitMin} minute(s).`,
+      );
+    }
   }
 
-  const profile = isEmail(identifier)
-    ? ((await getProfileByEmail(identifier)) as any)
-    : ((await getProfileByPhone(identifier)) as any);
+  // ── Look up profile ───────────────────────────────────────────────
+  let profile: any;
+  if (usePg) {
+    const col = isEmail(identifier) ? "email" : "phone";
+    const { rows } = await pgQuery(`SELECT * FROM profiles WHERE ${col} = $1`, [identifier]);
+    profile = rows[0] || null;
+  } else {
+    profile = isEmail(identifier)
+      ? ((await getProfileByEmail(identifier)) as any)
+      : ((await getProfileByPhone(identifier)) as any);
+  }
 
   if (!profile) {
-    recordFailedAttempt(key);
+    if (usePg) await recordFailedAttemptPg(key);
+    else recordFailedAttempt(key);
     throw new Error("Invalid credentials. Please check and try again.");
   }
 
   const ok = await verifyPassword(password, profile.password_hash);
   if (!ok) {
-    recordFailedAttempt(key);
+    if (usePg) await recordFailedAttemptPg(key);
+    else recordFailedAttempt(key);
     throw new Error("Invalid credentials. Please check and try again.");
   }
 
   // Migrate legacy plaintext password to a bcrypt hash on next login.
   if (!isBcryptHash(profile.password_hash)) {
     const hashed = await hashPassword(password);
-    updateUserPassword(profile.email, hashed);
+    if (usePg) {
+      await pgQuery(
+        "UPDATE profiles SET password_hash = $1, updated_at = NOW() WHERE email = $2",
+        [hashed, profile.email],
+      );
+    } else {
+      updateUserPassword(profile.email, hashed);
+    }
   }
 
   // ── Admin scope enforcement for the admin portal ────────────────────
@@ -109,8 +181,6 @@ export async function serverLogin(
       throw new Error("This account is not authorized for admin login.");
     }
     if (expectedAdminScope === "district") {
-      // District admin login: must be either a scoped admin (with
-      // assigned_district) OR a super_admin who is allowed everywhere.
       if (
         profile.role !== "super_admin" &&
         profile.role === "admin" &&
@@ -121,8 +191,6 @@ export async function serverLogin(
         );
       }
     } else if (expectedAdminScope === "full") {
-      // Full admin login: unscoped admin or super_admin are both allowed.
-      // A district-scoped admin should not log in through this entry.
       if (
         profile.role !== "super_admin" &&
         profile.role === "admin" &&
@@ -135,7 +203,11 @@ export async function serverLogin(
     }
   }
 
-  clearRateLimit(key);
+  if (usePg) {
+    await pgQuery("DELETE FROM auth_rate_limits WHERE identifier = $1", [key]);
+  } else {
+    clearRateLimit(key);
+  }
 
   const payload: SessionPayload = {
     sub: String(profile.id),
