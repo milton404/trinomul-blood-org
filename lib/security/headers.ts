@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
+import { SITE_URL } from "@/lib/seo";
 
 const isProduction = process.env.NODE_ENV === "production";
 
 const CLOUDINARY_CLOUD_NAME = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME;
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "";
 
 function buildCspHeader(nonce: string): string {
   const self = "'self'";
