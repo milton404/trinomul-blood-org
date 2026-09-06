@@ -566,6 +566,7 @@ export default function DonorCard({ donor }: DonorCardProps) {
               donorName={donor.full_name}
               bloodGroup={donor.blood_group}
               district={donor.district}
+              url={donorShareUrl}
               compact
             />
             <button

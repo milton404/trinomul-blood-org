@@ -1,12 +1,13 @@
 "use client";
 
 import { useTranslations } from "next-intl";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense } from "react";
 import dynamic from "next/dynamic";
 import Navbar from "@/components/common/Navbar";
 import Footer from "@/components/common/Footer";
 import DonorCard from "@/components/donors/DonorCard";
+import DonorDetailModal from "@/components/donors/DonorDetailModal";
 import { CardGridSkeleton } from "@/components/ui/Skeleton";
 import DonorEligibilityChecker from "@/components/donors/DonorEligibilityChecker";
 import BloodCompatibilityGuide from "@/components/donors/BloodCompatibilityGuide";
@@ -66,6 +67,8 @@ function DonorsContent() {
   const [donors, setDonors] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<MapViewMode>("list");
+  const [highlightDonor, setHighlightDonor] = useState<any | null>(null);
+  const router = useRouter();
 
   // Shared user location: GPS → localStorage cache → profile-set location.
   const {
@@ -227,6 +230,27 @@ function DonorsContent() {
       console.error("Error fetching donors:", error);
     }
     setIsLoading(false);
+  };
+
+  // When the URL has ?donor=ID (e.g. from a shared link), find that donor
+  // in the fetched list and pop up a detail modal with a close button.
+  useEffect(() => {
+    const donorId = searchParams.get("donor");
+    if (!donorId || isLoading || donors.length === 0) {
+      setHighlightDonor(null);
+      return;
+    }
+    const numericId = Number(donorId);
+    const found = donors.find((d) => d.id === numericId);
+    setHighlightDonor(found || null);
+  }, [searchParams, donors, isLoading]);
+
+  const closeDonorModal = () => {
+    setHighlightDonor(null);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("donor");
+    const qs = params.toString();
+    router.replace(qs ? `/${locale}/donors?${qs}` : `/${locale}/donors`);
   };
 
   const handleGetLocation = () => {
@@ -955,6 +979,8 @@ function DonorsContent() {
           )}
         </AnimatePresence>
       </main>
+
+      <DonorDetailModal donor={highlightDonor} onClose={closeDonorModal} />
 
       <Footer />
     </div>
