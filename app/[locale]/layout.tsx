@@ -67,11 +67,20 @@ export async function generateMetadata({
       siteName: t.title,
       title: t.ogTitle,
       description: t.ogDescription,
+      images: [
+        {
+          url: '/og-image.png',
+          width: 1200,
+          height: 630,
+          alt: t.title,
+        },
+      ],
     },
     twitter: {
       card: 'summary_large_image',
       title: t.ogTitle,
       description: t.ogDescription,
+      images: ['/og-image.png'],
     },
   };
 }

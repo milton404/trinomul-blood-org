@@ -120,7 +120,7 @@ export default function DonorCard({ donor }: DonorCardProps) {
     if (!donor.id) return;
     let active = true;
     QRCode.toDataURL(donorShareUrl, {
-      width: 120,
+      width: 200,
       margin: 1,
       errorCorrectionLevel: "H",
       color: { dark: "#0f172a", light: "#ffffff" },
@@ -140,7 +140,7 @@ export default function DonorCard({ donor }: DonorCardProps) {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setQrModalDataUrl(null);
 
-    const size = 400;
+    const size = 1024;
     const canvas = document.createElement("canvas");
     canvas.width = size;
     canvas.height = size;
@@ -209,7 +209,7 @@ export default function DonorCard({ donor }: DonorCardProps) {
     setDownloadingCard(true);
     try {
       const qrDataUrl = await QRCode.toDataURL(donorShareUrl, {
-        width: 600,
+        width: 1024,
         margin: 1,
         errorCorrectionLevel: "H",
         color: { dark: "#0f172a", light: "#ffffff" },
@@ -254,11 +254,25 @@ export default function DonorCard({ donor }: DonorCardProps) {
   const handleWhatsApp = () => {
     if (donor.phone) {
       if (donor.id) serverRecordContactClick(donor.id, "whatsapp").catch(() => {});
-      const phoneNumber = donor.phone.replace(/[^0-9]/g, "");
+      let phoneNumber = donor.phone.replace(/[^0-9]/g, "");
+      if (phoneNumber.startsWith("880")) {
+        // already international
+      } else if (phoneNumber.startsWith("0")) {
+        phoneNumber = "880" + phoneNumber.slice(1);
+      } else if (phoneNumber.startsWith("1") && phoneNumber.length === 10) {
+        phoneNumber = "880" + phoneNumber;
+      }
       const message = encodeURIComponent(
         "Hello, I found your profile on Trinomul Blood Bank and I need blood donation assistance.",
       );
-      window.open(`https://wa.me/${phoneNumber}?text=${message}`, "_blank");
+      const waUrl = `https://wa.me/${phoneNumber}?text=${message}`;
+      const a = document.createElement("a");
+      a.href = waUrl;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     }
   };
 

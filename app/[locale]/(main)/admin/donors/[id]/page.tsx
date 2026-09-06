@@ -344,17 +344,23 @@ export default function AdminDonorDetailPage({ params }: { params: Promise<{ id:
                 <span className="sm:hidden">Call</span>
               </a>
             )}
-            {profile.whatsapp_number && (
-              <a
-                href={`https://wa.me/${profile.whatsapp_number.replace(/\D/g, '')}?text=${encodeURIComponent('Hello, I saw your profile on Trinomul Blood Bank.')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#25D366] text-white hover:bg-[#1DA851] transition-colors text-sm font-medium"
-              >
-                <MessageCircle className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">WhatsApp</span>
-              </a>
-            )}
+            {profile.whatsapp_number && (() => {
+              let waNum = profile.whatsapp_number.replace(/\D/g, '');
+              if (waNum.startsWith('880')) { /* already international */ }
+              else if (waNum.startsWith('0')) waNum = '880' + waNum.slice(1);
+              else if (waNum.startsWith('1') && waNum.length === 10) waNum = '880' + waNum;
+              return (
+                <a
+                  href={`https://wa.me/${waNum}?text=${encodeURIComponent('Hello, I saw your profile on Trinomul Blood Bank.')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#25D366] text-white hover:bg-[#1DA851] transition-colors text-sm font-medium"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">WhatsApp</span>
+                </a>
+              );
+            })()}
             <button
               onClick={openEditModal}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors text-sm font-medium"

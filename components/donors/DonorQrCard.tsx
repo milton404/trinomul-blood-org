@@ -51,7 +51,7 @@ export default function DonorQrCard({
 
   const generateQr = useCallback(async () => {
     try {
-      const size = compact ? 160 : 400;
+      const size = compact ? 320 : 1024;
       const canvas = document.createElement("canvas");
       const dataUrl = await QRCode.toDataURL(payload, {
         width: size,

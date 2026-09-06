@@ -8,6 +8,12 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
+const SHOW_COUNT_KEY = 'pwa-install-show-count';
+const SHOW_DATE_KEY = 'pwa-install-show-date';
+const DISMISS_KEY = 'pwa-install-dismissed';
+const INSTALLED_KEY = 'pwa-installed';
+const MAX_SHOWS_PER_DAY = 3;
+
 export default function PWAInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
@@ -16,44 +22,75 @@ export default function PWAInstallPrompt() {
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    // Check if already installed
-    if (window.matchMedia('(display-mode: standalone)').matches) {
+    if (window.matchMedia('(display-mode: standalone)').matches || localStorage.getItem(INSTALLED_KEY) === 'true') {
       setIsInstalled(true);
       return;
     }
 
-    // Detect iOS
-    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
                         (navigator.userAgent.includes('Mac') && navigator.maxTouchPoints > 1);
     setIsIOS(isIOSDevice);
 
-    // Listen for beforeinstallprompt
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferredPrompt(e as BeforeInstallPromptEvent);
-      
-      // Show prompt after a delay (don't annoy users immediately)
-      setTimeout(() => {
-        if (!dismissed) setShowPrompt(true);
-      }, 5000);
     };
 
     window.addEventListener('beforeinstallprompt', handler);
 
-    // Check if dismissed before
-    const wasDismissed = localStorage.getItem('pwa-install-dismissed');
+    const wasDismissed = localStorage.getItem(DISMISS_KEY);
     if (wasDismissed) {
       const dismissTime = parseInt(wasDismissed, 10);
       const hoursSinceDismiss = (Date.now() - dismissTime) / (1000 * 60 * 60);
-      
-      // Show again after 7 days
       if (hoursSinceDismiss < 168) {
         setDismissed(true);
       }
     }
 
-    return () => window.removeEventListener('beforeinstallprompt', handler);
-  }, [dismissed]);
+    const appInstalledHandler = () => {
+      setIsInstalled(true);
+      setShowPrompt(false);
+      localStorage.setItem(INSTALLED_KEY, 'true');
+    };
+    window.addEventListener('appinstalled', appInstalledHandler);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handler);
+      window.removeEventListener('appinstalled', appInstalledHandler);
+    };
+  }, []);
+
+  const getTodayShowCount = (): number => {
+    const today = new Date().toDateString();
+    const savedDate = localStorage.getItem(SHOW_DATE_KEY);
+    if (savedDate !== today) {
+      localStorage.setItem(SHOW_DATE_KEY, today);
+      localStorage.setItem(SHOW_COUNT_KEY, '0');
+      return 0;
+    }
+    return parseInt(localStorage.getItem(SHOW_COUNT_KEY) || '0', 10);
+  };
+
+  const incrementShowCount = () => {
+    const count = getTodayShowCount();
+    localStorage.setItem(SHOW_COUNT_KEY, String(count + 1));
+  };
+
+  useEffect(() => {
+    if (isInstalled || dismissed) return;
+    if (!deferredPrompt && !isIOS) return;
+
+    const timer = setTimeout(() => {
+      const count = getTodayShowCount();
+      if (count < MAX_SHOWS_PER_DAY) {
+        setShowPrompt(true);
+        incrementShowCount();
+      }
+    }, 4000);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deferredPrompt, isIOS, isInstalled, dismissed]);
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
@@ -61,60 +98,54 @@ export default function PWAInstallPrompt() {
     try {
       await deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
-      
+
       if (outcome === 'accepted') {
         setShowPrompt(false);
         setIsInstalled(true);
-        console.log('PWA installed successfully');
+        localStorage.setItem(INSTALLED_KEY, 'true');
       }
     } catch (error) {
       console.error('Install prompt error:', error);
     }
-    
+
     setDeferredPrompt(null);
   };
 
   const handleDismiss = () => {
     setShowPrompt(false);
     setDismissed(true);
-    localStorage.setItem('pwa-install-dismissed', Date.now().toString());
+    localStorage.setItem(DISMISS_KEY, Date.now().toString());
   };
 
-  const handleShowPrompt = () => {
-    setShowPrompt(true);
-  };
-
-  // Don't render if installed or no prompt available (and not iOS)
   if (isInstalled) return null;
-  if (!showPrompt && !isIOS && !deferredPrompt) return null;
+  if (!showPrompt) return null;
+  if (!isIOS && !deferredPrompt) return null;
 
   // iOS Install Instructions
-  if (isIOS && showPrompt) {
+  if (isIOS) {
     return (
-      <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-md z-50 animate-in slide-in-from-bottom duration-300">
-        <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-5">
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
-                <Smartphone className="w-5 h-5 text-red-600" />
-              </div>
-              <div>
-                <h3 className="font-bold text-slate-900">Install Trinomul App</h3>
-                <p className="text-xs text-slate-500">For the best experience</p>
-              </div>
+      <div className="fixed bottom-4 left-2 right-2 sm:left-4 sm:right-auto sm:max-w-sm z-50 animate-in slide-in-from-bottom duration-300">
+        <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 sm:p-5 relative">
+          <button
+            onClick={handleDismiss}
+            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors"
+            aria-label="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
+          <div className="flex items-center gap-3 mb-3 pr-8">
+            <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center shrink-0">
+              <Smartphone className="w-5 h-5 text-red-600" />
             </div>
-            <button 
-              onClick={handleDismiss}
-              className="text-slate-400 hover:text-slate-600 p-1"
-              aria-label="Close"
-            >
-              <X className="w-5 h-5" />
-            </button>
+            <div>
+              <h3 className="font-bold text-slate-900 text-sm sm:text-base">Install Trinomul App</h3>
+              <p className="text-xs text-slate-500">For the best experience</p>
+            </div>
           </div>
 
-          <div className="bg-slate-50 rounded-xl p-4 space-y-2 text-sm text-slate-700">
+          <div className="bg-slate-50 rounded-xl p-3 sm:p-4 space-y-2 text-xs sm:text-sm text-slate-700">
             <p className="font-medium text-slate-900">To install on your device:</p>
-            <ol className="space-y-2 list-decimal list-inside">
+            <ol className="space-y-1.5 list-decimal list-inside">
               <li>Tap the <strong>Share button</strong> <span className="inline-block px-1.5 py-0.5 bg-slate-200 rounded text-xs">⎋</span> in Safari</li>
               <li>Scroll down and tap <strong>"Add to Home Screen"</strong></li>
               <li>Tap <strong>"Add"</strong> to confirm</li>
@@ -123,7 +154,7 @@ export default function PWAInstallPrompt() {
 
           <button
             onClick={handleDismiss}
-            className="w-full mt-4 py-2.5 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-colors"
+            className="w-full mt-3 py-2.5 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-colors text-sm"
           >
             Got it, thanks!
           </button>
@@ -133,83 +164,61 @@ export default function PWAInstallPrompt() {
   }
 
   // Android/Other Install Prompt
-  if (!isIOS && showPrompt && deferredPrompt) {
-    return (
-      <div className="fixed bottom-4 left-4 right-4 md:left-auto md:right-4 md:max-w-md z-50 animate-in slide-in-from-bottom duration-300">
-        <div className="bg-white rounded-2xl shadow-2xl border border-red-100 p-5">
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-red-200">
-                <DropletsIcon className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h3 className="font-bold text-slate-900">Install Trinomul Blood Bank</h3>
-                <p className="text-sm text-slate-500 flex items-center gap-1">
-                  <Wifi className="w-3 h-3" /> Works offline too!
-                </p>
-              </div>
-            </div>
-            <button 
-              onClick={handleDismiss}
-              className="text-slate-400 hover:text-slate-600 p-1"
-              aria-label="Close"
-            >
-              <X className="w-5 h-5" />
-            </button>
+  return (
+    <div className="fixed bottom-4 left-2 right-2 sm:left-4 sm:right-auto sm:max-w-sm z-50 animate-in slide-in-from-bottom duration-300">
+      <div className="bg-white rounded-2xl shadow-2xl border border-red-100 p-4 sm:p-5 relative">
+        <button
+          onClick={handleDismiss}
+          className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors z-10"
+          aria-label="Close"
+        >
+          <X className="w-4 h-4" />
+        </button>
+        <div className="flex items-center gap-3 mb-3 pr-8">
+          <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-red-200 shrink-0">
+            <DropletsIcon className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
           </div>
-
-          <div className="grid grid-cols-3 gap-3 mb-4">
-            <div className="text-center p-2 bg-red-50 rounded-lg">
-              <Download className="w-5 h-5 mx-auto mb-1 text-red-600" />
-              <span className="text-[10px] font-medium text-red-700">No Store</span>
-            </div>
-            <div className="text-center p-2 bg-blue-50 rounded-lg">
-              <Monitor className="w-5 h-5 mx-auto mb-1 text-blue-600" />
-              <span className="text-[10px] font-medium text-blue-700">Full Screen</span>
-            </div>
-            <div className="text-center p-2 bg-green-50 rounded-lg">
-              <Wifi className="w-5 h-5 mx-auto mb-1 text-green-600" />
-              <span className="text-[10px] font-medium text-green-700">Offline Mode</span>
-            </div>
-          </div>
-
-          <div className="flex gap-3">
-            <button
-              onClick={handleInstall}
-              className="flex-1 bg-red-600 text-white py-3 rounded-xl font-semibold hover:bg-red-700 transition-colors flex items-center justify-center gap-2"
-            >
-              <Download className="w-4 h-4" />
-              Install Now
-            </button>
-            <button
-              onClick={handleDismiss}
-              className="px-4 py-3 text-slate-500 hover:text-slate-700 font-medium"
-            >
-              Later
-            </button>
+          <div>
+            <h3 className="font-bold text-slate-900 text-sm sm:text-base">Install Trinomul Blood Bank</h3>
+            <p className="text-xs sm:text-sm text-slate-500 flex items-center gap-1">
+              <Wifi className="w-3 h-3" /> Works offline too!
+            </p>
           </div>
         </div>
+
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-3 sm:mb-4">
+          <div className="text-center p-1.5 sm:p-2 bg-red-50 rounded-lg">
+            <Download className="w-4 h-4 sm:w-5 sm:h-5 mx-auto mb-1 text-red-600" />
+            <span className="text-[9px] sm:text-[10px] font-medium text-red-700">No Store</span>
+          </div>
+          <div className="text-center p-1.5 sm:p-2 bg-blue-50 rounded-lg">
+            <Monitor className="w-4 h-4 sm:w-5 sm:h-5 mx-auto mb-1 text-blue-600" />
+            <span className="text-[9px] sm:text-[10px] font-medium text-blue-700">Full Screen</span>
+          </div>
+          <div className="text-center p-1.5 sm:p-2 bg-green-50 rounded-lg">
+            <Wifi className="w-4 h-4 sm:w-5 sm:h-5 mx-auto mb-1 text-green-600" />
+            <span className="text-[9px] sm:text-[10px] font-medium text-green-700">Offline Mode</span>
+          </div>
+        </div>
+
+        <div className="flex gap-2 sm:gap-3">
+          <button
+            onClick={handleInstall}
+            className="flex-1 bg-red-600 text-white py-2.5 sm:py-3 rounded-xl font-semibold hover:bg-red-700 transition-colors flex items-center justify-center gap-2 text-sm"
+          >
+            <Download className="w-4 h-4" />
+            Install Now
+          </button>
+          <button
+            onClick={handleDismiss}
+            className="px-3 sm:px-4 py-2.5 sm:py-3 text-slate-500 hover:text-slate-700 font-medium text-sm"
+          >
+            Later
+          </button>
+        </div>
       </div>
-    );
-  }
-
-  // Floating install button (when prompt available but not showing)
-  if (!isIOS && deferredPrompt && !showPrompt && !dismissed) {
-    return (
-      <button
-        onClick={handleShowPrompt}
-        className="fixed bottom-20 right-4 z-40 bg-red-600 text-white p-4 rounded-full shadow-lg hover:bg-red-700 transition-all hover:scale-105 group"
-        aria-label="Install app"
-      >
-        <Download className="w-6 h-6" />
-        <span className="absolute right-full mr-3 top-1/2 -translate-y-1/2 bg-slate-900 text-white text-sm px-3 py-1.5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-          Install App
-        </span>
-      </button>
-    );
-  }
-
-  return null;
+    </div>
+  );
 }
 
 // Simple droplets icon for the component

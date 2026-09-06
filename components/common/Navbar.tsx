@@ -94,7 +94,7 @@ export default function Navbar() {
       >
         <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-red-500/40 to-transparent" />
 
-        <div className="flex items-center justify-between h-16 md:h-18 px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 max-w-[1600px] mx-auto">
+        <div className="flex items-center justify-between h-14 sm:h-16 md:h-18 px-3 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 max-w-[1600px] mx-auto">
 
           {/* ── Logo ── */}
           <Link
@@ -107,7 +107,7 @@ export default function Navbar() {
               alt="Trinomul Blood Bank"
               width={32}
               height={32}
-              className="shrink-0 w-8 h-8 object-contain"
+              className="shrink-0 w-7 h-7 sm:w-8 sm:h-8 object-contain"
               priority
             />
             <span className="hidden md:inline text-lg font-bold bg-gradient-to-r from-green-700 via-emerald-600 to-teal-600 bg-clip-text text-transparent tracking-tight">
@@ -176,7 +176,7 @@ export default function Navbar() {
           </nav>
 
           {/* ── Right Section ── */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             <LanguageSwitcher className="shrink-0" />
 
             <span className="w-px h-5 bg-slate-200 hidden sm:block" aria-hidden="true" />
@@ -185,7 +185,7 @@ export default function Navbar() {
               <div className="flex items-center gap-1" role="group" aria-label="User menu">
                 <Link
                   href="/profile"
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[13px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50/80 transition-all shrink-0"
+                  className="flex items-center gap-1.5 px-2.5 sm:px-3 py-2 rounded-lg text-[13px] font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-50/80 transition-all shrink-0"
                   aria-label={`View your ${t("profile") || "profile"}`}
                 >
                   <User className="w-4 h-4 text-slate-400" />
@@ -214,24 +214,19 @@ export default function Navbar() {
               <div className="flex items-center shrink-0" role="group" aria-label="Authentication">
                 <Link
                   href="/login"
-                  className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-slate-600 hover:text-red-600 hover:bg-red-50/60 transition-all shrink-0"
+                  className="p-2 sm:px-3 sm:py-1.5 rounded-lg text-[12px] font-medium text-slate-600 hover:text-red-600 hover:bg-red-50/60 transition-all shrink-0 flex items-center gap-1.5"
+                  aria-label={t("login")}
                 >
-                  {t("login")}
+                  <User className="w-4 h-4 sm:hidden" />
+                  <span className="hidden sm:inline">{t("login")}</span>
                 </Link>
-                <span className="text-slate-300 text-sm select-none" aria-hidden="true">/</span>
                 <Link
                   href="/register"
-                  className="px-3 py-1.5 rounded-lg text-[12px] font-medium text-red-600 hover:text-red-700 hover:bg-red-50/60 transition-all shrink-0"
+                  className="p-2 sm:px-3 sm:py-1.5 rounded-lg text-[12px] font-medium text-red-600 hover:text-red-700 hover:bg-red-50/60 transition-all shrink-0 flex items-center gap-1.5"
+                  aria-label={t("register")}
                 >
-                  {t("register")}
-                </Link>
-                <Link
-                  href="/admin/login"
-                  className="hidden lg:flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[12px] font-medium text-slate-400 hover:text-slate-700 hover:bg-slate-50/80 transition-all shrink-0"
-                  title="Admin Panel Login"
-                >
-                  <Lock className="w-3 h-3" />
-                  Admin
+                  <Heart className="w-4 h-4 sm:hidden" />
+                  <span className="hidden sm:inline">{t("register")}</span>
                 </Link>
               </div>
             )}
@@ -296,14 +291,34 @@ export default function Navbar() {
             </button>
 
             {!user && (
-              <Link
-                href="/admin/login"
-                onClick={() => setIsMenuOpen(false)}
-                className="flex items-center justify-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:bg-slate-50 transition-all"
-              >
-                <Lock className="w-4 h-4 text-slate-400" />
-                Admin
-              </Link>
+              <>
+                <div className="mt-1 border-t border-slate-100 pt-2 flex flex-col gap-1">
+                  <Link
+                    href="/login"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="flex items-center justify-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all"
+                  >
+                    <User className="w-4 h-4 shrink-0 text-slate-400" />
+                    <span>{t("login")}</span>
+                  </Link>
+                  <Link
+                    href="/register"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="flex items-center justify-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition-all"
+                  >
+                    <Heart className="w-4 h-4 shrink-0 text-red-500" />
+                    <span>{t("register")}</span>
+                  </Link>
+                </div>
+                <Link
+                  href="/admin/login"
+                  onClick={() => setIsMenuOpen(false)}
+                  className="flex items-center justify-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:bg-slate-50 transition-all"
+                >
+                  <Lock className="w-4 h-4 text-slate-400" />
+                  Admin
+                </Link>
+              </>
             )}
 
             <div className="mt-2 border-t border-slate-100 pt-3 px-4">

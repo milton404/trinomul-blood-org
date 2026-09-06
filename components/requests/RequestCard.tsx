@@ -291,11 +291,25 @@ export default function RequestCard({ request }: RequestCardProps) {
 
   const handleWhatsApp = () => {
     if (whatsappNumber) {
-      const cleanedNumber = whatsappNumber.replace(/[^0-9]/g, "");
+      let cleanedNumber = whatsappNumber.replace(/[^0-9]/g, "");
+      if (cleanedNumber.startsWith("880")) {
+        // already international
+      } else if (cleanedNumber.startsWith("0")) {
+        cleanedNumber = "880" + cleanedNumber.slice(1);
+      } else if (cleanedNumber.startsWith("1") && cleanedNumber.length === 10) {
+        cleanedNumber = "880" + cleanedNumber;
+      }
       const message = encodeURIComponent(
         "Hello, I saw your blood request on Trinomul Blood Bank and I would like to help.",
       );
-      window.open(`https://wa.me/${cleanedNumber}?text=${message}`, "_blank");
+      const waUrl = `https://wa.me/${cleanedNumber}?text=${message}`;
+      const a = document.createElement("a");
+      a.href = waUrl;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     }
   };
 
@@ -461,7 +475,7 @@ export default function RequestCard({ request }: RequestCardProps) {
     const url = qrMode === "track" ? absoluteTrackingUrl : cardShareUrl;
     if (!url || qrModalDataUrl) return;
 
-    const size = 400;
+    const size = 1024;
     const canvas = document.createElement("canvas");
     canvas.width = size;
     canvas.height = size;
@@ -528,7 +542,7 @@ export default function RequestCard({ request }: RequestCardProps) {
 
   useEffect(() => {
     if (!cardShareUrl || inlineQrUrl) return;
-    const size = 120;
+    const size = 200;
     const canvas = document.createElement("canvas");
     canvas.width = size;
     canvas.height = size;
@@ -719,7 +733,7 @@ whatsapp_number: request.whatsapp_number || null,
         setQrDataUrl(
           await QRCode.toDataURL(cardShareUrl, {
             margin: 1,
-            width: 600,
+            width: 1024,
             errorCorrectionLevel: "H",
             color: { dark: "#0f172a", light: "#ffffff" },
           }),

@@ -1,4 +1,6 @@
 import { ImageResponse } from "next/og";
+import fs from "fs";
+import path from "path";
 
 export const OG_SIZE = { width: 1200, height: 630 } as const;
 export const OG_CONTENT_TYPE = "image/png";
@@ -10,6 +12,16 @@ export type OgCardProps = {
   siteName?: string;
   siteUrl?: string;
 };
+
+function getLogoDataUrl(): string | null {
+  try {
+    const logoPath = path.join(process.cwd(), "public", "android-chrome-512x512.png");
+    const buf = fs.readFileSync(logoPath);
+    return `data:image/png;base64,${buf.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
 
 function BloodDrop({
   size = 120,
@@ -47,6 +59,8 @@ export function OgCard({
       ? description.slice(0, 125) + "\u2026"
       : description;
 
+  const logoUrl = getLogoDataUrl();
+
   return (
     <div
       style={{
@@ -74,7 +88,12 @@ export function OgCard({
       </div>
 
       <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-        <BloodDrop size={40} />
+        {logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logoUrl} width={56} height={56} alt="logo" style={{ borderRadius: 12 }} />
+        ) : (
+          <BloodDrop size={40} />
+        )}
         <div
           style={{
             display: "flex",

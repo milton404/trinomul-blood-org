@@ -79,7 +79,7 @@ export default function ChatWidget() {
     if (isOpen || hidden) return;
     const timer = setInterval(() => {
       setHintIndex((prev) => (prev + 1) % hintMessages.length);
-    }, 2000);
+    }, 5000);
     return () => clearInterval(timer);
   }, [isOpen, hidden, hintMessages.length]);
 
@@ -315,7 +315,7 @@ export default function ChatWidget() {
                   {hintMessages[hintIndex]}
                 </span>
               </div>
-              <div className="w-16 h-[4.5rem] transition-transform group-hover:scale-110 group-active:scale-95 drop-shadow-lg"
+              <div className="w-12 h-14 sm:w-16 sm:h-[4.5rem] transition-transform group-hover:scale-110 group-active:scale-95 drop-shadow-lg"
                 style={{ animation: "chatbot-heartbeat 2.5s ease-in-out infinite", transformOrigin: "center" }}
               >
                 <Image
