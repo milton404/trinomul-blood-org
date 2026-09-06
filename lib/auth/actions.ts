@@ -34,6 +34,7 @@ import {
   sendPasswordResetSuccessEmail,
   sendWelcomeEmail,
 } from "@/lib/email";
+import { isSupabaseAvailable, query as pgQuery } from "@/lib/supabase/client";
 
 const isEmail = (value: string) =>
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -171,40 +172,95 @@ export async function serverRegister(input: {
   address?: string;
 }): Promise<{ user: AuthUser; redirectTo: string }> {
   const key = `register:${input.email.toLowerCase()}`;
-  const limit = checkRateLimit(key, 5, 60 * 60 * 1000);
-  if (!limit.allowed) {
-    throw new Error("Too many registration attempts. Please try later.");
+  const usePg = isSupabaseAvailable();
+
+  // ── Rate limit + email uniqueness + profile creation ──────────────────
+  let profileId: number;
+
+  if (usePg) {
+    const rlRow = await pgQuery<{ attempt_count: number; locked_until: number | null }>(
+      "SELECT attempt_count, locked_until FROM auth_rate_limits WHERE identifier = $1",
+      [key],
+    );
+    const rl = rlRow.rows[0];
+    if (rl?.locked_until && rl.locked_until > Date.now()) {
+      throw new Error("Too many registration attempts. Please try later.");
+    }
+    if (rl && rl.attempt_count >= 5) {
+      throw new Error("Too many registration attempts. Please try later.");
+    }
+
+    const existing = await pgQuery("SELECT 1 FROM profiles WHERE email = $1", [input.email]);
+    if (existing.rows.length > 0) {
+      throw new Error("An account with this email already exists.");
+    }
+
+    const passwordHash = await hashPassword(input.password);
+    const ins = await pgQuery<{ id: number }>(
+      `INSERT INTO profiles (email, password_hash, full_name_en, full_name_bn, phone, blood_group, role, district, upazila, hospital_name_en, hospital_name_bn, license_number, website)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+       RETURNING id`,
+      [
+        input.email,
+        passwordHash,
+        input.fullName,
+        input.fullName,
+        input.phone,
+        null,
+        input.role,
+        input.district || null,
+        input.upazila || null,
+        input.hospitalNameEn || null,
+        input.hospitalNameBn || null,
+        input.licenseNumber || null,
+        input.website || null,
+      ],
+    );
+    profileId = ins.rows[0].id;
+
+    if (input.address) {
+      await pgQuery("UPDATE profiles SET address = $1, updated_at = NOW() WHERE id = $2", [
+        input.address,
+        profileId,
+      ]);
+    }
+
+    await pgQuery("DELETE FROM auth_rate_limits WHERE identifier = $1", [key]);
+  } else {
+    const limit = checkRateLimit(key, 5, 60 * 60 * 1000);
+    if (!limit.allowed) {
+      throw new Error("Too many registration attempts. Please try later.");
+    }
+
+    const existing = (await getProfileByEmail(input.email)) as any;
+    if (existing) {
+      recordFailedAttempt(key);
+      throw new Error("An account with this email already exists.");
+    }
+
+    const passwordHash = await hashPassword(input.password);
+    profileId = dbCreateProfile({
+      email: input.email,
+      passwordHash,
+      fullNameEn: input.fullName,
+      fullNameBn: input.fullName,
+      phone: input.phone,
+      bloodGroup: null,
+      role: input.role,
+      district: input.district || null,
+      upazila: input.upazila || null,
+      hospitalNameEn: input.hospitalNameEn || null,
+      hospitalNameBn: input.hospitalNameBn || null,
+      licenseNumber: input.licenseNumber || null,
+      website: input.website || null,
+    });
+
+    if (input.address) {
+      dbUpdateProfile(profileId, { address: input.address });
+    }
+
+    clearRateLimit(key);
   }
-
-  const existing = (await getProfileByEmail(input.email)) as any;
-  if (existing) {
-    recordFailedAttempt(key);
-    throw new Error("An account with this email already exists.");
-  }
-
-  const passwordHash = await hashPassword(input.password);
-  const id = dbCreateProfile({
-    email: input.email,
-    passwordHash,
-    fullNameEn: input.fullName,
-    fullNameBn: input.fullName,
-    phone: input.phone,
-    bloodGroup: null,
-    role: input.role,
-    district: input.district || null,
-    upazila: input.upazila || null,
-    hospitalNameEn: input.hospitalNameEn || null,
-    hospitalNameBn: input.hospitalNameBn || null,
-    licenseNumber: input.licenseNumber || null,
-    website: input.website || null,
-  });
-
-  // `address` is not part of createProfile's INSERT columns; set it separately.
-  if (input.address) {
-    dbUpdateProfile(id, { address: input.address });
-  }
-
-  clearRateLimit(key);
 
   // Welcome email (best-effort — never blocks registration).
   try {
@@ -218,7 +274,7 @@ export async function serverRegister(input: {
   }
 
   const payload: SessionPayload = {
-    sub: String(id),
+    sub: String(profileId),
     email: input.email,
     role: input.role,
   };
@@ -226,7 +282,7 @@ export async function serverRegister(input: {
 
   return {
     user: {
-      id,
+      id: profileId,
       email: input.email,
       role: input.role,
       full_name_en: input.fullName,
