@@ -101,6 +101,11 @@ export default function Footer() {
                   {t("leaderboard")}
                 </Link>
               </li>
+              <li>
+                <Link href="/downloads" className="hover:text-white transition-colors">
+                  {locale === "bn" ? "অ্যাপ ডাউনলোড" : "Download App"}
+                </Link>
+              </li>
             </ul>
           </div>
           <div>
