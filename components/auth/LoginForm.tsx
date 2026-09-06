@@ -11,7 +11,7 @@ import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   Loader2, Eye, EyeOff, User, Lock,
-  Droplet, Heart, Hospital, Sparkles,
+  Droplet, Hospital,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { saveSession } from "@/components/providers/AuthProvider";
@@ -256,94 +256,6 @@ export default function LoginForm() {
           </Link>
         </p>
       </div>
-
-      {/* Demo Accounts — dev testing only */}
-      <div className="mt-6 pt-6 border-t border-dashed border-slate-200">
-        <div className="flex items-center gap-1.5 mb-3 justify-center">
-          <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-          <span className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-            Demo Accounts
-          </span>
-          <span className="text-[10px] text-slate-400 font-mono bg-slate-100 px-1.5 py-0.5 rounded">
-            demo1234
-          </span>
-        </div>
-        <div className="grid grid-cols-1 gap-2">
-          <DemoAccountButton
-            icon={<Droplet className="w-4 h-4 text-red-500" />}
-            label="Donor"
-            labelBn="রক্তদাতা"
-            email="demo.donor@trinomul.com"
-            password="demo1234"
-            onFill={() => {
-              setValue("identifier", "demo.donor@trinomul.com");
-              setValue("password", "demo1234");
-            }}
-          />
-          <DemoAccountButton
-            icon={<Heart className="w-4 h-4 text-pink-500" />}
-            label="Patient"
-            labelBn="রোগী"
-            email="demo.patient@trinomul.com"
-            password="demo1234"
-            onFill={() => {
-              setValue("identifier", "demo.patient@trinomul.com");
-              setValue("password", "demo1234");
-            }}
-          />
-          <DemoAccountButton
-            icon={<Hospital className="w-4 h-4 text-blue-500" />}
-            label="Hospital"
-            labelBn="হাসপাতাল"
-            email="demo.hospital@trinomul.com"
-            password="demo1234"
-            onFill={() => {
-              setValue("identifier", "demo.hospital@trinomul.com");
-              setValue("password", "demo1234");
-            }}
-          />
-        </div>
-      </div>
     </div>
-  );
-}
-
-function DemoAccountButton({
-  icon,
-  label,
-  labelBn,
-  email,
-  password,
-  onFill,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  labelBn: string;
-  email: string;
-  password: string;
-  onFill: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onFill}
-      className="flex items-center gap-2.5 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white hover:border-slate-300 hover:shadow-sm transition-all text-left group"
-    >
-      <span className="shrink-0 w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center">
-        {icon}
-      </span>
-      <span className="flex-1 min-w-0">
-        <span className="block text-xs font-bold text-slate-700">
-          {label}{" "}
-          <span className="text-slate-400 font-normal">· {labelBn}</span>
-        </span>
-        <span className="block text-[10px] text-slate-400 truncate font-mono">
-          {email}
-        </span>
-      </span>
-      <span className="shrink-0 text-[10px] text-slate-400 group-hover:text-red-600 font-semibold transition-colors">
-        Fill →
-      </span>
-    </button>
   );
 }
