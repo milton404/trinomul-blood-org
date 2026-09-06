@@ -5,13 +5,17 @@ import {
   updateProfile,
   getProfileByEmail,
 } from "@/lib/db";
+import { isSupabaseAvailable } from "@/lib/supabase/client";
+import { getDonorsWithStatsPg } from "@/lib/db-actions";
 import { hashPassword } from "@/lib/auth/password";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
-    const donors = getDonorsWithStats();
+    const donors = isSupabaseAvailable()
+      ? await getDonorsWithStatsPg()
+      : getDonorsWithStats();
     return NextResponse.json(donors);
   } catch (err) {
     console.error("[api/donors]", err);
