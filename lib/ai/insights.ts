@@ -23,16 +23,16 @@
  */
 
 import {
-  getPublicTransparencyStats,
-  getDonationImpactStats,
-  getDashboardStats,
-  getMonthlyStats,
-  getDistrictStats,
-  getBloodInventory,
-  getAllBloodRequests,
-  getAllDonations,
-  getProfilesByRole,
-} from "@/lib/db";
+  serverGetPublicTransparencyStats as getPublicTransparencyStats,
+  serverGetDonationImpactStats as getDonationImpactStats,
+  serverGetDashboardStats as getDashboardStats,
+  serverGetMonthlyStats as getMonthlyStats,
+  serverGetDistrictStats as getDistrictStats,
+  serverGetBloodInventory as getBloodInventory,
+  serverGetAllBloodRequests as getAllBloodRequests,
+  serverGetAllDonations as getAllDonations,
+  serverGetProfilesByRole as getProfilesByRole,
+} from "@/lib/db-actions";
 import {
   callLLM,
   extractJSON,
@@ -89,30 +89,53 @@ export interface NLQueryResult {
 // ── DB context builder ──────────────────────────────────────────────
 
 interface DBContext {
-  transparency: ReturnType<typeof getPublicTransparencyStats>;
-  impact: ReturnType<typeof getDonationImpactStats>;
-  dashboard: ReturnType<typeof getDashboardStats>;
-  monthly: ReturnType<typeof getMonthlyStats>;
-  district: ReturnType<typeof getDistrictStats>;
-  inventory: ReturnType<typeof getBloodInventory>;
+  transparency: Awaited<ReturnType<typeof getPublicTransparencyStats>>;
+  impact: Awaited<ReturnType<typeof getDonationImpactStats>>;
+  dashboard: Awaited<ReturnType<typeof getDashboardStats>>;
+  monthly: Awaited<ReturnType<typeof getMonthlyStats>>;
+  district: Awaited<ReturnType<typeof getDistrictStats>>;
+  inventory: Awaited<ReturnType<typeof getBloodInventory>>;
   totalRequests: number;
   totalDonations: number;
   donorCount: number;
   hospitalCount: number;
 }
 
-function buildDBContext(): DBContext {
+async function buildDBContext(): Promise<DBContext> {
+  const [
+    transparency,
+    impact,
+    dashboard,
+    monthly,
+    district,
+    inventory,
+    allRequests,
+    allDonations,
+    donors,
+    hospitals,
+  ] = await Promise.all([
+    getPublicTransparencyStats(),
+    getDonationImpactStats(),
+    getDashboardStats(),
+    getMonthlyStats(),
+    getDistrictStats(),
+    getBloodInventory(),
+    getAllBloodRequests(),
+    getAllDonations(),
+    getProfilesByRole("donor"),
+    getProfilesByRole("hospital"),
+  ]);
   return {
-    transparency: getPublicTransparencyStats(),
-    impact: getDonationImpactStats(),
-    dashboard: getDashboardStats(),
-    monthly: getMonthlyStats(),
-    district: getDistrictStats(),
-    inventory: getBloodInventory(),
-    totalRequests: getAllBloodRequests().length,
-    totalDonations: getAllDonations().length,
-    donorCount: getProfilesByRole("donor").length,
-    hospitalCount: getProfilesByRole("hospital").length,
+    transparency,
+    impact,
+    dashboard,
+    monthly,
+    district,
+    inventory,
+    totalRequests: allRequests.length,
+    totalDonations: allDonations.length,
+    donorCount: donors.length,
+    hospitalCount: hospitals.length,
   };
 }
 
@@ -174,7 +197,7 @@ Generate 3-7 insights focusing on: blood inventory levels, donor availability, u
  * Uses DeepSeek (primary) or Zhipu (fallback); falls back to rules.
  */
 export async function generateAIInsights(): Promise<AISummary> {
-  const ctx = buildDBContext();
+  const ctx = await buildDBContext();
   const activeProvider = getActiveProvider();
 
   let insights: AIInsight[] = [];
@@ -333,7 +356,7 @@ function buildRuleBasedInsights(ctx: DBContext): AIInsight[] {
       title: "Suggested camp location",
       description: `${topDistrict.district} has the highest donor density (${count} donors). A camp here could yield high turnout.`,
       recommendation: `Schedule next blood donation camp in ${topDistrict.district}.`,
-      metrics: { district: topDistrict.district, donorCount: count },
+      metrics: { district: String(topDistrict.district), donorCount: Number(count) },
       createdAt: now,
     });
   }
@@ -360,7 +383,7 @@ Provide a clear, factual answer using the data above. If the question asks about
 export async function askNaturalLanguageQuery(
   question: string,
 ): Promise<NLQueryResult> {
-  const ctx = buildDBContext();
+  const ctx = await buildDBContext();
   const activeProvider = getActiveProvider();
 
   if (!activeProvider) {

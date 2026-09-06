@@ -159,6 +159,94 @@ import {
   getDonationImpactStatsPg,
   getTopReferrersPg,
 } from "@/lib/pg/requests";
+import {
+  createProfilePg,
+  getAllProfilesPg,
+  getProfilesByRolesPg,
+  deleteProfilePg,
+  searchProfilesPg,
+  getAdminsPg,
+  getPendingVerificationsPg,
+  getDonorApplicationsPg,
+  countDonorApplicationsPg,
+  setAdminAssignmentPg,
+  recordAdminPolicyAcceptancePg,
+  searchBloodRequestsPg,
+  updateBloodRequestPg,
+  updateRequestStatusPg,
+  deleteRequestPg,
+  getVisibleBloodRequestsPg2,
+  getRequestStatusCountsPg,
+  getAdminRequestsPg,
+  getBloodRequestsByHospitalPg,
+  getDonationsByHospitalPg,
+  getHospitalStatsPg,
+  getRequestCollectedUnitsPg,
+  updateOwnBloodRequestPg,
+  updateGuestBloodRequestPg,
+  archiveGuestRequestPg,
+  archiveOwnRequestPg,
+  markOwnRequestFulfilledPg,
+  boostOwnRequestPg,
+  recordRequestEditHistoryPg,
+  getRequestEditHistoryPg,
+  saveRequestTranslationPg,
+  getRequestTranslationPg,
+  getRequestTranslationFieldsPg,
+  deleteRequestTranslationPg,
+  findMatchingDonorsPg,
+  recordDonorMatchesPg,
+  updateDonorMatchResponsePg,
+  getDonorMatchesForRequestPg,
+  getAllDonorMatchesPg,
+  addStatusLogPg,
+  getStatusLogsPg,
+  getAllDonationsPg,
+  updateDonationPg,
+  deleteDonationPg,
+  getDashboardStatsPg,
+  getAnalyticsStatsPg,
+  getBloodInventoryPg,
+  getDistrictStatsPg,
+  getMonthlyStatsPg,
+  getDailyStatsPg,
+  getWeeklyStatsPg,
+  seedDonorEligibilityDataPg,
+  getOrganizationsPg,
+  getAllOrganizationsPg,
+  createOrganizationPg,
+  updateOrganizationPg,
+  deleteOrganizationPg,
+  getSiteSettingsPg,
+  updateSiteSettingsPg,
+  recordActivityLogPg,
+  getActivityLogPg,
+  bulkDeleteProfilesPg,
+  bulkDeactivateProfilesPg,
+  bulkActivateProfilesPg,
+  bulkDeleteRequestsPg,
+  bulkUpdateRequestStatusPg,
+  bulkDeleteDonationsPg,
+  getSocialFeedPg,
+  createSocialPostPg,
+  getSocialPostByIdPg,
+  updateSocialPostPg,
+  deleteSocialPostPg,
+  toggleSocialPostLikePg,
+  addSocialPostCommentPg,
+  getSocialPostCommentsPg,
+  incrementSocialPostSharePg,
+  pinSocialPostPg,
+  adminGetSocialPostsPg,
+  toggleBookmarkPg,
+  isBookmarkedPg,
+  getBookmarkedDonorIdsPg,
+  getBookmarkedDonorsPg,
+  updateLastActivePg,
+  recordContactClickPg,
+  getDonorContactClickStatsPg,
+  searchReferrerCandidatesPg,
+} from "@/lib/pg/queries";
 
 // Profile actions
 export async function serverGetProfileByUserId(userId: number) {
@@ -186,6 +274,7 @@ export async function serverGetProfileByPhone(phone: string) {
 }
 
 export async function serverCreateProfile(profile: Record<string, any>) {
+  if (isSupabaseAvailable()) return createProfilePg(profile);
   return dbCreateProfile(profile);
 }
 
@@ -449,6 +538,7 @@ export async function serverUpdateProfile(
 }
 
 export async function serverGetAllProfiles() {
+  if (isSupabaseAvailable()) return getAllProfilesPg();
   return getAllProfiles();
 }
 
@@ -464,6 +554,7 @@ export async function serverGetProfilesByRole(role: string) {
 }
 
 export async function serverGetProfilesByRoles(roles: string[]) {
+  if (isSupabaseAvailable()) return getProfilesByRolesPg(roles);
   return getProfilesByRoles(roles);
 }
 
@@ -474,10 +565,26 @@ export async function serverGetProfilesByRoles(roles: string[]) {
  */
 export async function serverDeleteProfile(id: number) {
   const ctx = await requireFullAdmin();
-  const target = (await getProfileByUserId(id)) as any;
+  const target = (await (isSupabaseAvailable() ? serverGetProfileByUserId(id) : getProfileByUserId(id))) as any;
   if (!target) throw new Error("Profile not found");
   if (target.role === "super_admin") {
     throw new Error("Cannot delete a super admin account");
+  }
+  if (isSupabaseAvailable()) {
+    const result = deleteProfilePg(id);
+    try {
+      await recordActivityLogPg({
+        actorId: ctx.id,
+        actorEmail: ctx.email,
+        action: "profile_deleted",
+        entityType: "profile",
+        entityId: String(id),
+        details: `Deleted ${target.role} "${target.full_name_en || target.email}" (#${id})`,
+      });
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
+    return result;
   }
   const result = dbDeleteProfile(id);
   try {
@@ -513,6 +620,7 @@ export async function serverSearchProfiles(filters?: {
     }
     scoped.districts = districtMatchValues(ctx.assignedDistrict);
   }
+  if (isSupabaseAvailable()) return searchProfilesPg(scoped);
   return dbSearchProfiles(scoped);
 }
 
@@ -523,6 +631,7 @@ export async function serverGetAdmins(filters?: {
   offset?: number;
 }) {
   await requireFullAdmin();
+  if (isSupabaseAvailable()) return getAdminsPg(filters);
   return dbGetAdmins(filters);
 }
 
@@ -548,6 +657,22 @@ export async function serverGetMyAdminContext() {
 /** Record the calling admin's acceptance of the admin policy & terms. */
 export async function serverAcceptAdminPolicy() {
   const ctx = await requireAdmin();
+  if (isSupabaseAvailable()) {
+    const changes = recordAdminPolicyAcceptancePg(ctx.id);
+    try {
+      await recordActivityLogPg({
+        actorId: ctx.id,
+        actorEmail: ctx.email,
+        action: "admin_policy_accepted",
+        entityType: "profile",
+        entityId: String(ctx.id),
+        details: `${ctx.email} accepted the admin policy & terms`,
+      });
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
+    return changes;
+  }
   const changes = recordAdminPolicyAcceptance(ctx.id);
   try {
     dbRecordActivityLog({
@@ -572,6 +697,26 @@ export async function serverSetAdminAssignment(
   assignedUpazila: string | null,
 ) {
   const ctx = await requireFullAdmin();
+  if (isSupabaseAvailable()) {
+    const changes = setAdminAssignmentPg(
+      profileId,
+      assignedDistrict || null,
+      assignedUpazila || null,
+    );
+    try {
+      await recordActivityLogPg({
+        actorId: ctx.id,
+        actorEmail: ctx.email,
+        action: "admin_assignment_changed",
+        entityType: "profile",
+        entityId: String(profileId),
+        details: `Set admin #${profileId} scope to district=${assignedDistrict || "(full)"} upazila=${assignedUpazila || "(all)"}`,
+      });
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
+    return changes;
+  }
   const changes = setAdminAssignment(
     profileId,
     assignedDistrict || null,
@@ -611,6 +756,7 @@ export async function serverSearchBloodRequests(filters?: {
   limit?: number;
   offset?: number;
 }) {
+  if (isSupabaseAvailable()) return searchBloodRequestsPg(filters);
   return dbSearchBloodRequests(filters);
 }
 
@@ -697,11 +843,26 @@ export async function serverUpdateBloodRequest(
   data: Record<string, any>,
 ) {
   const ctx = await requireAdmin();
+  const usePg = isSupabaseAvailable();
   if (ctx.isDistrictAdmin) {
-    const req = (await getBloodRequestById(id)) as any;
+    const req = (await (usePg ? getBloodRequestByIdPg(id) : getBloodRequestById(id))) as any;
     assertDistrictAllowed(ctx, req?.district);
   }
-  const previous = (await getBloodRequestById(id)) as any;
+  const previous = (await (usePg ? getBloodRequestByIdPg(id) : getBloodRequestById(id))) as any;
+  if (usePg) {
+    const changes = await updateBloodRequestPg(id, data);
+    if (changes > 0 && previous) {
+      await recordRequestEditHistoryPg({
+        requestId: id,
+        editorType: "admin",
+        editorId: ctx.id,
+        editorEmail: ctx.email,
+        previousValues: previous,
+        newValues: data,
+      });
+    }
+    return changes;
+  }
   const changes = dbUpdateBloodRequest(id, data);
   if (changes > 0 && previous) {
     recordRequestEditHistory({
@@ -718,10 +879,12 @@ export async function serverUpdateBloodRequest(
 
 export async function serverUpdateRequestStatus(id: number, status: string) {
   const ctx = await requireAdmin();
+  const usePg = isSupabaseAvailable();
   if (ctx.isDistrictAdmin) {
-    const req = (await getBloodRequestById(id)) as any;
+    const req = (await (usePg ? getBloodRequestByIdPg(id) : getBloodRequestById(id))) as any;
     assertDistrictAllowed(ctx, req?.district);
   }
+  if (usePg) return updateRequestStatusPg(id, status);
   return dbUpdateRequestStatus(id, status);
 }
 
@@ -733,9 +896,16 @@ export async function serverUpdateRequestStatus(id: number, status: string) {
  */
 export async function serverAdminUpdateLifecycleStatus(id: number, status: string) {
   const ctx = await requireAdmin();
+  const usePg = isSupabaseAvailable();
   if (ctx.isDistrictAdmin) {
-    const req = (await getBloodRequestById(id)) as any;
+    const req = (await (usePg ? getBloodRequestByIdPg(id) : getBloodRequestById(id))) as any;
     assertDistrictAllowed(ctx, req?.district);
+  }
+  if (usePg) {
+    if (status === "fulfilled" || status === "cancelled") {
+      await updateRequestStatusPg(id, status);
+    }
+    return addStatusLogPg(id, status, ctx.email || "admin");
   }
   if (status === "fulfilled" || status === "cancelled") {
     dbUpdateRequestStatus(id, status);
@@ -746,6 +916,23 @@ export async function serverAdminUpdateLifecycleStatus(id: number, status: strin
 /** Permanent request deletion — main admins only. */
 export async function serverDeleteRequest(id: number) {
   const ctx = await requireFullAdmin();
+  if (isSupabaseAvailable()) {
+    deleteRequestTranslationPg(id);
+    const result = await deleteRequestPg(id);
+    try {
+      await recordActivityLogPg({
+        actorId: ctx.id,
+        actorEmail: ctx.email,
+        action: "request_deleted_permanent",
+        entityType: "blood_request",
+        entityId: String(id),
+        details: `Permanently deleted request #${id}`,
+      });
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
+    return result;
+  }
   deleteRequestTranslation(id);
   const result = dbDeleteRequest(id);
   try {
@@ -837,6 +1024,7 @@ export async function serverGetDonationsByDonorId(donorId: number, _cacheBuster?
 }
 
 export async function serverGetAllDonations() {
+  if (isSupabaseAvailable()) return getAllDonationsPg();
   return getAllDonations();
 }
 
@@ -868,11 +1056,12 @@ export async function serverGetRequestByQrContent(
   }
 
   let req: any = null;
+  const usePg = isSupabaseAvailable();
   if (parsed.trackingCode) {
-    req = getBloodRequestByTrackingCode(parsed.trackingCode);
+    req = usePg ? await getBloodRequestByTrackingCodePg(parsed.trackingCode) : getBloodRequestByTrackingCode(parsed.trackingCode);
   }
   if (!req && parsed.requestId) {
-    req = getBloodRequestById(parsed.requestId);
+    req = usePg ? await getBloodRequestByIdPg(parsed.requestId) : getBloodRequestById(parsed.requestId);
   }
   if (!req) {
     return { request: null, error: "Request not found" };
@@ -920,7 +1109,8 @@ export async function serverRecordDonationByScan(
     return { success: false, error: "You must be logged in to record a donation" };
   }
 
-  const req = getBloodRequestById(input.requestId) as any;
+  const usePg = isSupabaseAvailable();
+  const req = (usePg ? await getBloodRequestByIdPg(input.requestId) : getBloodRequestById(input.requestId)) as any;
   if (!req) {
     return { success: false, error: "Request not found" };
   }
@@ -932,7 +1122,7 @@ export async function serverRecordDonationByScan(
   }
 
   // Get the donor's full profile to check blood group
-  const profile = (await getProfileByUserId(me.id)) as any;
+  const profile = (await (usePg ? serverGetProfileByUserId(me.id) : getProfileByUserId(me.id))) as any;
   if (!profile) {
     return { success: false, error: "Profile not found" };
   }
@@ -947,6 +1137,57 @@ export async function serverRecordDonationByScan(
   }
 
   // Check for duplicate donation (same donor + same request)
+  if (usePg) {
+    const { rows: existingRows } = await pgQuery(
+      "SELECT id FROM donations WHERE donor_id = $1 AND request_id = $2",
+      [me.id, input.requestId],
+    );
+    if (existingRows.length > 0) {
+      return { success: false, error: "You have already recorded a donation for this request" };
+    }
+
+    const donationDate = new Date().toISOString().slice(0, 10);
+    const { rows: insRows } = await pgQuery<{ id: number }>(
+      `INSERT INTO donations (donor_id, request_id, blood_group, units, hospital_name, donation_date, donation_type, recipient_type, referrer_profile_id, referrer_name, referrer_phone)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+      [
+        me.id,
+        input.requestId,
+        req.blood_group,
+        input.units ?? 1,
+        req.hospital_name ?? null,
+        donationDate,
+        input.donationType || "whole_blood",
+        "Patient",
+        input.referrerProfileId ?? null,
+        input.referrerName ?? null,
+        input.referrerPhone ?? null,
+      ],
+    );
+    const donationId = insRows[0].id;
+
+    await pgQuery(
+      `UPDATE profiles
+       SET last_donation_date = $1,
+           last_donation_type = COALESCE($2, 'whole_blood')
+       WHERE id = $3
+         AND ($1 >= COALESCE(NULLIF(last_donation_date, ''), '0000-01-01'))`,
+      [donationDate, input.donationType || "whole_blood", me.id],
+    );
+
+    if (input.referrerProfileId != null || (input.referrerName && String(input.referrerName).trim() !== "")) {
+      await pgQuery(
+        `UPDATE blood_requests
+         SET referrer_profile_id = $1,
+             referrer_name = $2,
+             referrer_phone = $3,
+             updated_at = NOW()
+         WHERE id = $4`,
+        [input.referrerProfileId ?? null, input.referrerName ?? null, input.referrerPhone ?? null, input.requestId],
+      );
+    }
+    return { success: true, donationId };
+  }
   const { getDb } = await import("@/lib/db");
   const db = getDb();
   const existing = db
@@ -976,10 +1217,12 @@ export async function serverRecordDonationByScan(
 
 // Stats actions
 export async function serverGetDashboardStats() {
+  if (isSupabaseAvailable()) return getDashboardStatsPg();
   return getDashboardStats();
 }
 
 export async function serverGetAnalyticsStats() {
+  if (isSupabaseAvailable()) return getAnalyticsStatsPg() as any;
   return getAnalyticsStats();
 }
 
@@ -989,18 +1232,22 @@ export async function serverGetDonorsWithStats() {
 }
 
 export async function serverSeedDonorEligibilityData() {
+  if (isSupabaseAvailable()) return seedDonorEligibilityDataPg();
   return seedDonorEligibilityData();
 }
 
 export async function serverGetMonthlyStats() {
+  if (isSupabaseAvailable()) return getMonthlyStatsPg();
   return getMonthlyStats();
 }
 
 export async function serverGetDailyStats(days?: number) {
+  if (isSupabaseAvailable()) return getDailyStatsPg(days);
   return getDailyStats(days);
 }
 
 export async function serverGetWeeklyStats(weeks?: number) {
+  if (isSupabaseAvailable()) return getWeeklyStatsPg(weeks);
   return getWeeklyStats(weeks);
 }
 
@@ -1010,10 +1257,12 @@ export async function serverGetHomepageStats() {
 }
 
 export async function serverGetBloodInventory() {
+  if (isSupabaseAvailable()) return getBloodInventoryPg();
   return getBloodInventory();
 }
 
 export async function serverGetDistrictStats() {
+  if (isSupabaseAvailable()) return getDistrictStatsPg();
   return getDistrictStats();
 }
 
@@ -1027,7 +1276,19 @@ export async function serverFindMatchingDonors(
   limit?: number,
   requestLat?: number | null,
   requestLng?: number | null,
+  exactMatch?: boolean,
 ) {
+  if (isSupabaseAvailable())
+    return findMatchingDonorsPg(
+      bloodGroup,
+      district,
+      upazila,
+      urgencyLevel,
+      limit,
+      requestLat,
+      requestLng,
+      exactMatch,
+    );
   return findMatchingDonors(
     bloodGroup,
     district,
@@ -1036,6 +1297,7 @@ export async function serverFindMatchingDonors(
     limit,
     requestLat,
     requestLng,
+    exactMatch,
   );
 }
 
@@ -1044,6 +1306,7 @@ export async function serverRecordDonorMatches(
   matches: any[],
   method: string = "sms",
 ) {
+  if (isSupabaseAvailable()) return recordDonorMatchesPg(requestId, matches, method);
   return recordDonorMatches(requestId, matches, method);
 }
 
@@ -1052,10 +1315,12 @@ export async function serverUpdateDonorMatchResponse(
   donorId: number,
   responseStatus: "accepted" | "declined" | "no_response",
 ) {
+  if (isSupabaseAvailable()) return updateDonorMatchResponsePg(requestId, donorId, responseStatus);
   return updateDonorMatchResponse(requestId, donorId, responseStatus);
 }
 
 export async function serverGetDonorMatchesForRequest(requestId: number) {
+  if (isSupabaseAvailable()) return getDonorMatchesForRequestPg(requestId);
   return getDonorMatchesForRequest(requestId);
 }
 
@@ -1067,10 +1332,12 @@ export async function serverAddStatusLog(
   changedBy?: string,
   note?: string,
 ) {
+  if (isSupabaseAvailable()) return addStatusLogPg(requestId, status, changedBy, note);
   return addStatusLog(requestId, status, changedBy, note);
 }
 
 export async function serverGetStatusLogs(requestId: number) {
+  if (isSupabaseAvailable()) return getStatusLogsPg(requestId);
   return getStatusLogs(requestId);
 }
 
@@ -1325,6 +1592,7 @@ export async function serverGetDonationImpactStats() {
 // ── Phase 5.3: Organizations ──────────────────────────────────────────
 
 export async function serverGetOrganizations() {
+  if (isSupabaseAvailable()) return getOrganizationsPg();
   return getOrganizations();
 }
 
@@ -1380,7 +1648,7 @@ export async function serverChatWithAssistant(
     } catch {
       // fall back to a shared bucket if fingerprinting is unavailable
     }
-    const limit = checkRateLimit(rateKey, 30, 5 * 60 * 1000, 10 * 60 * 1000);
+    const limit = await checkRateLimit(rateKey, 30, 5 * 60 * 1000, 10 * 60 * 1000);
     if (!limit.allowed) {
       const waitMin = Math.ceil(
         ((limit.lockedUntil ?? limit.resetTime) - Date.now()) / 60000,
@@ -1396,8 +1664,7 @@ export async function serverChatWithAssistant(
     const { getSession } = await import("@/lib/auth/session");
     const session = await getSession();
     if (session) {
-      const { getProfileByEmail, getDonationsByDonorId } = await import("./db");
-      const profile = getProfileByEmail(session.email) as any;
+      const profile = (await serverGetProfileByEmail(session.email)) as any;
       if (profile) {
         userProfile = {
           id: profile.id,
@@ -1417,7 +1684,7 @@ export async function serverChatWithAssistant(
           donationCount: 0,
         };
         try {
-          const donations = getDonationsByDonorId(profile.id) as any[];
+          const donations = (await serverGetDonationsByDonorId(profile.id)) as any[];
           (userProfile as any).donationCount = donations?.length || 0;
           if (donations?.length > 0) {
             (userProfile as any).lastDonationDate = donations[0].donation_date || profile.last_donation_date;
@@ -1434,7 +1701,7 @@ export async function serverChatWithAssistant(
   const { chatWithAssistant } = await import("./ai/user-assistant");
   const result = await chatWithAssistant(message, safeHistory, isBn, workflowState ?? null, safeLocation, userProfile);
   if (process.env.NODE_ENV === "production") {
-    incrementRateLimit(rateKey, 5 * 60 * 1000);
+    await incrementRateLimit(rateKey, 5 * 60 * 1000);
   }
   return result;
 }
@@ -1486,11 +1753,28 @@ export async function serverGetAssistantQuickReplies() {
 // ── Phase 3.1: Site Settings persistence ──────────────────────────────
 
 export async function serverGetSiteSettings() {
+  if (isSupabaseAvailable()) return getSiteSettingsPg();
   return dbGetSiteSettings();
 }
 
 export async function serverUpdateSiteSettings(settings: Record<string, string>) {
   const ctx = await requireFullAdmin();
+  if (isSupabaseAvailable()) {
+    const result = await updateSiteSettingsPg(settings);
+    try {
+      await recordActivityLogPg({
+        actorId: ctx.id,
+        actorEmail: ctx.email,
+        action: "settings_updated",
+        entityType: "site_settings",
+        entityId: null,
+        details: `Updated ${result} setting(s): ${Object.keys(settings).join(", ")}`,
+      });
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
+    return result;
+  }
   const result = dbUpdateSiteSettings(settings);
   try {
     dbRecordActivityLog({
@@ -1518,6 +1802,7 @@ export async function serverGetActivityLog(filters?: {
   actorId?: number;
 }) {
   await requireFullAdmin();
+  if (isSupabaseAvailable()) return getActivityLogPg(filters);
   return dbGetActivityLog(filters);
 }
 
@@ -1530,6 +1815,10 @@ export async function serverGetRecentActivityLog(
   limit = 5,
 ): Promise<any[]> {
   await requireAdmin();
+  if (isSupabaseAvailable()) {
+    const result = await getActivityLogPg({ action, sinceHours, limit });
+    return result.rows;
+  }
   const result = await dbGetActivityLog({ action, sinceHours, limit });
   return result.rows;
 }
@@ -1543,12 +1832,29 @@ export async function serverRecordActivityLog(entry: {
   details?: string | null;
   ipAddress?: string | null;
 }) {
+  if (isSupabaseAvailable()) return recordActivityLogPg(entry);
   return dbRecordActivityLog(entry);
 }
 
 // ── Phase 4.1: Donations CRUD ─────────────────────────────────────────
 
 export async function serverUpdateDonation(id: number, data: Record<string, any>) {
+  if (isSupabaseAvailable()) {
+    const result = await updateDonationPg(id, data);
+    try {
+      await recordActivityLogPg({
+        actorId: null,
+        actorEmail: null,
+        action: "donation_updated",
+        entityType: "donation",
+        entityId: String(id),
+        details: `Updated donation #${id}: ${Object.keys(data).join(", ")}`,
+      });
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
+    return result;
+  }
   const result = dbUpdateDonation(id, data);
   try {
     dbRecordActivityLog({
@@ -1567,6 +1873,22 @@ export async function serverUpdateDonation(id: number, data: Record<string, any>
 
 export async function serverDeleteDonation(id: number) {
   const ctx = await requireFullAdmin();
+  if (isSupabaseAvailable()) {
+    const result = await deleteDonationPg(id);
+    try {
+      await recordActivityLogPg({
+        actorId: ctx.id,
+        actorEmail: ctx.email,
+        action: "donation_deleted",
+        entityType: "donation",
+        entityId: String(id),
+        details: `Deleted donation #${id}`,
+      });
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
+    return result;
+  }
   const result = dbDeleteDonation(id);
   try {
     dbRecordActivityLog({
@@ -1586,6 +1908,7 @@ export async function serverDeleteDonation(id: number) {
 // ── Phase 4.2: Organizations CRUD ─────────────────────────────────────
 
 export async function serverGetAllOrganizations() {
+  if (isSupabaseAvailable()) return getAllOrganizationsPg();
   return dbGetAllOrganizations();
 }
 
@@ -1598,6 +1921,22 @@ export async function serverCreateOrganization(data: {
   district?: string;
   is_active?: number;
 }) {
+  if (isSupabaseAvailable()) {
+    const id = await createOrganizationPg(data);
+    try {
+      await recordActivityLogPg({
+        actorId: null,
+        actorEmail: null,
+        action: "organization_created",
+        entityType: "organization",
+        entityId: String(id),
+        details: `Created organization: ${data.name_en}`,
+      });
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
+    return id;
+  }
   const id = dbCreateOrganization(data);
   try {
     dbRecordActivityLog({
@@ -1615,6 +1954,22 @@ export async function serverCreateOrganization(data: {
 }
 
 export async function serverUpdateOrganization(id: number, data: Record<string, any>) {
+  if (isSupabaseAvailable()) {
+    const result = await updateOrganizationPg(id, data);
+    try {
+      await recordActivityLogPg({
+        actorId: null,
+        actorEmail: null,
+        action: "organization_updated",
+        entityType: "organization",
+        entityId: String(id),
+        details: `Updated organization #${id}: ${Object.keys(data).join(", ")}`,
+      });
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
+    return result;
+  }
   const result = dbUpdateOrganization(id, data);
   try {
     dbRecordActivityLog({
@@ -1633,6 +1988,22 @@ export async function serverUpdateOrganization(id: number, data: Record<string, 
 
 export async function serverDeleteOrganization(id: number) {
   const ctx = await requireFullAdmin();
+  if (isSupabaseAvailable()) {
+    const result = await deleteOrganizationPg(id);
+    try {
+      await recordActivityLogPg({
+        actorId: ctx.id,
+        actorEmail: ctx.email,
+        action: "organization_deactivated",
+        entityType: "organization",
+        entityId: String(id),
+        details: `Deactivated organization #${id}`,
+      });
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
+    return result;
+  }
   const result = dbDeleteOrganization(id);
   try {
     dbRecordActivityLog({
@@ -1653,6 +2024,22 @@ export async function serverDeleteOrganization(id: number) {
 
 export async function serverBulkDeleteProfiles(ids: number[]) {
   const ctx = await requireFullAdmin();
+  if (isSupabaseAvailable()) {
+    const result = await bulkDeleteProfilesPg(ids);
+    try {
+      await recordActivityLogPg({
+        actorId: ctx.id,
+        actorEmail: ctx.email,
+        action: "profiles_bulk_deleted",
+        entityType: "profile",
+        entityId: null,
+        details: `Bulk deleted ${result} profile(s): IDs [${ids.join(", ")}]`,
+      });
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
+    return result;
+  }
   const result = bulkDeleteProfiles(ids);
   try {
     dbRecordActivityLog({
@@ -1671,6 +2058,22 @@ export async function serverBulkDeleteProfiles(ids: number[]) {
 
 export async function serverBulkDeactivateProfiles(ids: number[]) {
   const ctx = await requireAdmin();
+  if (isSupabaseAvailable()) {
+    const result = await bulkDeactivateProfilesPg(ids);
+    try {
+      await recordActivityLogPg({
+        actorId: ctx.id,
+        actorEmail: ctx.email,
+        action: "profiles_bulk_deactivated",
+        entityType: "profile",
+        entityId: null,
+        details: `Bulk deactivated ${result} profile(s): IDs [${ids.join(", ")}]`,
+      });
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
+    return result;
+  }
   const result = bulkDeactivateProfiles(ids);
   try {
     dbRecordActivityLog({
@@ -1689,6 +2092,22 @@ export async function serverBulkDeactivateProfiles(ids: number[]) {
 
 export async function serverBulkActivateProfiles(ids: number[]) {
   const ctx = await requireAdmin();
+  if (isSupabaseAvailable()) {
+    const result = await bulkActivateProfilesPg(ids);
+    try {
+      await recordActivityLogPg({
+        actorId: ctx.id,
+        actorEmail: ctx.email,
+        action: "profiles_bulk_activated",
+        entityType: "profile",
+        entityId: null,
+        details: `Bulk activated ${result} profile(s): IDs [${ids.join(", ")}]`,
+      });
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
+    return result;
+  }
   const result = bulkActivateProfiles(ids);
   try {
     dbRecordActivityLog({
@@ -1707,6 +2126,22 @@ export async function serverBulkActivateProfiles(ids: number[]) {
 
 export async function serverBulkDeleteRequests(ids: number[]) {
   const ctx = await requireAdmin();
+  if (isSupabaseAvailable()) {
+    const result = await bulkDeleteRequestsPg(ids);
+    try {
+      await recordActivityLogPg({
+        actorId: ctx.id,
+        actorEmail: ctx.email,
+        action: "requests_bulk_deleted",
+        entityType: "blood_request",
+        entityId: null,
+        details: `Bulk deleted ${result} request(s): IDs [${ids.join(", ")}]`,
+      });
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
+    return result;
+  }
   const result = bulkDeleteRequests(ids);
   try {
     dbRecordActivityLog({
@@ -1725,6 +2160,22 @@ export async function serverBulkDeleteRequests(ids: number[]) {
 
 export async function serverBulkUpdateRequestStatus(ids: number[], status: string) {
   const ctx = await requireAdmin();
+  if (isSupabaseAvailable()) {
+    const result = await bulkUpdateRequestStatusPg(ids, status);
+    try {
+      await recordActivityLogPg({
+        actorId: ctx.id,
+        actorEmail: ctx.email,
+        action: "requests_bulk_status_update",
+        entityType: "blood_request",
+        entityId: null,
+        details: `Bulk updated ${result} request(s) to status "${status}": IDs [${ids.join(", ")}]`,
+      });
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
+    return result;
+  }
   const result = bulkUpdateRequestStatus(ids, status);
   try {
     dbRecordActivityLog({
@@ -1743,6 +2194,22 @@ export async function serverBulkUpdateRequestStatus(ids: number[], status: strin
 
 export async function serverBulkDeleteDonations(ids: number[]) {
   const ctx = await requireFullAdmin();
+  if (isSupabaseAvailable()) {
+    const result = await bulkDeleteDonationsPg(ids);
+    try {
+      await recordActivityLogPg({
+        actorId: ctx.id,
+        actorEmail: ctx.email,
+        action: "donations_bulk_deleted",
+        entityType: "donation",
+        entityId: null,
+        details: `Bulk deleted ${result} donation(s): IDs [${ids.join(", ")}]`,
+      });
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
+    return result;
+  }
   const result = bulkDeleteDonations(ids);
   try {
     dbRecordActivityLog({
@@ -1768,6 +2235,7 @@ export async function serverGetAllDonorMatches(filters?: {
   requestId?: number;
   donorId?: number;
 }) {
+  if (isSupabaseAvailable()) return getAllDonorMatchesPg(filters);
   return dbGetAllDonorMatches(filters);
 }
 
@@ -1775,11 +2243,13 @@ export async function serverGetAllDonorMatches(filters?: {
 
 /** Public feed: active + last-chance + recently-fulfilled (seal window). */
 export async function serverGetVisibleBloodRequests() {
+  if (isSupabaseAvailable()) return getVisibleBloodRequestsPg2();
   return getVisibleBloodRequests();
 }
 
 /** Per-tab counts for the admin blood-requests page. */
 export async function serverGetRequestStatusCounts() {
+  if (isSupabaseAvailable()) return getRequestStatusCountsPg();
   return getRequestStatusCounts();
 }
 
@@ -1804,6 +2274,7 @@ export async function serverGetAdminRequests(filters?: {
   if (ctx.isDistrictAdmin) {
     scoped.districts = districtMatchValues(ctx.assignedDistrict);
   }
+  if (isSupabaseAvailable()) return getAdminRequestsPg(scoped);
   return getAdminRequests(scoped);
 }
 
@@ -1822,14 +2293,17 @@ export async function serverGetMyRequests(userId: number) {
 }
 
 export async function serverGetRequestsByHospital(hospitalNameEn: string, hospitalNameBn?: string) {
+  if (isSupabaseAvailable()) return getBloodRequestsByHospitalPg(hospitalNameEn, hospitalNameBn);
   return getBloodRequestsByHospital(hospitalNameEn, hospitalNameBn);
 }
 
 export async function serverGetDonationsByHospital(hospitalNameEn: string, hospitalNameBn?: string) {
+  if (isSupabaseAvailable()) return getDonationsByHospitalPg(hospitalNameEn, hospitalNameBn);
   return getDonationsByHospital(hospitalNameEn, hospitalNameBn);
 }
 
 export async function serverGetHospitalStats(hospitalNameEn: string, hospitalNameBn?: string) {
+  if (isSupabaseAvailable()) return getHospitalStatsPg(hospitalNameEn, hospitalNameBn);
   return getHospitalStats(hospitalNameEn, hospitalNameBn);
 }
 
@@ -1888,11 +2362,13 @@ export async function serverGetRequestsForDonor(donorId: number) {
 
 /** Units collected so far for a request (fulfillment progress bar). */
 export async function serverGetRequestProgress(requestId: number) {
+  if (isSupabaseAvailable()) return getRequestCollectedUnitsPg(requestId);
   return getRequestCollectedUnits(requestId);
 }
 
 /** Status-change history for a request (pipeline timestamps). */
 export async function serverGetRequestStatusLogs(requestId: number) {
+  if (isSupabaseAvailable()) return getStatusLogsPg(requestId);
   return getStatusLogs(requestId);
 }
 
@@ -1902,6 +2378,25 @@ export async function serverUpdateOwnRequest(
   userId: number,
   data: Record<string, any>,
 ) {
+  if (isSupabaseAvailable()) {
+    const changes = await updateOwnBloodRequestPg(requestId, userId, data);
+    if (changes === 0) {
+      throw new Error("Request not found, not active, or not yours");
+    }
+    try {
+      await recordActivityLogPg({
+        actorId: userId,
+        actorEmail: null,
+        action: "request_updated_by_user",
+        entityType: "blood_request",
+        entityId: String(requestId),
+        details: `Requester updated request #${requestId}`,
+      });
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
+    return changes;
+  }
   const changes = updateOwnBloodRequest(requestId, userId, data);
   if (changes === 0) {
     throw new Error("Request not found, not active, or not yours");
@@ -1929,7 +2424,7 @@ export async function serverUpdateOwnRequest(
 export async function serverCheckGuestEditEligibility(requestId: number): Promise<boolean> {
   const { getVisitorFingerprint, matchesVisitor } = await import("./auth/visitor");
   const { ip, userAgent } = await getVisitorFingerprint();
-  const req = (await getBloodRequestById(requestId)) as any;
+  const req = (await (isSupabaseAvailable() ? getBloodRequestByIdPg(requestId) : getBloodRequestById(requestId))) as any;
   if (!req) return false;
   if (req.requester_id != null) return false;
   if (req.status !== "active" || req.archived_at != null) return false;
@@ -1946,7 +2441,7 @@ export async function serverUpdateGuestRequest(
 
   // Rate limit: 10 edits per 15 minutes per IP
   const rateKey = `guest-edit:${ip}`;
-  const limit = checkRateLimit(rateKey, 10, 15 * 60 * 1000, 30 * 60 * 1000);
+  const limit = await checkRateLimit(rateKey, 10, 15 * 60 * 1000, 30 * 60 * 1000);
   if (!limit.allowed) {
     const waitMin = Math.ceil(
       ((limit.lockedUntil ?? limit.resetTime) - Date.now()) / 60000,
@@ -1956,22 +2451,37 @@ export async function serverUpdateGuestRequest(
     );
   }
 
-  const changes = updateGuestBloodRequest(requestId, ip, userAgent, data);
+  const usePg = isSupabaseAvailable();
+  const changes = usePg
+    ? await updateGuestBloodRequestPg(requestId, ip, userAgent, data)
+    : updateGuestBloodRequest(requestId, ip, userAgent, data);
   if (changes === 0) {
-    recordFailedAttempt(rateKey);
+    await recordFailedAttempt(rateKey);
     throw new Error("Request not found, not active, or not yours");
   }
-  clearRateLimit(rateKey);
+  await clearRateLimit(rateKey);
   try {
-    dbRecordActivityLog({
-      actorId: null,
-      actorEmail: null,
-      action: "request_updated_by_guest",
-      entityType: "blood_request",
-      entityId: String(requestId),
-      details: `Guest (IP: ${ip}) updated request #${requestId}`,
-      ipAddress: ip,
-    });
+    if (usePg) {
+      await recordActivityLogPg({
+        actorId: null,
+        actorEmail: null,
+        action: "request_updated_by_guest",
+        entityType: "blood_request",
+        entityId: String(requestId),
+        details: `Guest (IP: ${ip}) updated request #${requestId}`,
+        ipAddress: ip,
+      });
+    } else {
+      dbRecordActivityLog({
+        actorId: null,
+        actorEmail: null,
+        action: "request_updated_by_guest",
+        entityType: "blood_request",
+        entityId: String(requestId),
+        details: `Guest (IP: ${ip}) updated request #${requestId}`,
+        ipAddress: ip,
+      });
+    }
   } catch (e) {
     console.error("Failed to record activity log:", e);
   }
@@ -1985,7 +2495,7 @@ export async function serverCancelGuestRequest(requestId: number) {
 
   // Rate limit: 3 cancellations per 15 minutes per IP
   const rateKey = `guest-cancel:${ip}`;
-  const limit = checkRateLimit(rateKey, 3, 15 * 60 * 1000, 60 * 60 * 1000);
+  const limit = await checkRateLimit(rateKey, 3, 15 * 60 * 1000, 60 * 60 * 1000);
   if (!limit.allowed) {
     const waitMin = Math.ceil(
       ((limit.lockedUntil ?? limit.resetTime) - Date.now()) / 60000,
@@ -1995,23 +2505,42 @@ export async function serverCancelGuestRequest(requestId: number) {
     );
   }
 
-  const changes = archiveGuestRequest(requestId, ip, userAgent);
+  const usePg = isSupabaseAvailable();
+  const changes = usePg
+    ? await archiveGuestRequestPg(requestId, ip, userAgent)
+    : archiveGuestRequest(requestId, ip, userAgent);
   if (changes === 0) {
-    recordFailedAttempt(rateKey);
+    await recordFailedAttempt(rateKey);
     throw new Error("Request not found, not active, or not yours");
   }
-  clearRateLimit(rateKey);
-  deleteRequestTranslation(requestId);
+  await clearRateLimit(rateKey);
+  if (usePg) {
+    deleteRequestTranslationPg(requestId);
+  } else {
+    deleteRequestTranslation(requestId);
+  }
   try {
-    dbRecordActivityLog({
-      actorId: null,
-      actorEmail: null,
-      action: "request_cancelled_by_guest",
-      entityType: "blood_request",
-      entityId: String(requestId),
-      details: `Guest (IP: ${ip}) cancelled request #${requestId}`,
-      ipAddress: ip,
-    });
+    if (usePg) {
+      await recordActivityLogPg({
+        actorId: null,
+        actorEmail: null,
+        action: "request_cancelled_by_guest",
+        entityType: "blood_request",
+        entityId: String(requestId),
+        details: `Guest (IP: ${ip}) cancelled request #${requestId}`,
+        ipAddress: ip,
+      });
+    } else {
+      dbRecordActivityLog({
+        actorId: null,
+        actorEmail: null,
+        action: "request_cancelled_by_guest",
+        entityType: "blood_request",
+        entityId: String(requestId),
+        details: `Guest (IP: ${ip}) cancelled request #${requestId}`,
+        ipAddress: ip,
+      });
+    }
   } catch (e) {
     console.error("Failed to record activity log:", e);
   }
@@ -2020,14 +2549,35 @@ export async function serverCancelGuestRequest(requestId: number) {
 
 /** Returns the full edit history for a request (admin panel audit trail). */
 export async function serverGetRequestEditHistory(requestId: number) {
+  if (isSupabaseAvailable()) return getRequestEditHistoryPg(requestId);
   return getRequestEditHistory(requestId);
 }
 
 /** Registered requester marks their own active request fulfilled. */
+
 export async function serverMarkOwnRequestFulfilled(
   requestId: number,
   userId: number,
 ) {
+  if (isSupabaseAvailable()) {
+    const changes = await markOwnRequestFulfilledPg(requestId, userId);
+    if (changes === 0) {
+      throw new Error("Request not found, not active, or not yours");
+    }
+    try {
+      await recordActivityLogPg({
+        actorId: userId,
+        actorEmail: null,
+        action: "request_fulfilled_by_user",
+        entityType: "blood_request",
+        entityId: String(requestId),
+        details: `Requester marked request #${requestId} fulfilled`,
+      });
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
+    return changes;
+  }
   const changes = markOwnRequestFulfilled(requestId, userId);
   if (changes === 0) {
     throw new Error("Request not found, not active, or not yours");
@@ -2052,7 +2602,8 @@ export async function serverMarkOwnRequestFulfilled(
  * and records a fresh notification round so more donors see it.
  */
 export async function serverBoostOwnRequest(requestId: number, userId: number) {
-  const changes = boostOwnRequest(requestId, userId);
+  const usePg = isSupabaseAvailable();
+  const changes = usePg ? await boostOwnRequestPg(requestId, userId) : boostOwnRequest(requestId, userId);
   if (changes === 0) {
     throw new Error(
       "Boost unavailable — request is not active, not yours, or was boosted within the last 24 hours",
@@ -2061,7 +2612,7 @@ export async function serverBoostOwnRequest(requestId: number, userId: number) {
 
   let matchedCount = 0;
   try {
-    const req = (await getBloodRequestById(requestId)) as any;
+    const req = (await (usePg ? getBloodRequestByIdPg(requestId) : getBloodRequestById(requestId))) as any;
     if (req) {
       const matches = (await serverFindMatchingDonors(
         req.blood_group,
@@ -2076,21 +2627,36 @@ export async function serverBoostOwnRequest(requestId: number, userId: number) {
         await serverRecordDonorMatches(requestId, matches, "boost");
         matchedCount = matches.length;
       }
-      addStatusLog(requestId, "active", "requester", "Request boosted by owner");
+      if (usePg) {
+        await addStatusLogPg(requestId, "active", "requester", "Request boosted by owner");
+      } else {
+        addStatusLog(requestId, "active", "requester", "Request boosted by owner");
+      }
     }
   } catch (e) {
     console.error("Boost re-matching failed (non-blocking):", e);
   }
 
   try {
-    dbRecordActivityLog({
-      actorId: userId,
-      actorEmail: null,
-      action: "request_boosted",
-      entityType: "blood_request",
-      entityId: String(requestId),
-      details: `Requester boosted request #${requestId}; ${matchedCount} donors re-notified`,
-    });
+    if (usePg) {
+      await recordActivityLogPg({
+        actorId: userId,
+        actorEmail: null,
+        action: "request_boosted",
+        entityType: "blood_request",
+        entityId: String(requestId),
+        details: `Requester boosted request #${requestId}; ${matchedCount} donors re-notified`,
+      });
+    } else {
+      dbRecordActivityLog({
+        actorId: userId,
+        actorEmail: null,
+        action: "request_boosted",
+        entityType: "blood_request",
+        entityId: String(requestId),
+        details: `Requester boosted request #${requestId}; ${matchedCount} donors re-notified`,
+      });
+    }
   } catch (e) {
     console.error("Failed to record activity log:", e);
   }
@@ -2223,6 +2789,24 @@ export async function serverArchiveOwnRequest(
   requestId: number,
   userId: number,
 ) {
+  if (isSupabaseAvailable()) {
+    const changes = await archiveOwnRequestPg(requestId, userId);
+    if (changes > 0) {
+      try {
+        await recordActivityLogPg({
+          actorId: userId,
+          actorEmail: null,
+          action: "request_deleted_by_user",
+          entityType: "blood_request",
+          entityId: String(requestId),
+          details: `Requester deleted request #${requestId}`,
+        });
+      } catch (e) {
+        console.error("Failed to record activity log:", e);
+      }
+    }
+    return changes;
+  }
   const changes = dbArchiveOwnRequest(requestId, userId);
   if (changes > 0) {
     try {
@@ -2265,8 +2849,9 @@ export async function serverMarkRequestFulfilled(
   input: MarkRequestFulfilledInput,
 ) {
   const ctx = await requireAdmin();
+  const usePg = isSupabaseAvailable();
   if (ctx.isDistrictAdmin) {
-    const req = (await getBloodRequestById(input.requestId)) as any;
+    const req = (await (usePg ? getBloodRequestByIdPg(input.requestId) : getBloodRequestById(input.requestId))) as any;
     assertDistrictAllowed(ctx, req?.district);
   }
   return serverMarkRequestFulfilledInner(input);
@@ -2275,24 +2860,13 @@ export async function serverMarkRequestFulfilled(
 async function serverMarkRequestFulfilledInner(
   input: MarkRequestFulfilledInput,
 ) {
-  const req = getBloodRequestById(input.requestId);
+  const usePg = isSupabaseAvailable();
+  const req = usePg ? await getBloodRequestByIdPg(input.requestId) : getBloodRequestById(input.requestId);
   if (!req) throw new Error("Request not found");
 
-  const donationId = dbCreateDonation({
-    donorId: input.donorId,
-    requestId: input.requestId,
-    bloodGroup: req.blood_group,
-    units: input.units || 1,
-    hospitalName: req.hospital_name,
-    donationDate: new Date().toISOString().split("T")[0],
-    donationType: input.donationType || "whole_blood",
-    recipientType: "Patient",
-    referrerProfileId: input.referrerProfileId ?? null,
-    referrerName: input.referrerName ?? null,
-    referrerPhone: input.referrerPhone ?? null,
-  });
-
-  dbUpdateBloodRequest(input.requestId, {
+  let donationId: number;
+  const donationDate = new Date().toISOString().split("T")[0];
+  const updateData = {
     status: "fulfilled",
     current_status: "fulfilled",
     donor_id: input.donorId,
@@ -2303,7 +2877,72 @@ async function serverMarkRequestFulfilledInner(
     referrer_profile_id: input.referrerProfileId ?? null,
     referrer_name: input.referrerName ?? null,
     referrer_phone: input.referrerPhone ?? null,
+  };
+
+  if (usePg) {
+    const { rows } = await pgQuery<{ id: number }>(
+      `INSERT INTO donations (donor_id, request_id, blood_group, units, hospital_name, donation_date, donation_type, recipient_type, referrer_profile_id, referrer_name, referrer_phone)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
+      [
+        input.donorId,
+        input.requestId,
+        req.blood_group,
+        input.units || 1,
+        req.hospital_name ?? null,
+        donationDate,
+        input.donationType || "whole_blood",
+        "Patient",
+        input.referrerProfileId ?? null,
+        input.referrerName ?? null,
+        input.referrerPhone ?? null,
+      ],
+    );
+    donationId = rows[0].id;
+
+    if (input.donorId) {
+      await pgQuery(
+        `UPDATE profiles
+         SET last_donation_date = $1,
+             last_donation_type = COALESCE($2, 'whole_blood')
+         WHERE id = $3
+           AND ($1 >= COALESCE(NULLIF(last_donation_date, ''), '0000-01-01'))`,
+        [donationDate, input.donationType || "whole_blood", input.donorId],
+      );
+    }
+
+    await updateBloodRequestPg(input.requestId, updateData);
+    await addStatusLogPg(input.requestId, "fulfilled", input.actorEmail || "admin", "Request fulfilled");
+
+    try {
+      await recordActivityLogPg({
+        actorId: input.actorId ?? null,
+        actorEmail: input.actorEmail ?? null,
+        action: "request_fulfilled",
+        entityType: "blood_request",
+        entityId: String(input.requestId),
+        details: `Request #${input.requestId} fulfilled; donation #${donationId} recorded`,
+      });
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
+    return donationId;
+  }
+
+  donationId = dbCreateDonation({
+    donorId: input.donorId,
+    requestId: input.requestId,
+    bloodGroup: req.blood_group,
+    units: input.units || 1,
+    hospitalName: req.hospital_name,
+    donationDate,
+    donationType: input.donationType || "whole_blood",
+    recipientType: "Patient",
+    referrerProfileId: input.referrerProfileId ?? null,
+    referrerName: input.referrerName ?? null,
+    referrerPhone: input.referrerPhone ?? null,
   });
+
+  dbUpdateBloodRequest(input.requestId, updateData);
   addStatusLog(input.requestId, "fulfilled", input.actorEmail || "admin", "Request fulfilled");
 
   try {
@@ -2326,6 +2965,26 @@ export async function serverAdminCreateBloodRequest(
   request: Record<string, any>,
   actor?: { actorId?: number | null; actorEmail?: string | null },
 ) {
+  if (isSupabaseAvailable()) {
+    const id = await createBloodRequestPg({
+      ...request,
+      requesterType: "admin",
+      status: "active",
+    });
+    try {
+      await recordActivityLogPg({
+        actorId: actor?.actorId ?? null,
+        actorEmail: actor?.actorEmail ?? null,
+        action: "request_created_by_admin",
+        entityType: "blood_request",
+        entityId: String(id),
+        details: `Admin created request #${id} for ${request.patientName || "patient"}`,
+      });
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
+    return id;
+  }
   const id = dbCreateBloodRequest({
     ...request,
     requesterType: "admin",
@@ -2357,7 +3016,86 @@ export async function serverSearchReferrerCandidates(
   search: string,
   limit: number = 8,
 ) {
+  if (isSupabaseAvailable()) return searchReferrerCandidatesPg(search, limit);
   return searchReferrerCandidates(search, limit);
+}
+
+/** Find active blood requests near a location (PG-aware). */
+export async function serverFindRequestsNearby(
+  lat?: number | null,
+  lng?: number | null,
+  district?: string,
+  bloodGroup?: string,
+  limit = 5,
+) {
+  if (isSupabaseAvailable()) {
+    await runRequestLifecycleSweepPg();
+    const hasCoords = typeof lat === "number" && typeof lng === "number"
+      && Number.isFinite(lat) && Number.isFinite(lng);
+    const conditions = ["status = 'active'", "archived_at IS NULL"];
+    const params: unknown[] = [];
+    if (bloodGroup && bloodGroup !== "ANY") {
+      conditions.push(`blood_group = $${params.length + 1}`);
+      params.push(bloodGroup);
+    }
+    const { rows } = await pgQuery(
+      `SELECT id, tracking_code, blood_group, units_needed, urgency_level,
+              district, upazila, hospital_name, contact_number,
+              needed_date, lat, lng, created_at
+       FROM blood_requests
+       WHERE ${conditions.join(" AND ")}
+       ORDER BY created_at DESC
+       LIMIT 200`,
+      params,
+    );
+    const origin = hasCoords
+      ? { lat: lat as number, lng: lng as number }
+      : district
+        ? resolveCoordsLocal(null, null, district)
+        : null;
+    const districtLower = district?.toLowerCase() ?? null;
+    const scored = (rows as any[]).map((r) => {
+      let distance: number | null = null;
+      if (origin) {
+        const reqCoords = resolveCoordsLocal(r.lat, r.lng, r.district, r.upazila);
+        const dLat = (origin.lat - reqCoords.lat) * Math.PI / 180;
+        const dLng = (origin.lng - reqCoords.lng) * Math.PI / 180;
+        const a = Math.sin(dLat / 2) ** 2 + Math.cos(origin.lat * Math.PI / 180) * Math.cos(reqCoords.lat * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+        distance = Math.round(6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) * 10) / 10;
+      }
+      const sameDistrict = districtLower
+        ? (r.district ?? "").toLowerCase() === districtLower
+        : false;
+      const urgencyBoost = r.urgency_level === "critical" ? 2 : r.urgency_level === "urgent" ? 1 : 0;
+      return { r, distance, sameDistrict, urgencyBoost };
+    });
+    scored.sort((a, b) => {
+      if (a.distance !== null || b.distance !== null) {
+        const da = a.distance ?? Number.POSITIVE_INFINITY;
+        const dbv = b.distance ?? Number.POSITIVE_INFINITY;
+        if (da !== dbv) return da - dbv;
+      }
+      if (a.sameDistrict !== b.sameDistrict) return a.sameDistrict ? -1 : 1;
+      if (a.urgencyBoost !== b.urgencyBoost) return b.urgencyBoost - a.urgencyBoost;
+      return (b.r.created_at ?? "").localeCompare(a.r.created_at ?? "");
+    });
+    return scored.slice(0, limit).map(({ r, distance }) => ({
+      id: r.id,
+      tracking_code: r.tracking_code,
+      blood_group: r.blood_group,
+      units_needed: r.units_needed,
+      urgency_level: r.urgency_level,
+      district: r.district,
+      upazila: r.upazila ?? null,
+      hospital_name: r.hospital_name ?? null,
+      contact_number: r.contact_number ?? null,
+      needed_date: r.needed_date ?? null,
+      distance_km: distance,
+      created_at: r.created_at,
+    }));
+  }
+  const { findRequestsNearby } = await import("./db");
+  return findRequestsNearby(lat, lng, district, bloodGroup, limit);
 }
 
 // ─────────────────────────────────────────────────────────────────────────
@@ -2375,7 +3113,7 @@ async function getCurrentProfile(): Promise<{
 } | null> {
   const session = await getSession();
   if (!session) return null;
-  const profile = (await getProfileByUserId(Number(session.sub))) as any;
+  const profile = (await serverGetProfileByUserId(Number(session.sub))) as any;
   if (!profile) return null;
   return {
     id: profile.id,
@@ -2392,13 +3130,15 @@ export async function serverGetFeed(opts?: {
 }) {
   const session = await getSession();
   const viewerId = session ? Number(session.sub) : null;
-  return getSocialFeed({
+  const feedOpts = {
     viewerId,
     isAdmin: session?.role === "admin" || session?.role === "super_admin",
     limit: opts?.limit ?? 20,
     offset: opts?.offset ?? 0,
     filter: opts?.filter ?? "all",
-  });
+  };
+  if (isSupabaseAvailable()) return getSocialFeedPg(feedOpts);
+  return getSocialFeed(feedOpts);
 }
 
 export interface CreatePostInput {
@@ -2431,25 +3171,46 @@ export async function serverCreatePost(input: CreatePostInput) {
     postType = "general";
   }
 
-  const id = createSocialPost({
-    authorId: me.id,
-    authorRole: me.role,
-    content,
-    images,
-    postType,
-    relatedRequestId: input.relatedRequestId ?? null,
-    isPublic: input.isPublic !== false,
-  });
+  const id = isSupabaseAvailable()
+    ? await createSocialPostPg({
+        authorId: me.id,
+        authorRole: me.role,
+        content,
+        images,
+        postType,
+        relatedRequestId: input.relatedRequestId ?? null,
+        isPublic: input.isPublic !== false,
+      })
+    : createSocialPost({
+        authorId: me.id,
+        authorRole: me.role,
+        content,
+        images,
+        postType,
+        relatedRequestId: input.relatedRequestId ?? null,
+        isPublic: input.isPublic !== false,
+      });
 
   try {
-    dbRecordActivityLog({
-      actorId: me.id,
-      actorEmail: null,
-      action: "social_post_created",
-      entityType: "social_post",
-      entityId: String(id),
-      details: `User posted a ${postType} update`,
-    });
+    if (isSupabaseAvailable()) {
+      await recordActivityLogPg({
+        actorId: me.id,
+        actorEmail: null,
+        action: "social_post_created",
+        entityType: "social_post",
+        entityId: String(id),
+        details: `User posted a ${postType} update`,
+      });
+    } else {
+      dbRecordActivityLog({
+        actorId: me.id,
+        actorEmail: null,
+        action: "social_post_created",
+        entityType: "social_post",
+        entityId: String(id),
+        details: `User posted a ${postType} update`,
+      });
+    }
   } catch (e) {
     console.error("Failed to record activity log:", e);
   }
@@ -2464,7 +3225,7 @@ export async function serverUpdatePost(
   const me = await getCurrentProfile();
   if (!me) throw new Error("You must be logged in.");
 
-  const post = getSocialPostById(postId);
+  const post = isSupabaseAvailable() ? await getSocialPostByIdPg(postId) : getSocialPostById(postId);
   if (!post || post.status === "deleted") throw new Error("Post not found.");
   if (post.authorId !== me.id && me.role !== "admin" && me.role !== "super_admin") {
     throw new Error("You can only edit your own posts.");
@@ -2475,6 +3236,12 @@ export async function serverUpdatePost(
     throw new Error(`Post is too long (max ${MAX_POST_LENGTH} characters).`);
   }
 
+  if (isSupabaseAvailable())
+    return updateSocialPostPg(postId, {
+      content,
+      images: data.images,
+      isPublic: data.isPublic,
+    });
   return updateSocialPost(postId, {
     content,
     images: data.images,
@@ -2487,12 +3254,28 @@ export async function serverDeletePost(postId: number) {
   const me = await getCurrentProfile();
   if (!me) throw new Error("You must be logged in.");
 
-  const post = getSocialPostById(postId);
+  const post = isSupabaseAvailable() ? await getSocialPostByIdPg(postId) : getSocialPostById(postId);
   if (!post || post.status === "deleted") throw new Error("Post not found.");
   if (post.authorId !== me.id && me.role !== "admin" && me.role !== "super_admin") {
     throw new Error("You can only delete your own posts.");
   }
 
+  if (isSupabaseAvailable()) {
+    const changes = await deleteSocialPostPg(postId);
+    try {
+      await recordActivityLogPg({
+        actorId: me.id,
+        actorEmail: null,
+        action: "social_post_deleted",
+        entityType: "social_post",
+        entityId: String(postId),
+        details: `Post #${postId} deleted`,
+      });
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
+    return changes;
+  }
   const changes = deleteSocialPost(postId);
   try {
     dbRecordActivityLog({
@@ -2513,8 +3296,9 @@ export async function serverDeletePost(postId: number) {
 export async function serverToggleLike(postId: number) {
   const me = await getCurrentProfile();
   if (!me) throw new Error("You must be logged in to like posts.");
-  const post = getSocialPostById(postId);
+  const post = isSupabaseAvailable() ? await getSocialPostByIdPg(postId) : getSocialPostById(postId);
   if (!post || post.status === "deleted") throw new Error("Post not found.");
+  if (isSupabaseAvailable()) return toggleSocialPostLikePg(postId, me.id);
   return toggleSocialPostLike(postId, me.id);
 }
 
@@ -2525,12 +3309,14 @@ export async function serverAddComment(postId: number, content: string) {
   const text = (content || "").trim();
   if (!text) throw new Error("Comment cannot be empty.");
   if (text.length > 500) throw new Error("Comment is too long.");
-  const post = getSocialPostById(postId);
+  const post = isSupabaseAvailable() ? await getSocialPostByIdPg(postId) : getSocialPostById(postId);
   if (!post || post.status === "deleted") throw new Error("Post not found.");
+  if (isSupabaseAvailable()) return addSocialPostCommentPg(postId, me.id, me.role, me.name, text);
   return addSocialPostComment(postId, me.id, me.role, me.name, text);
 }
 
 export async function serverGetComments(postId: number) {
+  if (isSupabaseAvailable()) return getSocialPostCommentsPg(postId);
   return getSocialPostComments(postId);
 }
 
@@ -2538,8 +3324,9 @@ export async function serverGetComments(postId: number) {
 export async function serverSharePost(postId: number) {
   const me = await getCurrentProfile();
   if (!me) throw new Error("You must be logged in to share.");
-  const post = getSocialPostById(postId);
+  const post = isSupabaseAvailable() ? await getSocialPostByIdPg(postId) : getSocialPostById(postId);
   if (!post || post.status === "deleted") throw new Error("Post not found.");
+  if (isSupabaseAvailable()) return incrementSocialPostSharePg(postId, me.id);
   return incrementSocialPostShare(postId, me.id);
 }
 
@@ -2547,7 +3334,7 @@ export async function serverSharePost(postId: number) {
 export async function serverGetMyDonationStats() {
   const me = await getCurrentProfile();
   if (!me) throw new Error("You must be logged in.");
-  const donations = getDonationsByDonorId(me.id) as any[];
+  const donations = (await serverGetDonationsByDonorId(me.id)) as any[];
   const lastDonation = donations[0];
   return {
     count: donations.length,
@@ -2558,6 +3345,11 @@ export async function serverGetMyDonationStats() {
 /** Admin: pin / unpin a post to the top of the feed. */
 export async function serverPinPost(postId: number, pinned: boolean) {
   await requireAdmin();
+  if (isSupabaseAvailable()) {
+    const post = await getSocialPostByIdPg(postId);
+    if (!post) throw new Error("Post not found.");
+    return pinSocialPostPg(postId, pinned);
+  }
   const post = getSocialPostById(postId);
   if (!post) throw new Error("Post not found.");
   return pinSocialPost(postId, pinned);
@@ -2570,12 +3362,29 @@ export async function serverAdminGetPosts(opts?: {
   pageSize?: number;
 }) {
   await requireAdmin();
+  if (isSupabaseAvailable()) return adminGetSocialPostsPg(opts || {});
   return adminGetSocialPosts(opts || {});
 }
 
 /** Admin: hard-delete a post from the moderation panel. */
 export async function serverAdminDeletePost(postId: number) {
   const ctx = await requireAdmin();
+  if (isSupabaseAvailable()) {
+    const changes = await deleteSocialPostPg(postId);
+    try {
+      await recordActivityLogPg({
+        actorId: ctx.id,
+        actorEmail: ctx.email,
+        action: "social_post_admin_deleted",
+        entityType: "social_post",
+        entityId: String(postId),
+        details: `Admin deleted post #${postId}`,
+      });
+    } catch (e) {
+      console.error("Failed to record activity log:", e);
+    }
+    return changes;
+  }
   const changes = deleteSocialPost(postId);
   try {
     dbRecordActivityLog({
@@ -2760,6 +3569,7 @@ export async function serverTranslateShareText(input: {
  * Returns null if the background translation hasn't completed yet.
  */
 export async function serverGetBnShareText(requestId: number): Promise<string | null> {
+  if (isSupabaseAvailable()) return getRequestTranslationPg(requestId);
   return getRequestTranslation(requestId);
 }
 
@@ -2785,12 +3595,18 @@ export async function serverTranslateAndCacheBn(requestId: number, input: {
   share_link?: string | null;
   patient_hb_level?: number | null;
 }): Promise<string> {
-  const cached = getRequestTranslation(requestId);
+  const cached = isSupabaseAvailable()
+    ? await getRequestTranslationPg(requestId)
+    : getRequestTranslation(requestId);
   if (cached) return cached;
 
   const result = await serverTranslateShareText(input);
   try {
-    saveRequestTranslation(requestId, result.text);
+    if (isSupabaseAvailable()) {
+      await saveRequestTranslationPg(requestId, result.text);
+    } else {
+      saveRequestTranslation(requestId, result.text);
+    }
   } catch (e) {
     console.error("Failed to cache BN translation:", e);
   }
@@ -2832,7 +3648,9 @@ export async function serverGetBnImageFields(input: {
   reason: string;
 }> {
   if (input.request_id) {
-    const cached = getRequestTranslationFields(input.request_id);
+    const cached = isSupabaseAvailable()
+      ? await getRequestTranslationFieldsPg(input.request_id)
+      : getRequestTranslationFields(input.request_id);
     if (cached) {
       try {
         return JSON.parse(cached);
@@ -3028,7 +3846,7 @@ export async function serverSubmitNidForVerification(
   }
 
   // Fetch current profile to check for old NID assets to clean up.
-  const current = (await getProfileByUserId(userId)) as any;
+  const current = (await (isSupabaseAvailable() ? serverGetProfileByUserId(userId) : getProfileByUserId(userId))) as any;
   if (!current) throw new Error("Profile not found");
 
   // Best-effort cleanup of previous NID assets (don't block on failure).
@@ -3041,6 +3859,32 @@ export async function serverSubmitNidForVerification(
 
   // Persist. These fields are NOT in PROTECTED_PROFILE_FIELDS for this path
   // because we write them directly via dbUpdateProfile (not serverUpdateProfile).
+  if (isSupabaseAvailable()) {
+    await updateProfilePg(userId, {
+      nid_number: nidNumber,
+      nid_front_url: input.nidFrontUrl,
+      nid_back_url: input.nidBackUrl,
+      nid_uploaded_at: new Date().toISOString(),
+      verification_status: "pending",
+      // Reset any previous rejection note — admin will set a new one if rejected again.
+      verification_note: null,
+    });
+
+    try {
+      await recordActivityLogPg({
+        actorId: userId,
+        actorEmail: session.email,
+        action: "nid_submitted",
+        entityType: "profile",
+        entityId: String(userId),
+        details: `Donor submitted NID for verification (number ending ${nidNumber.slice(-4)}).`,
+      });
+    } catch {
+      /* activity log is best-effort */
+    }
+
+    return { success: true };
+  }
   dbUpdateProfile(userId, {
     nid_number: nidNumber,
     nid_front_url: input.nidFrontUrl,
@@ -3090,7 +3934,7 @@ export async function serverGetMyVerificationStatus(): Promise<MyVerificationSta
   const session = await getSession();
   if (!session) return null;
   const userId = Number(session.sub);
-  const profile = (await getProfileByUserId(userId)) as any;
+  const profile = (await (isSupabaseAvailable() ? serverGetProfileByUserId(userId) : getProfileByUserId(userId))) as any;
   if (!profile) return null;
 
   const status: VerificationStatus =
@@ -3126,7 +3970,11 @@ export async function serverSetAnonymousMode(
   if (!session) throw new Error("Unauthorized");
   const userId = Number(session.sub);
 
-  dbUpdateProfile(userId, { is_anonymous: value ? 1 : 0 });
+  if (isSupabaseAvailable()) {
+    await updateProfilePg(userId, { is_anonymous: value });
+  } else {
+    dbUpdateProfile(userId, { is_anonymous: value ? 1 : 0 });
+  }
 
   return { success: true, isAnonymous: value };
 }
@@ -3157,6 +4005,11 @@ export async function serverGetSignedNidUrl(
  */
 export async function serverGetPendingVerifications() {
   const ctx = await requireAdmin();
+  if (isSupabaseAvailable())
+    return getPendingVerificationsPg({
+      district: ctx.isDistrictAdmin && ctx.assignedDistrict ? ctx.assignedDistrict : undefined,
+      limit: 200,
+    });
   return dbGetPendingVerifications({
     district: ctx.isDistrictAdmin && ctx.assignedDistrict ? ctx.assignedDistrict : undefined,
     limit: 200,
@@ -3172,7 +4025,7 @@ export async function serverSetPhoneVerified(
   value: boolean,
 ): Promise<{ success: boolean; phoneVerified: boolean; isVerified: boolean }> {
   const ctx = await requireAdmin();
-  const target = (await getProfileByUserId(donorId)) as any;
+  const target = (await (isSupabaseAvailable() ? serverGetProfileByUserId(donorId) : getProfileByUserId(donorId))) as any;
   if (!target) throw new Error("Donor not found");
 
   if (ctx.isDistrictAdmin) {
@@ -3184,6 +4037,24 @@ export async function serverSetPhoneVerified(
   const nidAlreadyVerified = target.verification_status === "verified";
   const isVerified = phoneVerified === 1 && nidAlreadyVerified ? 1 : 0;
 
+  if (isSupabaseAvailable()) {
+    await updateProfilePg(donorId, { phone_verified: phoneVerified === 1, is_verified: isVerified === 1 });
+
+    try {
+      await recordActivityLogPg({
+        actorId: ctx.id,
+        actorEmail: ctx.email,
+        action: value ? "phone_verified_set" : "phone_verified_unset",
+        entityType: "profile",
+        entityId: String(donorId),
+        details: `Admin ${value ? "verified" : "unverified"} phone for donor ${target.full_name_en || `#${donorId}`}.`,
+      });
+    } catch {
+      /* best-effort */
+    }
+
+    return { success: true, phoneVerified: value, isVerified: Boolean(isVerified) };
+  }
   dbUpdateProfile(donorId, { phone_verified: phoneVerified, is_verified: isVerified });
 
   try {
@@ -3215,7 +4086,7 @@ export async function serverVerifyDonor(
   input: { status: "verified" | "rejected"; note?: string },
 ): Promise<{ success: boolean; verificationStatus: string; isVerified: boolean }> {
   const ctx = await requireAdmin();
-  const target = (await getProfileByUserId(donorId)) as any;
+  const target = (await (isSupabaseAvailable() ? serverGetProfileByUserId(donorId) : getProfileByUserId(donorId))) as any;
   if (!target) throw new Error("Donor not found");
 
   if (ctx.isDistrictAdmin) {
@@ -3225,6 +4096,30 @@ export async function serverVerifyDonor(
   if (input.status === "verified") {
     const phoneAlreadyVerified = Boolean(target.phone_verified);
     const isVerified = phoneAlreadyVerified ? 1 : 0;
+    if (isSupabaseAvailable()) {
+      await updateProfilePg(donorId, {
+        verification_status: "verified",
+        verified_by_admin_id: ctx.id,
+        verified_at: new Date().toISOString(),
+        verification_note: input.note ?? null,
+        is_verified: isVerified === 1,
+      });
+
+      try {
+        await recordActivityLogPg({
+          actorId: ctx.id,
+          actorEmail: ctx.email,
+          action: "donor_nid_verified",
+          entityType: "profile",
+          entityId: String(donorId),
+          details: `Admin verified NID for donor ${target.full_name_en || `#${donorId}`}.${phoneAlreadyVerified ? " Phone already verified → donor fully verified." : " Phone not yet verified."}`,
+        });
+      } catch {
+        /* best-effort */
+      }
+
+      return { success: true, verificationStatus: "verified", isVerified: Boolean(isVerified) };
+    }
     dbUpdateProfile(donorId, {
       verification_status: "verified",
       verified_by_admin_id: ctx.id,
@@ -3250,6 +4145,28 @@ export async function serverVerifyDonor(
   }
 
   // rejected
+  if (isSupabaseAvailable()) {
+    await updateProfilePg(donorId, {
+      verification_status: "rejected",
+      verification_note: input.note ?? null,
+      is_verified: false,
+    });
+
+    try {
+      await recordActivityLogPg({
+        actorId: ctx.id,
+        actorEmail: ctx.email,
+        action: "donor_nid_rejected",
+        entityType: "profile",
+        entityId: String(donorId),
+        details: `Admin rejected NID for donor ${target.full_name_en || `#${donorId}`}.${input.note ? ` Note: ${input.note}` : ""}`,
+      });
+    } catch {
+      /* best-effort */
+    }
+
+    return { success: true, verificationStatus: "rejected", isVerified: false };
+  }
   dbUpdateProfile(donorId, {
     verification_status: "rejected",
     verification_note: input.note ?? null,
@@ -3282,6 +4199,10 @@ export async function serverToggleBookmark(
   const userId = Number(session.sub);
   if (userId === donorId) throw new Error("Cannot bookmark yourself");
 
+  if (isSupabaseAvailable()) {
+    const bookmarked = await toggleBookmarkPg(userId, donorId);
+    return { success: true, bookmarked };
+  }
   const bookmarked = dbToggleBookmark(userId, donorId);
   return { success: true, bookmarked };
 }
@@ -3292,6 +4213,7 @@ export async function serverIsBookmarked(
   const session = await getSession();
   if (!session) return false;
   const userId = Number(session.sub);
+  if (isSupabaseAvailable()) return isBookmarkedPg(userId, donorId);
   return dbIsBookmarked(userId, donorId);
 }
 
@@ -3299,6 +4221,7 @@ export async function serverGetBookmarkedDonorIds(): Promise<number[]> {
   const session = await getSession();
   if (!session) return [];
   const userId = Number(session.sub);
+  if (isSupabaseAvailable()) return getBookmarkedDonorIdsPg(userId);
   return dbGetBookmarkedDonorIds(userId);
 }
 
@@ -3306,6 +4229,7 @@ export async function serverGetBookmarkedDonors(): Promise<Record<string, unknow
   const session = await getSession();
   if (!session) return [];
   const userId = Number(session.sub);
+  if (isSupabaseAvailable()) return getBookmarkedDonorsPg(userId);
   return dbGetBookmarkedDonors(userId);
 }
 
@@ -3322,7 +4246,11 @@ export async function serverUpdateLastActive(): Promise<void> {
   if (!session) return;
   const userId = Number(session.sub);
   try {
-    dbUpdateLastActive(userId);
+    if (isSupabaseAvailable()) {
+      await updateLastActivePg(userId);
+    } else {
+      dbUpdateLastActive(userId);
+    }
   } catch {
     /* best-effort — presence is non-critical */
   }
@@ -3345,11 +4273,16 @@ export async function serverRecordContactClick(
     const session = await getSession();
     const userId = session ? Number(session.sub) : null;
     const userName = session ? session.email ?? null : null;
-    dbRecordContactClick(donorId, buttonType, ip, userId, userName);
+    if (isSupabaseAvailable()) {
+      await recordContactClickPg(donorId, buttonType, ip, userId, userName);
+    } else {
+      dbRecordContactClick(donorId, buttonType, ip, userId, userName);
+    }
   } catch {
     /* best-effort — don't block the call/WhatsApp action */
   }
 }
+
 
 /**
  * Get contact click stats for a donor (admin only).
@@ -3372,6 +4305,21 @@ export async function serverGetDonorContactClickStats(
   }>;
 }> {
   await requireAdmin();
+  if (isSupabaseAvailable()) return getDonorContactClickStatsPg(donorId) as Promise<{
+    totalCall: number;
+    totalWhatsapp: number;
+    totalClicks: number;
+    uniqueClickers: number;
+    recentClicks: Array<{
+      id: number;
+      donor_id: number;
+      button_type: string;
+      clicker_ip: string | null;
+      clicker_user_id: number | null;
+      clicker_user_name: string | null;
+      created_at: string;
+    }>;
+  }>;
   return dbGetDonorContactClickStats(donorId);
 }
 
@@ -3399,7 +4347,7 @@ export async function serverSubmitDonorApplication(data: {
   diseaseDetails?: string;
   avatarUrl?: string;
 }) {
-  const existing = (await getProfileByEmail(data.email)) as any;
+  const existing = (await (isSupabaseAvailable() ? serverGetProfileByEmail(data.email) : getProfileByEmail(data.email))) as any;
   if (existing) {
     throw new Error("An account with this email already exists.");
   }
@@ -3410,37 +4358,73 @@ export async function serverSubmitDonorApplication(data: {
   const randomPassword = randomBytes(16).toString("hex");
   const passwordHash = await hashPassword(randomPassword);
 
-  const id = dbCreateProfile({
-    email: data.email,
-    passwordHash,
-    fullNameEn: data.fullNameEn,
-    fullNameBn: data.fullNameBn,
-    phone: data.phone,
-    bloodGroup: data.bloodGroup,
-    role: "donor",
-    district: data.district,
-    upazila: data.upazila || null,
-    lat: null,
-    lng: null,
-  });
+  const usePg = isSupabaseAvailable();
+  let id: number;
+  if (usePg) {
+    id = await createProfilePg({
+      email: data.email,
+      passwordHash,
+      fullNameEn: data.fullNameEn,
+      fullNameBn: data.fullNameBn,
+      phone: data.phone,
+      bloodGroup: data.bloodGroup,
+      role: "donor",
+      district: data.district,
+      upazila: data.upazila || null,
+      lat: null,
+      lng: null,
+    });
 
-  dbUpdateProfile(id, {
-    address: data.address || null,
-    whatsapp_number: data.whatsappNumber || null,
-    sex: data.sex,
-    date_of_birth: data.dateOfBirth,
-    weight_kg: data.weightKg,
-    occupation: data.occupation || null,
-    preferred_contact: data.preferredContact || "call",
-    hb_level: data.hbLevel || null,
-    last_hb_test_date: data.lastHbTestDate || null,
-    last_donation_date: data.lastDonationDate || null,
-    has_chronic_disease: data.hasChronicDisease ? 1 : 0,
-    disease_details: data.diseaseDetails || null,
-    avatar_url: data.avatarUrl || null,
-    is_approved: 0,
-    verification_status: "pending",
-  });
+    await updateProfilePg(id, {
+      address: data.address || null,
+      whatsapp_number: data.whatsappNumber || null,
+      sex: data.sex,
+      date_of_birth: data.dateOfBirth,
+      weight_kg: data.weightKg,
+      occupation: data.occupation || null,
+      preferred_contact: data.preferredContact || "call",
+      hb_level: data.hbLevel || null,
+      last_hb_test_date: data.lastHbTestDate || null,
+      last_donation_date: data.lastDonationDate || null,
+      has_chronic_disease: data.hasChronicDisease,
+      disease_details: data.diseaseDetails || null,
+      avatar_url: data.avatarUrl || null,
+      is_approved: false,
+      verification_status: "pending",
+    });
+  } else {
+    id = dbCreateProfile({
+      email: data.email,
+      passwordHash,
+      fullNameEn: data.fullNameEn,
+      fullNameBn: data.fullNameBn,
+      phone: data.phone,
+      bloodGroup: data.bloodGroup,
+      role: "donor",
+      district: data.district,
+      upazila: data.upazila || null,
+      lat: null,
+      lng: null,
+    });
+
+    dbUpdateProfile(id, {
+      address: data.address || null,
+      whatsapp_number: data.whatsappNumber || null,
+      sex: data.sex,
+      date_of_birth: data.dateOfBirth,
+      weight_kg: data.weightKg,
+      occupation: data.occupation || null,
+      preferred_contact: data.preferredContact || "call",
+      hb_level: data.hbLevel || null,
+      last_hb_test_date: data.lastHbTestDate || null,
+      last_donation_date: data.lastDonationDate || null,
+      has_chronic_disease: data.hasChronicDisease ? 1 : 0,
+      disease_details: data.diseaseDetails || null,
+      avatar_url: data.avatarUrl || null,
+      is_approved: 0,
+      verification_status: "pending",
+    });
+  }
 
   return { id };
 }
@@ -3452,6 +4436,14 @@ export async function serverGetDonorApplications(filters?: {
   offset?: number;
 }) {
   await requireAdmin();
+  if (isSupabaseAvailable()) {
+    const rows = await getDonorApplicationsPg(filters);
+    const total = await countDonorApplicationsPg({
+      district: filters?.district,
+      search: filters?.search,
+    });
+    return { rows, total };
+  }
   const rows = dbGetDonorApplications(filters);
   const total = dbCountDonorApplications({
     district: filters?.district,
@@ -3463,28 +4455,49 @@ export async function serverGetDonorApplications(filters?: {
 export async function serverApproveDonorApplication(id: number) {
   const ctx = await requireAdmin();
 
-  const target = (await getProfileByUserId(id)) as any;
+  const target = (await (isSupabaseAvailable() ? serverGetProfileByUserId(id) : getProfileByUserId(id))) as any;
   if (!target) throw new Error("Profile not found");
-  if (target.is_approved === 1) throw new Error("Already approved");
+  if (target.is_approved === 1 || target.is_approved === true) throw new Error("Already approved");
 
-  dbUpdateProfile(id, {
-    is_approved: 1,
-    role: "donor",
-    verification_status: "verified",
-    verified_by_admin_id: ctx.id,
-    verified_at: new Date().toISOString(),
-  });
-
-  try {
-    dbRecordActivityLog({
-      actorId: ctx.id,
-      actorEmail: ctx.email,
-      action: "approve_donor_application",
-      entityType: "profile",
-      entityId: String(id),
-      details: `Approved donor application for ${target.full_name_en || target.email} (#${id})`,
+  if (isSupabaseAvailable()) {
+    await updateProfilePg(id, {
+      is_approved: true,
+      role: "donor",
+      verification_status: "verified",
+      verified_by_admin_id: ctx.id,
+      verified_at: new Date().toISOString(),
     });
-  } catch {}
+
+    try {
+      await recordActivityLogPg({
+        actorId: ctx.id,
+        actorEmail: ctx.email,
+        action: "approve_donor_application",
+        entityType: "profile",
+        entityId: String(id),
+        details: `Approved donor application for ${target.full_name_en || target.email} (#${id})`,
+      });
+    } catch {}
+  } else {
+    dbUpdateProfile(id, {
+      is_approved: 1,
+      role: "donor",
+      verification_status: "verified",
+      verified_by_admin_id: ctx.id,
+      verified_at: new Date().toISOString(),
+    });
+
+    try {
+      dbRecordActivityLog({
+        actorId: ctx.id,
+        actorEmail: ctx.email,
+        action: "approve_donor_application",
+        entityType: "profile",
+        entityId: String(id),
+        details: `Approved donor application for ${target.full_name_en || target.email} (#${id})`,
+      });
+    } catch {}
+  }
 
   // Email the applicant the good news (best-effort, never throws).
   try {
@@ -3504,27 +4517,48 @@ export async function serverRejectDonorApplication(
 ) {
   const ctx = await requireAdmin();
 
-  const target = (await getProfileByUserId(id)) as any;
+  const target = (await (isSupabaseAvailable() ? serverGetProfileByUserId(id) : getProfileByUserId(id))) as any;
   if (!target) throw new Error("Profile not found");
 
-  dbUpdateProfile(id, {
-    is_approved: 0,
-    verification_status: "rejected",
-    verification_note: note,
-    verified_by_admin_id: ctx.id,
-    verified_at: new Date().toISOString(),
-  });
-
-  try {
-    dbRecordActivityLog({
-      actorId: ctx.id,
-      actorEmail: ctx.email,
-      action: "reject_donor_application",
-      entityType: "profile",
-      entityId: String(id),
-      details: `Rejected donor application for ${target.full_name_en || target.email} (#${id}): ${note}`,
+  if (isSupabaseAvailable()) {
+    await updateProfilePg(id, {
+      is_approved: false,
+      verification_status: "rejected",
+      verification_note: note,
+      verified_by_admin_id: ctx.id,
+      verified_at: new Date().toISOString(),
     });
-  } catch {}
+
+    try {
+      await recordActivityLogPg({
+        actorId: ctx.id,
+        actorEmail: ctx.email,
+        action: "reject_donor_application",
+        entityType: "profile",
+        entityId: String(id),
+        details: `Rejected donor application for ${target.full_name_en || target.email} (#${id}): ${note}`,
+      });
+    } catch {}
+  } else {
+    dbUpdateProfile(id, {
+      is_approved: 0,
+      verification_status: "rejected",
+      verification_note: note,
+      verified_by_admin_id: ctx.id,
+      verified_at: new Date().toISOString(),
+    });
+
+    try {
+      dbRecordActivityLog({
+        actorId: ctx.id,
+        actorEmail: ctx.email,
+        action: "reject_donor_application",
+        entityType: "profile",
+        entityId: String(id),
+        details: `Rejected donor application for ${target.full_name_en || target.email} (#${id}): ${note}`,
+      });
+    } catch {}
+  }
 
   // Email the applicant the rejection reason (best-effort, never throws).
   try {

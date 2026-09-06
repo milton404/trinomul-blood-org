@@ -126,7 +126,7 @@ export async function serverLogin(
       throw new Error(`Too many attempts. Please try again in ${waitMin} minute(s).`);
     }
   } else {
-    const limit = checkRateLimit(key);
+    const limit = await checkRateLimit(key);
     if (!limit.allowed) {
       const waitMin = Math.ceil(
         ((limit.lockedUntil ?? limit.resetTime) - Date.now()) / 60000,
@@ -151,14 +151,14 @@ export async function serverLogin(
 
   if (!profile) {
     if (usePg) await recordFailedAttemptPg(key);
-    else recordFailedAttempt(key);
+    else await recordFailedAttempt(key);
     throw new Error("Invalid credentials. Please check and try again.");
   }
 
   const ok = await verifyPassword(password, profile.password_hash);
   if (!ok) {
     if (usePg) await recordFailedAttemptPg(key);
-    else recordFailedAttempt(key);
+    else await recordFailedAttempt(key);
     throw new Error("Invalid credentials. Please check and try again.");
   }
 
@@ -206,7 +206,7 @@ export async function serverLogin(
   if (usePg) {
     await pgQuery("DELETE FROM auth_rate_limits WHERE identifier = $1", [key]);
   } else {
-    clearRateLimit(key);
+    await clearRateLimit(key);
   }
 
   const payload: SessionPayload = {
@@ -299,14 +299,14 @@ export async function serverRegister(input: {
 
     await pgQuery("DELETE FROM auth_rate_limits WHERE identifier = $1", [key]);
   } else {
-    const limit = checkRateLimit(key, 5, 60 * 60 * 1000);
+    const limit = await checkRateLimit(key, 5, 60 * 60 * 1000);
     if (!limit.allowed) {
       throw new Error("Too many registration attempts. Please try later.");
     }
 
     const existing = (await getProfileByEmail(input.email)) as any;
     if (existing) {
-      recordFailedAttempt(key);
+      await recordFailedAttempt(key);
       throw new Error("An account with this email already exists.");
     }
 
@@ -331,7 +331,7 @@ export async function serverRegister(input: {
       dbUpdateProfile(profileId, { address: input.address });
     }
 
-    clearRateLimit(key);
+    await clearRateLimit(key);
   }
 
   // Welcome email (best-effort — never blocks registration).
@@ -460,7 +460,7 @@ export async function serverRequestPasswordReset(
   identifier: string,
 ): Promise<string | null> {
   const key = `reset:${identifier.toLowerCase()}`;
-  const limit = checkRateLimit(key, 3, 60 * 60 * 1000);
+  const limit = await checkRateLimit(key, 3, 60 * 60 * 1000);
   if (!limit.allowed) {
     throw new Error("Too many reset attempts. Please try later.");
   }
@@ -477,7 +477,7 @@ export async function serverRequestPasswordReset(
   const token = generateResetToken();
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
   createPasswordReset(profile.email || profile.phone, token, expiresAt);
-  clearRateLimit(key);
+  await clearRateLimit(key);
 
   // Email the reset link when the account has an email on file
   // (best-effort — never blocks the reset flow).

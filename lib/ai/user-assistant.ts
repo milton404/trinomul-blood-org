@@ -24,13 +24,13 @@ import {
   type AIProvider,
 } from "./providers";
 import {
-  getBloodInventory,
-  getActiveBloodRequests,
-  getProfilesByRole,
-  getBloodRequestByTrackingCode,
-  findMatchingDonors,
-  findRequestsNearby,
-} from "@/lib/db";
+  serverGetBloodInventory as getBloodInventory,
+  serverGetActiveBloodRequests as getActiveBloodRequests,
+  serverGetProfilesByRole as getProfilesByRole,
+  serverGetBloodRequestByTrackingCode as getBloodRequestByTrackingCode,
+  serverFindMatchingDonors as findMatchingDonors,
+  serverFindRequestsNearby as findRequestsNearby,
+} from "@/lib/db-actions";
 import {
   advanceAssistantWorkflow,
   detectAssistantLanguage,
@@ -58,14 +58,14 @@ const CACHE_TTL_MS = 30_000; // refresh every 30s
  * starts so the first data question is answered instantly.
  */
 export async function warmUpAssistant(): Promise<void> {
-  const ctx = buildUserContext();
+  const ctx = await buildUserContext();
   cachedContext = ctx;
   cachedAt = Date.now();
   // Also pre-load donor data arrays in the module scope
   try {
-    getBloodInventory();
-    getActiveBloodRequests(50);
-    getProfilesByRole("donor");
+    await getBloodInventory();
+    await getActiveBloodRequests(50);
+    await getProfilesByRole("donor");
   } catch {
     // Silently warm caches
   }
@@ -150,14 +150,14 @@ interface UserDBContext {
   topDistricts: { district: string; donorCount: number }[];
 }
 
-function buildUserContext(): UserDBContext {
+async function buildUserContext(): Promise<UserDBContext> {
   if (cachedContext && Date.now() - cachedAt < CACHE_TTL_MS) {
     return cachedContext;
   }
 
-  const inventory = getBloodInventory();
-  const activeReqs = getActiveBloodRequests(100) as any[];
-  const donors = getProfilesByRole("donor") as any[];
+  const inventory = (await getBloodInventory()) as { blood_group: string; count: number }[];
+  const activeReqs = (await getActiveBloodRequests(100)) as any[];
+  const donors = (await getProfilesByRole("donor")) as any[];
   const districts = new Set(
     donors.map((d) => d.district).filter(Boolean),
   );
@@ -393,12 +393,12 @@ function extractDistrictFromText(message: string): string | undefined {
  * group is given) and nearby active blood requests, using browser GPS
  * coordinates or the logged-in user's profile district.
  */
-function handleNearMeQuery(
+async function handleNearMeQuery(
   message: string,
   isBn: boolean,
   location?: { latitude: number; longitude: number },
   userProfile?: Record<string, unknown> | null,
-): AssistantReply {
+): Promise<AssistantReply> {
   const bloodGroup = extractBloodGroup(message);
   const district =
     (userProfile?.district as string) || extractDistrictFromText(message);
@@ -417,7 +417,7 @@ function handleNearMeQuery(
   }
 
   // Nearby active blood requests (always relevant for donors asking)
-  const requests = findRequestsNearby(lat, lng, district, bloodGroup ?? undefined, 5);
+  const requests = await findRequestsNearby(lat, lng, district, bloodGroup ?? undefined, 5);
   const requestCards = requests.map((r) => ({
     trackingCode: r.tracking_code,
     bloodGroup: r.blood_group,
@@ -434,7 +434,7 @@ function handleNearMeQuery(
   // Nearby donors (only when a specific blood group is requested)
   let donorCards: Record<string, unknown>[] = [];
   if (bloodGroup) {
-    const donors = findMatchingDonors(
+    const donors = await findMatchingDonors(
       bloodGroup,
       district,
       undefined,
@@ -511,7 +511,7 @@ export async function chatWithAssistant(
 ): Promise<AssistantReply> {
   const language = workflowState?.locale ?? detectAssistantLanguage(message);
   const useBangla = language === "bn" || isBn;
-  const ctx = buildUserContext();
+  const ctx = await buildUserContext();
 
   if (!workflowState && isPersonalQuestion(message)) {
     const personalReply = handlePersonalQuestion(message, useBangla, userProfile);
@@ -521,7 +521,7 @@ export async function chatWithAssistant(
   if (!workflowState && isBloodAvailabilityQuestion(message)) {
     const bloodGroup = extractBloodGroup(message);
     if (bloodGroup) {
-      const count = getBloodInventory().find((item) => item.blood_group === bloodGroup)?.count ?? 0;
+      const count = ((await getBloodInventory()) as { blood_group: string; count: number }[]).find((item) => item.blood_group === bloodGroup)?.count ?? 0;
       return {
         reply: useBangla
           ? count > 0
@@ -539,7 +539,7 @@ export async function chatWithAssistant(
     const groupOnly = message.match(/\b(AB|A|B|O)\b\s*(?:group|blood|donor)?/i);
     if (groupOnly) {
       const letter = groupOnly[1].toUpperCase();
-      const inventory = getBloodInventory();
+      const inventory = (await getBloodInventory()) as { blood_group: string; count: number }[];
       const matching = inventory.filter((item) => item.blood_group.startsWith(letter));
       const totalCount = matching.reduce((sum, item) => sum + item.count, 0);
       const groupList = matching.map((item) => `${item.blood_group}: ${item.count}`).join(", ");
@@ -561,7 +561,7 @@ export async function chatWithAssistant(
 
   // ── Near-me fast path: instant location-based answer (no AI call) ──
   if (!workflowState && isNearMe(message)) {
-    return handleNearMeQuery(message, useBangla, location, userProfile);
+    return await handleNearMeQuery(message, useBangla, location, userProfile);
   }
 
   const workflow = advanceAssistantWorkflow(message, workflowState);
@@ -587,7 +587,7 @@ export async function chatWithAssistant(
   if (workflow.shouldSearchDonors && workflow.state?.values.bloodGroup) {
     const { bloodGroup, location: area } = workflow.state.values;
     try {
-      const donors = findMatchingDonors(
+      const donors = await findMatchingDonors(
         bloodGroup,
         area,
         undefined,
@@ -642,7 +642,7 @@ export async function chatWithAssistant(
   if (workflow.shouldTrackRequest) {
     try {
       const code = message.trim().toUpperCase();
-      const request = getBloodRequestByTrackingCode(code) as any;
+      const request = (await getBloodRequestByTrackingCode(code)) as any;
       if (!request) {
         return {
           reply: useBangla ? "এই ট্র্যাকিং কোডে কোনো রিকোয়েস্ট পাওয়া যায়নি। কোডটি আবার যাচাই করুন।" : "I could not find a request for that tracking code. Please check the code and try again.",
@@ -751,7 +751,7 @@ export async function chatWithAssistant(
               
             }
           }
-          return ruleBasedChat(message, ctx);
+          return await ruleBasedChat(message, ctx);
         }
 
         // If intent is find_donor, also fetch donor data
@@ -759,7 +759,7 @@ export async function chatWithAssistant(
         if (intent === "find_donor") {
           const bg = extractBloodGroup(message);
           if (bg) {
-            const donors = findMatchingDonors(bg, undefined, undefined, "normal", 5, null, null, true);
+            const donors = await findMatchingDonors(bg, undefined, undefined, "normal", 5, null, null, true);
             data = {
               bloodGroup: bg,
               donorCount: donors.length,
@@ -778,7 +778,7 @@ export async function chatWithAssistant(
         if (intent === "track_request") {
           const code = extractTrackingCode(message);
           if (code) {
-            const req = getBloodRequestByTrackingCode(code) as any;
+            const req = (await getBloodRequestByTrackingCode(code)) as any;
             if (req) {
               data = {
                 trackingCode: code,
@@ -820,7 +820,7 @@ export async function chatWithAssistant(
   }
 
   // Rule-based fallback
-  return ruleBasedChat(message, ctx);
+  return await ruleBasedChat(message, ctx);
 }
 
 // ── Rule-based chat fallback ────────────────────────────────────────
@@ -829,10 +829,10 @@ function hasBengaliScript(text: string): boolean {
   return /[\u0980-\u09FF]/.test(text);
 }
 
-function ruleBasedChat(
+async function ruleBasedChat(
   message: string,
   ctx: UserDBContext,
-): AssistantReply {
+): Promise<AssistantReply> {
   const lower = message.toLowerCase();
 
   // Bengali detection
@@ -926,7 +926,7 @@ function ruleBasedChat(
   if (code || lower.includes("track") || lower.includes("status") ||
       lower.includes("ট্র্যাক") || lower.includes("অবস্থা")) {
     if (code) {
-      const req = getBloodRequestByTrackingCode(code) as any;
+      const req = (await getBloodRequestByTrackingCode(code)) as any;
       if (req) {
         return {
           reply: isBn
@@ -1030,7 +1030,7 @@ export async function analyzeRequestContext(data: {
   urgencyLevel?: string;
   unitsNeeded?: number;
 }): Promise<RequestAnalysis> {
-  const ctx = buildUserContext();
+  const ctx = await buildUserContext();
   const activeProvider = getActiveProvider();
 
   // Rule-based analysis (always computed as fallback)
@@ -1184,7 +1184,7 @@ export async function getDonorAdvice(
   },
   donationHistory?: { donation_date: string; donation_type: string }[],
 ): Promise<DonorAdvice> {
-  const ctx = buildUserContext();
+  const ctx = await buildUserContext();
   const activeProvider = getActiveProvider();
 
   // Rule-based advice (always computed as fallback)
