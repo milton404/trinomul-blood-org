@@ -74,7 +74,13 @@
     "share_call_now": "Call Now",
     "share_alternative": "Alternative",
     "share_whatsapp": "WhatsApp",
-    "share_scan_qr": "Scan to view details"
+    "share_scan_qr": "Scan to view details",
+    "become_donor": "Become a Donor",
+    "quick_links": "Quick Links",
+    "resources": "Resources",
+    "support": "Support",
+    "blood_bank_areas": "Blood Bank Areas",
+    "download_app": "Download App"
   },
   "transparency": {
     "title": "Transparency Dashboard",
@@ -99,13 +105,7 @@
     "commitment_1": "All donation records are verifiable and public",
     "commitment_2": "Financial records will be published when payment integration is active",
     "commitment_3": "Monthly and annual reports are generated from real data",
-    "view_leaderboard": "View Donor Leaderboard",
-    "become_donor": "Become a Donor",
-    "quick_links": "Quick Links",
-    "resources": "Resources",
-    "support": "Support",
-    "blood_bank_areas": "Blood Bank Areas",
-    "download_app": "Download App"
+    "view_leaderboard": "View Donor Leaderboard"
   },
   "leaderboard": {
     "title": "Donor Leaderboard",

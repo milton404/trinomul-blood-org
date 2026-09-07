@@ -74,7 +74,13 @@
     "share_call_now": "এখনই কল করুন",
     "share_alternative": "বিকল্প নম্বর",
     "share_whatsapp": "হোয়াটসঅ্যাপ",
-    "share_scan_qr": "বিস্তারিত দেখতে স্ক্যান করুন"
+    "share_scan_qr": "বিস্তারিত দেখতে স্ক্যান করুন",
+    "become_donor": "রক্তদাতা হন",
+    "quick_links": "দ্রুত লিংক",
+    "resources": "রিসোর্স",
+    "support": "সহায়তা",
+    "blood_bank_areas": "ব্লাড ব্যাংক এলাকা",
+    "download_app": "অ্যাপ ডাউনলোড"
   },
   "transparency": {
     "title": "স্বচ্ছতা ড্যাশবোর্ড",
@@ -99,13 +105,7 @@
     "commitment_1": "সমস্ত রক্তদানের রেকর্ড যাচাইযোগ্য এবং প্রকাশ্য",
     "commitment_2": "পেমেন্ট ইন্টিগ্রেশন সক্রিয় হলে আর্থিক রেকর্ড প্রকাশ করা হবে",
     "commitment_3": "মাসিক এবং বার্ষিক প্রতিবেদন বাস্তব তথ্য থেকে তৈরি",
-    "view_leaderboard": "ডোনার লিডারবোর্ড দেখুন",
-    "become_donor": "রক্তদাতা হন",
-    "quick_links": "দ্রুত লিংক",
-    "resources": "রিসোর্স",
-    "support": "সহায়তা",
-    "blood_bank_areas": "ব্লাড ব্যাংক এলাকা",
-    "download_app": "অ্যাপ ডাউনলোড"
+    "view_leaderboard": "ডোনার লিডারবোর্ড দেখুন"
   },
   "leaderboard": {
     "title": "ডোনার লিডারবোর্ড",
