@@ -10,8 +10,9 @@
 html,
 body {
   overflow-x: clip;
-  /* Native app feel: no pull-to-refresh / rubber-band bounce at page edges. */
-  overscroll-behavior-y: none;
+  /* Keep native momentum scrolling and the app-like pull-down-to-refresh
+     gesture at the top (browser/OS handled, as in native apps). Pinch zoom
+     stays disabled via the viewport meta for an app feel. */
 }
 
 body {
