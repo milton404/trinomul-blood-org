@@ -51,6 +51,14 @@ export default function DownloadsPage() {
     setDevice(detectDevice());
     setIsStandalone(window.matchMedia('(display-mode: standalone)').matches);
     const currentUrl = window.location.origin + '/' + locale;
+    QRCode.toDataURL(currentUrl, {
+      width: 400,
+      margin: 2,
+      errorCorrectionLevel: 'H',
+      color: { dark: '#dc2626', light: '#ffffff' },
+    })
+      .then(setQrUrl)
+      .catch(() => {});
 
     const onBeforeInstall = (e: Event) => {
       e.preventDefault();
@@ -87,15 +95,7 @@ export default function DownloadsPage() {
     setDeferredPrompt(null);
     setInstalling(false);
   };
-    QRCode.toDataURL(currentUrl, {
-      width: 400,
-      margin: 2,
-      errorCorrectionLevel: 'H',
-      color: { dark: '#dc2626', light: '#ffffff' },
-    })
-      .then(setQrUrl)
-      .catch(() => {});
-  }, [locale]);
+
 
   const t = (en: string, bn: string) => (isBn ? bn : en);
 
