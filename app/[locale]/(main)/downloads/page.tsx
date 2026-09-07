@@ -259,7 +259,7 @@ export default function DownloadsPage() {
             </div>
 
             {/* Device-specific Card */}
-            <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-5 sm:p-6">
+            <div id="steps" className="bg-white rounded-2xl shadow-xl border border-slate-100 p-5 sm:p-6 scroll-mt-4">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center shrink-0">
                   <DeviceIcon className="w-5 h-5 text-red-600" />
@@ -336,11 +336,11 @@ export default function DownloadsPage() {
                 </button>
               ) : (
                 <a
-                  href={`/${locale}`}
+                  href="#steps"
                   className="inline-flex items-center gap-2 bg-white text-red-600 px-6 py-3 rounded-xl font-bold hover:bg-red-50 transition-colors shadow-lg"
                 >
-                  <Plus className="w-5 h-5" />
-                  {t('Open App & Install', 'অ্যাপ খুলুন ও ইনস্টল করুন')}
+                  <Download className="w-5 h-5" />
+                  {t('Follow Steps Below', 'নিচের ধাপ অনুসরণ করুন')}
                 </a>
               )}
 

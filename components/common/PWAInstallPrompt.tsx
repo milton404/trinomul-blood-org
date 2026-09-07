@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Download, X, Smartphone, Monitor, Wifi } from 'lucide-react';
+import { Download, X, Smartphone, Monitor, Wifi, ExternalLink } from 'lucide-react';
+import { Link } from '@/i18n/routing';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -158,6 +159,16 @@ export default function PWAInstallPrompt() {
           >
             Got it, thanks!
           </button>
+          <Link
+            href="/downloads"
+            onClick={() => setShowPrompt(false)}
+            className="block text-center mt-2 text-xs text-slate-500 hover:text-red-600 transition-colors"
+          >
+            <span className="inline-flex items-center gap-1">
+              <ExternalLink className="w-3 h-3" />
+              Go to Download Page
+            </span>
+          </Link>
         </div>
       </div>
     );
@@ -216,6 +227,16 @@ export default function PWAInstallPrompt() {
             Later
           </button>
         </div>
+        <Link
+          href="/downloads"
+          onClick={() => setShowPrompt(false)}
+          className="block text-center mt-2 text-xs text-slate-500 hover:text-red-600 transition-colors"
+        >
+          <span className="inline-flex items-center gap-1">
+            <ExternalLink className="w-3 h-3" />
+            Go to Download Page
+          </span>
+        </Link>
       </div>
     </div>
   );
