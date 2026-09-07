@@ -834,7 +834,7 @@ function DonorsContent() {
         >
           <button
             onClick={() => setActiveTab("donors")}
-            className={`px-2 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
+            className={`px-1.5 sm:px-4 py-2 rounded-lg text-[10px] sm:text-sm font-semibold transition-all flex items-center gap-1 sm:gap-1.5 whitespace-nowrap flex-shrink-0 ${
               activeTab === "donors"
                 ? "bg-red-600 text-white shadow-lg shadow-red-200"
                 : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
@@ -850,7 +850,7 @@ function DonorsContent() {
           </button>
           <button
             onClick={() => setActiveTab("eligibility")}
-            className={`px-2 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
+            className={`px-1.5 sm:px-4 py-2 rounded-lg text-[10px] sm:text-sm font-semibold transition-all flex items-center gap-1 sm:gap-1.5 whitespace-nowrap flex-shrink-0 ${
               activeTab === "eligibility"
                 ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200"
                 : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
@@ -858,12 +858,12 @@ function DonorsContent() {
             role="tab"
             aria-selected={activeTab === "eligibility"}
           >
-            <Info className="w-3.5 h-3.5" />
+            <Info className="hidden sm:block w-3.5 h-3.5" />
             {isBn ? "যোগ্যতা যাচাই" : "Eligibility"}
           </button>
           <button
             onClick={() => setActiveTab("compatibility")}
-            className={`px-2 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
+            className={`px-1.5 sm:px-4 py-2 rounded-lg text-[10px] sm:text-sm font-semibold transition-all flex items-center gap-1 sm:gap-1.5 whitespace-nowrap flex-shrink-0 ${
               activeTab === "compatibility"
                 ? "bg-purple-600 text-white shadow-lg shadow-purple-200"
                 : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
