@@ -15,7 +15,7 @@ import DonorVerificationPanel from '@/components/admin/DonorVerificationPanel';
 import DonorContactStats from '@/components/admin/DonorContactStats';
 import DonorQrCard from '@/components/donors/DonorQrCard';
 import QuickAddDonationModal from '@/components/admin/QuickAddDonationModal';
-import { useTranslations, useLocale } from 'next-intl';
+import { useLocale } from 'next-intl';
 import { useRouter, useParams } from 'next/navigation';
 import {
   ArrowLeft,
@@ -152,9 +152,8 @@ function formatDateTime(iso: string | null | undefined): string {
 
 export default function AdminDonorDetailPage() {
   const params = useParams();
-  const donorId = parseInt(params.id as string, 10);
+  const donorId = parseInt((params?.id as string) || '0', 10);
 
-  const t = useTranslations('admin');
   const locale = useLocale();
   const isBn = locale === 'bn';
   const router = useRouter();
@@ -257,6 +256,16 @@ export default function AdminDonorDetailPage() {
       })
       .finally(() => setIsLoading(false));
   }, [donorId]);
+
+  if (!donorId || Number.isNaN(donorId)) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center p-6">
+        <div className="text-center">
+          <p className="text-slate-500 font-medium">Invalid donor ID</p>
+        </div>
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
