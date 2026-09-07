@@ -63,22 +63,12 @@ export default function QrScannerModal({ onClose }: { onClose: () => void }) {
       }
 
       if (path) {
-        const trackMatch = path.match(/\/track\/([^/?#]+)/);
-        if (trackMatch) {
-          router.push(`/track/${decodeURIComponent(trackMatch[1])}`);
-          onClose();
-          return;
-        }
-        const reqMatch = path.match(/\/requests(?:\?req=([^&#]+))?/);
-        if (reqMatch) {
-          if (reqMatch[1]) {
-            router.push(`/requests?req=${reqMatch[1]}`);
-          } else {
-            router.push(`/requests`);
-          }
-          onClose();
-          return;
-        }
+        // Normalise away a leading locale segment (e.g. /en or /bn) so the
+        // i18n router does not prefix it a second time.
+        const cleanPath = path.replace(/^\/(en|bn)(?=\/|$)/, "") || "/";
+        router.push(cleanPath);
+        onClose();
+        return;
       }
 
       if (/^REQ-[A-Z0-9]{4,}$/i.test(trimmed)) {
