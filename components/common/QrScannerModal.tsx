@@ -3,13 +3,16 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "@/i18n/routing";
 import { useTranslations } from "next-intl";
-import { X, ScanLine, Camera, CameraOff, Loader2, RefreshCw, ExternalLink } from "lucide-react";
+import { X, ScanLine, Camera, CameraOff, Loader2, RefreshCw, ExternalLink, Image as ImageIcon } from "lucide-react";
 
 export default function QrScannerModal({ onClose }: { onClose: () => void }) {
   const t = useTranslations("common");
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<{ stop: () => void } | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [imageScanning, setImageScanning] = useState(false);
+  const [galleryError, setGalleryError] = useState("");
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [activeDeviceId, setActiveDeviceId] = useState<string | undefined>(undefined);
   const [status, setStatus] = useState<"starting" | "scanning" | "error" | "done">("starting");
@@ -155,6 +158,30 @@ export default function QrScannerModal({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [stopCamera, onClose]);
 
+  const scanFromGallery = async (file: File) => {
+    try {
+      setImageScanning(true);
+      setGalleryError("");
+      const { BrowserMultiFormatReader } = await import("@zxing/browser");
+      const reader = new BrowserMultiFormatReader();
+      const url = URL.createObjectURL(file);
+      try {
+        const result = await reader.decodeFromImageUrl(url);
+        handleDecoded(result.getText());
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    } catch {
+      setGalleryError(
+        isBn
+          ? "এই ছবিতে কোনো QR কোড পাওয়া যায়নি। অন্য ছবি চেষ্টা করুন।"
+          : "No QR code found in this image. Try another photo.",
+      );
+    } finally {
+      setImageScanning(false);
+    }
+  };
+
   const switchCamera = () => {
     if (devices.length < 2) return;
     const next = devices.find((d) => d.deviceId !== activeDeviceId);
@@ -248,6 +275,36 @@ export default function QrScannerModal({ onClose }: { onClose: () => void }) {
                 <Camera className="w-3.5 h-3.5" />
                 {isBn ? "ক্যামেরা পরিবর্তন" : "Switch Camera"}
               </button>
+            )}
+
+            <div className="flex flex-wrap items-center justify-center gap-2 mt-3">
+              <button
+                type="button"
+                onClick={() => fileRef.current?.click()}
+                disabled={imageScanning}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 text-xs font-medium hover:bg-slate-50 disabled:opacity-60 transition-colors"
+              >
+                {imageScanning ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <ImageIcon className="w-3.5 h-3.5" />
+                )}
+                {isBn ? "ছবি থেকে স্ক্যান করুন" : "Scan from Gallery"}
+              </button>
+              <input
+                ref={fileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) scanFromGallery(f);
+                  e.target.value = "";
+                }}
+              />
+            </div>
+            {galleryError && (
+              <p className="text-xs text-red-500 text-center mt-2">{galleryError}</p>
             )}
           </>
         )}
