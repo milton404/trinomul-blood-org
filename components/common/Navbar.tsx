@@ -214,10 +214,10 @@ export default function Navbar() {
               <div className="flex items-center shrink-0" role="group" aria-label="Authentication">
                 <Link
                   href="/login"
-                  className="p-2 sm:px-3 sm:py-1.5 rounded-lg text-[12px] font-medium text-slate-600 hover:text-red-600 hover:bg-red-50/60 transition-all shrink-0 flex items-center gap-1.5"
+                  className="hidden sm:flex p-2 sm:px-3 sm:py-1.5 rounded-lg text-[12px] font-medium text-slate-600 hover:text-red-600 hover:bg-red-50/60 transition-all shrink-0 items-center gap-1.5"
                   aria-label={t("login")}
                 >
-                  <User className="w-4 h-4 sm:hidden" />
+                  <User className="w-4 h-4" />
                   <span className="hidden sm:inline">{t("login")}</span>
                 </Link>
                 <Link
