@@ -57,7 +57,9 @@ export default function DonorDetailModal({ donor, onClose }: DonorDetailModalPro
               <X className="w-5 h-5" />
             </button>
 
-            <div className="max-h-[85vh] overflow-y-auto">
+            {/* pt-10 keeps the floating close (X) button clear of the card's
+                top-right header, where the blood group is shown on phone/PWA. */}
+            <div className="max-h-[85vh] overflow-y-auto pt-10">
               <DonorCard
                 donor={{
                   id: donor.id,
