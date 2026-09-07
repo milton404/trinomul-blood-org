@@ -41,8 +41,8 @@ export default function Navbar() {
   const [trackCode, setTrackCode] = useState("");
   const pathname = usePathname();
   const { direction, atTop } = useScrollDirection();
-  // Facebook-style: hide the header when scrolling up (phone only).
-  const hideHeader = !atTop && direction === "up";
+  // Facebook-style: hide the header when scrolling down (phone only).
+  const hideHeader = !atTop && direction === "down";
 
   useEffect(() => {
     setIsTrackOpen(false);
