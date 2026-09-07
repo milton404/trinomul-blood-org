@@ -210,6 +210,7 @@ export default function RegisterForm({ defaultRole }: RegisterFormProps) {
           </label>
           <input
             {...register("fullName")}
+            autoComplete="name"
             className={inputCls(!!errors.fullName)}
             placeholder={t("name_placeholder")}
           />
@@ -227,6 +228,7 @@ export default function RegisterForm({ defaultRole }: RegisterFormProps) {
           <input
             {...register("email")}
             type="email"
+            autoComplete="email"
             className={inputCls(!!errors.email)}
             placeholder={t("email_placeholder")}
           />
@@ -241,6 +243,8 @@ export default function RegisterForm({ defaultRole }: RegisterFormProps) {
           </label>
           <input
             {...register("phone")}
+            type="tel"
+            autoComplete="tel"
             className={inputCls(!!errors.phone)}
             placeholder={t("phone_placeholder")}
           />
@@ -292,6 +296,7 @@ export default function RegisterForm({ defaultRole }: RegisterFormProps) {
             <input
               {...register("password")}
               type={showPassword ? "text" : "password"}
+              autoComplete="new-password"
               className={`${inputCls(!!errors.password)} pr-12`}
               placeholder={t("password_placeholder")}
             />
