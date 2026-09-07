@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect } from 'react';
 
 import { BloodDropLoading } from "@/components/ui/BloodDropLoading";
 import {
@@ -16,7 +16,7 @@ import DonorContactStats from '@/components/admin/DonorContactStats';
 import DonorQrCard from '@/components/donors/DonorQrCard';
 import QuickAddDonationModal from '@/components/admin/QuickAddDonationModal';
 import { useTranslations, useLocale } from 'next-intl';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import {
   ArrowLeft,
   Droplet,
@@ -150,9 +150,9 @@ function formatDateTime(iso: string | null | undefined): string {
   }
 }
 
-export default function AdminDonorDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params);
-  const donorId = parseInt(id, 10);
+export default function AdminDonorDetailPage() {
+  const params = useParams();
+  const donorId = parseInt(params.id as string, 10);
 
   const t = useTranslations('admin');
   const locale = useLocale();
