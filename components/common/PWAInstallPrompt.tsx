@@ -20,6 +20,7 @@ export default function PWAInstallPrompt() {
   const [showPrompt, setShowPrompt] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
+  const [isInAppBrowser, setIsInAppBrowser] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
@@ -28,8 +29,15 @@ export default function PWAInstallPrompt() {
       return;
     }
 
-    const isIOSDevice = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-                        (navigator.userAgent.includes('Mac') && navigator.maxTouchPoints > 1);
+    const ua = navigator.userAgent;
+    // Facebook / Messenger / Instagram in-app browsers don't fire `beforeinstallprompt`
+    // and can't install a PWA — show a "open in your browser" notice instead.
+    const inAppBrowser = /FBAN|FBAV|FB_IAB|\bMessenger\b|Instagram/i.test(ua);
+    setIsInAppBrowser(inAppBrowser);
+
+    const isIOSDevice = !inAppBrowser &&
+                        (/iPad|iPhone|iPod/.test(ua) ||
+                        (ua.includes('Mac') && navigator.maxTouchPoints > 1));
     setIsIOS(isIOSDevice);
 
     const handler = (e: Event) => {
@@ -79,7 +87,7 @@ export default function PWAInstallPrompt() {
 
   useEffect(() => {
     if (isInstalled || dismissed) return;
-    if (!deferredPrompt && !isIOS) return;
+    if (!deferredPrompt && !isIOS && !isInAppBrowser) return;
 
     const timer = setTimeout(() => {
       const count = getTodayShowCount();
@@ -91,7 +99,7 @@ export default function PWAInstallPrompt() {
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deferredPrompt, isIOS, isInstalled, dismissed]);
+  }, [deferredPrompt, isIOS, isInAppBrowser, isInstalled, dismissed]);
 
   const handleInstall = async () => {
     if (!deferredPrompt) return;
@@ -120,7 +128,48 @@ export default function PWAInstallPrompt() {
 
   if (isInstalled) return null;
   if (!showPrompt) return null;
-  if (!isIOS && !deferredPrompt) return null;
+  if (!isIOS && !deferredPrompt && !isInAppBrowser) return null;
+
+  // Facebook / Messenger / Instagram in-app browser — cannot install a PWA.
+  if (isInAppBrowser) {
+    return (
+      <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-2 right-2 sm:left-4 sm:right-auto sm:max-w-sm z-50 animate-in slide-in-from-bottom duration-300">
+        <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 sm:p-5 relative">
+          <button
+            onClick={handleDismiss}
+            className="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 hover:text-slate-700 transition-colors"
+            aria-label="Close"
+          >
+            <X className="w-4 h-4" />
+          </button>
+          <div className="flex items-center gap-3 mb-3 pr-8">
+            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center shrink-0">
+              <ExternalLink className="w-5 h-5 text-blue-600" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-900 text-sm sm:text-base">Open in your browser</h3>
+              <p className="text-xs text-slate-500">To install the app</p>
+            </div>
+          </div>
+
+          <div className="bg-slate-50 rounded-xl p-3 sm:p-4 text-xs sm:text-sm text-slate-700">
+            <p>
+              This app cannot be installed inside this in-app browser. Open this
+              page in <strong>Chrome</strong>, <strong>Edge</strong> or your
+              phone&apos;s default browser to install it.
+            </p>
+          </div>
+
+          <button
+            onClick={handleDismiss}
+            className="w-full mt-3 py-2.5 bg-red-600 text-white rounded-xl font-semibold hover:bg-red-700 transition-colors text-sm"
+          >
+            Got it, thanks!
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // iOS Install Instructions
   if (isIOS) {

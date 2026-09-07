@@ -107,7 +107,7 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/register?role=donor" className="hover:text-white transition-colors">
+                <Link href="/become-donor" className="hover:text-white transition-colors">
                   {t("become_donor")}
                 </Link>
               </li>
