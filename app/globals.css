@@ -180,10 +180,28 @@ body {
   100% { transform: translateY(14px) scale(0.8); opacity: 0; }
 }
 
-/* Expanding radar ring behind the drop. */
-@keyframes blood-ripple {
-  0% { transform: scale(0.35); opacity: 0.8; }
-  100% { transform: scale(1.7); opacity: 0; }
+/* Soft radial glow breathing behind the drop (no hard circular border). */
+@keyframes blood-glow {
+  0%, 100% { transform: scale(0.9); opacity: 0.5; }
+  50% { transform: scale(1.1); opacity: 1; }
+}
+
+/* Gentle vertical float for the whole drop stage. */
+@keyframes blood-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* ECG heartbeat line drawing across. */
+@keyframes blood-ecg {
+  0% { stroke-dashoffset: 264; }
+  100% { stroke-dashoffset: 0; }
+}
+
+/* Subtle label fade to draw the eye. */
+@keyframes blood-label {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
 }
 
 /* Trailing progress bar sweeping under the label. */
@@ -211,8 +229,23 @@ body {
   animation: blood-drip 2.6s ease-in-out infinite;
 }
 
-.blood-ripple-ring {
-  animation: blood-ripple 2.6s ease-out infinite;
+.blood-drop-stage {
+  animation: blood-float 3.2s ease-in-out infinite;
+}
+
+.blood-drop-glow {
+  animation: blood-glow 2.8s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.blood-ecg-path {
+  stroke-dasharray: 264;
+  stroke-dashoffset: 264;
+  animation: blood-ecg 2.4s linear infinite;
+}
+
+.blood-label-text {
+  animation: blood-label 1.8s ease-in-out infinite;
 }
 
 .blood-progress-track {

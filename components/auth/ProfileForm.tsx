@@ -3,7 +3,7 @@
 import NidVerificationSection from "@/components/donors/NidVerificationSection";
 import DonorQrCard from "@/components/donors/DonorQrCard";
 import MyRequests from "@/components/requests/MyRequests";
-import { ProfileSkeleton } from "@/components/ui/Skeleton";
+
 import { BloodDropLoading } from "@/components/ui/BloodDropLoading";
 import ImageAdjustPreview from "@/components/ui/ImageAdjustPreview";
 import { useState, useEffect, useRef, type ReactNode } from "react";
@@ -641,9 +641,8 @@ export default function ProfileForm() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center gap-6">
-        <BloodDropLoading label={isBn ? "লোড হচ্ছে" : "Loading"} size={64} />
-        <ProfileSkeleton />
+      <div className="flex min-h-[60vh] w-full items-center justify-center p-6">
+        <BloodDropLoading label={isBn ? "লোড হচ্ছে" : "Loading"} size={80} />
       </div>
     );
   }

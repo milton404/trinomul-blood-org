@@ -7,6 +7,7 @@ import RegisterForm from "@/components/auth/RegisterForm";
 import Navbar from "@/components/common/Navbar";
 import Footer from "@/components/common/Footer";
 import DonorEligibilityChecker from "@/components/donors/DonorEligibilityChecker";
+import { BloodDropLoading } from "@/components/ui/BloodDropLoading";
 
 const ELIGIBILITY_STORAGE_KEY = "donor_eligibility_onboarding";
 
@@ -112,7 +113,7 @@ export default function RegisterPage() {
         <div className="min-h-screen flex flex-col bg-slate-50">
           <Navbar />
           <main className="flex-grow flex items-center justify-center py-20 px-4">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-red-500 border-t-transparent" />
+            <BloodDropLoading label="Loading" size={80} />
           </main>
           <Footer />
         </div>

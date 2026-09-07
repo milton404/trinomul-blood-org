@@ -19,7 +19,7 @@ import {
   Copy,
   Check,
 } from "lucide-react";
-import { DetailPageSkeleton } from "@/components/ui/Skeleton";
+
 import { BloodDropLoading } from "@/components/ui/BloodDropLoading";
 import {
   serverGetBloodRequestById,
@@ -134,11 +134,8 @@ export default function TrackingPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-50">
-        <div className="pt-10 pb-2 flex justify-center">
-          <BloodDropLoading label="Loading" size={64} />
-        </div>
-        <DetailPageSkeleton />
+      <div className="flex min-h-screen w-full items-center justify-center bg-slate-50 p-6">
+        <BloodDropLoading label="Loading" size={80} />
       </div>
     );
   }

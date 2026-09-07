@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, use } from 'react';
-import { DetailPageSkeleton } from "@/components/ui/Skeleton";
+
 import { BloodDropLoading } from "@/components/ui/BloodDropLoading";
 import {
   serverGetProfileByUserId,
@@ -260,11 +260,8 @@ export default function AdminDonorDetailPage({ params }: { params: Promise<{ id:
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center gap-6">
-        <div className="pt-8">
-          <BloodDropLoading label="Loading" size={64} />
-        </div>
-        <DetailPageSkeleton />
+      <div className="flex min-h-[70vh] w-full flex-col items-center justify-center gap-6 p-6">
+        <BloodDropLoading label="Loading" size={80} />
       </div>
     );
   }
