@@ -65,6 +65,8 @@ function DonorsContent() {
     "donors" | "eligibility" | "compatibility"
   >("donors");
   const [sortByProximity, setSortByProximity] = useState(false);
+  // Phone-only: hide the Type + Status filter rows behind a toggle to save space.
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [donors, setDonors] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [viewMode, setViewMode] = useState<MapViewMode>("list");
@@ -743,6 +745,25 @@ function DonorsContent() {
             ))}
           </div>
 
+          {/* Phone-only toggle: collapses the Type + Status filter rows */}
+          <button
+            type="button"
+            onClick={() => setShowMoreFilters((v) => !v)}
+            className="md:hidden flex items-center justify-between w-full px-3 py-2 rounded-lg border border-slate-200 bg-slate-50 text-xs font-semibold text-slate-600 hover:border-red-300 hover:text-red-600 transition-all"
+            aria-expanded={showMoreFilters}
+          >
+            <span className="flex items-center gap-1.5">
+              <SlidersHorizontal className="w-3.5 h-3.5" />
+              {isBn ? (showMoreFilters ? "ফিল্টার লুকান" : "আরও ফিল্টার") : showMoreFilters ? "Hide Filters" : "More Filters"}
+              {(filterDonationType !== "all" ? 1 : 0) + (filterStatus !== "all" ? 1 : 0) > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-600 text-white">
+                  {(filterDonationType !== "all" ? 1 : 0) + (filterStatus !== "all" ? 1 : 0)}
+                </span>
+              )}
+            </span>
+          </button>
+
+          <div className={`${showMoreFilters ? "block" : "hidden"} md:block space-y-3`}>
           {/* Row 3: Donation Type Filter */}
           <div
             className="flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-hide"
@@ -802,6 +823,7 @@ function DonorsContent() {
                 {isBn ? status.labelBn : status.label}
               </button>
             ))}
+          </div>
           </div>
         </div>
 
