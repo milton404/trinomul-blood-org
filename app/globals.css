@@ -19,7 +19,20 @@ body {
 /* Keep page content clear of the fixed mobile bottom tab bar. */
 @media (max-width: 767.98px) {
   body:has(.bottom-nav) {
-    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+    padding-bottom: calc(4.75rem + env(safe-area-inset-bottom));
+  }
+}
+
+/* Liquid "pop" for the active bottom-nav bubble */
+@keyframes bottom-nav-pop {
+  0% {
+    transform: scale(0.85);
+  }
+  55% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1.05);
   }
 }
 

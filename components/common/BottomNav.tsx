@@ -45,70 +45,85 @@ export default function BottomNav() {
   return (
     <>
       <nav
-        className="bottom-nav fixed inset-x-0 bottom-0 z-50 grid grid-cols-6 md:hidden
-          bg-white/65 backdrop-blur-2xl backdrop-saturate-150
-          border-t border-white/60
-          shadow-[0_-8px_32px_-12px_rgba(15,23,42,0.25),0_-2px_10px_-4px_rgba(220,38,38,0.12)]
+        className="bottom-nav fixed inset-x-0 bottom-0 z-50 md:hidden
           pb-[env(safe-area-inset-bottom)]"
         aria-label="Bottom navigation"
       >
-        {tabs.map((tab) => {
-          const active = isActive(tab);
-          const Icon = tab.icon;
+        <div
+          className="pointer-events-auto relative mx-auto mb-2 grid max-w-[26rem] grid-cols-6 items-end gap-1
+            rounded-[28px] border border-white/60 bg-white/70 px-2 pt-2 pb-1.5
+            backdrop-blur-2xl backdrop-saturate-150
+            shadow-[0_-2px_24px_-6px_rgba(148,163,184,0.35),0_8px_32px_-12px_rgba(220,38,38,0.28),inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-6px_12px_-8px_rgba(220,38,38,0.12)]"
+        >
+          {/* Liquid sheen along the top edge of the glass bar */}
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-x-6 top-0 h-px rounded-full bg-gradient-to-r from-transparent via-white/90 to-transparent"
+          />
+          {tabs.map((tab) => {
+            const active = isActive(tab);
+            const Icon = tab.icon;
 
-          const content = (
-            <>
-              <span
-                className={`relative flex h-7 w-12 items-center justify-center rounded-full transition-colors duration-200 ${
-                  active ? "bg-red-500/10" : ""
-                }`}
-              >
-                <Icon
-                  className={`h-[22px] w-[22px] transition-colors ${
-                    active ? "text-red-600" : "text-slate-400"
+            const content = (
+              <>
+                <span
+                  className={`relative flex h-9 w-14 items-center justify-center rounded-full transition-all duration-300 ${
+                    active
+                      ? "bg-gradient-to-b from-red-500 to-red-600 text-white ring-2 ring-white/70 shadow-[0_6px_20px_-4px_rgba(220,38,38,0.7),0_2px_8px_-2px_rgba(220,38,38,0.45),inset_0_1px_0_rgba(255,255,255,0.5),inset_0_-5px_10px_-6px_rgba(127,29,29,0.65)] animate-[bottom-nav-pop_0.4s_ease-out_both]"
+                      : "text-slate-400"
                   }`}
-                  strokeWidth={active ? 2.4 : 2}
-                />
-              </span>
-              <span
-                className={`text-[10px] leading-none font-medium transition-colors ${
-                  active ? "text-red-600" : "text-slate-400"
-                }`}
-              >
-                {tab.label}
-              </span>
-            </>
-          );
+                >
+                  <Icon
+                    className="h-6 w-6 transition-all duration-300"
+                    strokeWidth={active ? 2.4 : 2}
+                  />
+                  {active && (
+                    <span
+                      aria-hidden
+                      className="absolute inset-x-2 top-0 h-1/2 rounded-full bg-gradient-to-b from-white/50 to-transparent"
+                    />
+                  )}
+                </span>
+                <span
+                  className={`text-[11px] leading-none transition-colors duration-300 ${
+                    active ? "font-semibold text-red-600" : "font-medium text-slate-400"
+                  }`}
+                >
+                  {tab.label}
+                </span>
+              </>
+            );
 
-          const itemClass =
-            "flex flex-col items-center gap-1 pt-2 pb-1.5 select-none active:scale-95 transition-transform";
-          const ariaCurrent = active ? ("page" as const) : undefined;
+            const itemClass =
+              "flex flex-col items-center gap-1 pt-1 pb-0.5 select-none active:scale-90 transition-transform duration-200";
+            const ariaCurrent = active ? ("page" as const) : undefined;
 
-          if (tab.href) {
+            if (tab.href) {
+              return (
+                <Link
+                  key={tab.key}
+                  href={tab.href}
+                  className={itemClass}
+                  aria-current={ariaCurrent}
+                >
+                  {content}
+                </Link>
+              );
+            }
+
             return (
-              <Link
+              <button
                 key={tab.key}
-                href={tab.href}
+                type="button"
+                onClick={() => setIsScanOpen(true)}
                 className={itemClass}
-                aria-current={ariaCurrent}
+                aria-label={tab.label}
               >
                 {content}
-              </Link>
+              </button>
             );
-          }
-
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setIsScanOpen(true)}
-              className={itemClass}
-              aria-label={tab.label}
-            >
-              {content}
-            </button>
-          );
-        })}
+          })}
+        </div>
       </nav>
 
       {isScanOpen && <QrScannerModal onClose={() => setIsScanOpen(false)} />}
