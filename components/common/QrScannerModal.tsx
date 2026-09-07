@@ -19,6 +19,9 @@ export default function QrScannerModal({ onClose }: { onClose: () => void }) {
   const [errorMsg, setErrorMsg] = useState("");
   const [decoded, setDecoded] = useState<string | null>(null);
   const isBn = useLocaleIsBn();
+  // Guards against re-scanning after a code has already been decoded,
+  // which previously kept scanning behind the result screen.
+  const handledRef = useRef(false);
 
   const stopCamera = useCallback(() => {
     if (controlsRef.current) {
@@ -35,6 +38,11 @@ export default function QrScannerModal({ onClose }: { onClose: () => void }) {
 
   const handleDecoded = useCallback(
     (text: string) => {
+      // Only accept the first successful decode; the live scan loop can
+      // keep firing callbacks (or pick up another QR) after we are done.
+      if (handledRef.current) return;
+      handledRef.current = true;
+
       const trimmed = text.trim();
       setDecoded(trimmed);
       setStatus("done");
@@ -84,6 +92,7 @@ export default function QrScannerModal({ onClose }: { onClose: () => void }) {
 
   const startCamera = useCallback(
     async (deviceId?: string) => {
+      handledRef.current = false;
       setStatus("starting");
       setErrorMsg("");
       stopCamera();
