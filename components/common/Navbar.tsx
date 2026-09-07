@@ -1,4 +1,4 @@
-﻿﻿﻿﻿"use client";
+﻿﻿﻿"use client";
 
 import Image from "next/image";
 
@@ -11,7 +11,6 @@ import {
   LogOut,
   User,
   Settings,
-  Lock,
   Heart,
   Users,
   AlertCircle,
@@ -111,7 +110,7 @@ export default function Navbar() {
               className="shrink-0 w-7 h-7 sm:w-8 sm:h-8 object-contain"
               priority
             />
-            <span className="hidden md:inline text-lg font-bold bg-gradient-to-r from-green-700 via-emerald-600 to-teal-600 bg-clip-text text-transparent tracking-tight">
+            <span className="truncate text-[12px] sm:text-sm md:text-lg font-bold bg-gradient-to-r from-green-700 via-emerald-600 to-teal-600 bg-clip-text text-transparent tracking-tight">
               {t("title")}
             </span>
           </Link>
@@ -295,14 +294,6 @@ export default function Navbar() {
               <>
                 <div className="mt-1 border-t border-slate-100 pt-2 flex flex-col gap-1">
                   <Link
-                    href="/login"
-                    onClick={() => setIsMenuOpen(false)}
-                    className="flex items-center justify-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all"
-                  >
-                    <User className="w-4 h-4 shrink-0 text-slate-400" />
-                    <span>{t("login")}</span>
-                  </Link>
-                  <Link
                     href="/register"
                     onClick={() => setIsMenuOpen(false)}
                     className="flex items-center justify-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-red-600 hover:bg-red-50 transition-all"
@@ -311,14 +302,6 @@ export default function Navbar() {
                     <span>{t("register")}</span>
                   </Link>
                 </div>
-                <Link
-                  href="/admin/login"
-                  onClick={() => setIsMenuOpen(false)}
-                  className="flex items-center justify-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-slate-400 hover:bg-slate-50 transition-all"
-                >
-                  <Lock className="w-4 h-4 text-slate-400" />
-                  Admin
-                </Link>
               </>
             )}
 

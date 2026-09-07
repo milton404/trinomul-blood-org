@@ -36,6 +36,7 @@ export default function ChatWidget() {
     { id: string; text: string }[]
   >([]);
   const [hintIndex, setHintIndex] = useState(0);
+  const [hintVisible, setHintVisible] = useState(true);
   const [confirmNewChat, setConfirmNewChat] = useState(false);
   const [workflowState, setWorkflowState] = useState<AssistantWorkflowState | null>(null);
 
@@ -74,13 +75,22 @@ export default function ChatWidget() {
     pathname.includes("/forgot-password") ||
     pathname.includes("/reset-password");
 
-  // Cycle hint messages every 2s when chat is closed
+  // Rotate hint messages when chat is closed: show each hint briefly,
+  // then hide it until the next 5s tick brings the next hint
   useEffect(() => {
     if (isOpen || hidden) return;
-    const timer = setInterval(() => {
+    setHintVisible(true);
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const showTimer = setInterval(() => {
       setHintIndex((prev) => (prev + 1) % hintMessages.length);
+      setHintVisible(true);
+      timers.push(setTimeout(() => setHintVisible(false), 2500));
     }, 5000);
-    return () => clearInterval(timer);
+    timers.push(setTimeout(() => setHintVisible(false), 2500));
+    return () => {
+      clearInterval(showTimer);
+      timers.forEach(clearTimeout);
+    };
   }, [isOpen, hidden, hintMessages.length]);
 
   // Load session from sessionStorage on mount
@@ -308,9 +318,11 @@ export default function ChatWidget() {
               {/* Rotating hint message above icon */}
               <div className="absolute bottom-full right-0 mb-1 text-right">
                 <span
-                  key={hintIndex}
-                  className="inline-block bg-white/95 text-[10px] sm:text-[11px] font-medium text-slate-700 shadow-md rounded-xl px-2.5 py-1.5 whitespace-nowrap border border-rose-100 transition-all duration-300"
-                  style={{ animation: "hint-fade 0.3s ease-out" }}
+                  className={`inline-block bg-white/95 text-[10px] sm:text-[11px] font-medium text-slate-700 shadow-md rounded-xl px-2.5 py-1.5 whitespace-nowrap border border-rose-100 transition-all duration-500 ${
+                    hintVisible
+                      ? "opacity-100 translate-y-0"
+                      : "pointer-events-none opacity-0 translate-y-1"
+                  }`}
                 >
                   {hintMessages[hintIndex]}
                 </span>
