@@ -509,6 +509,28 @@ function DonorsContent() {
     setSelectedUpazila(""); setSelectedUnion("");
   };
 
+  // Near Me button reused in two spots: after the view-mode toggle on phone,
+  // and in the filter bar on desktop (md+).
+  const nearMeButton = (
+    <button
+      onClick={handleGetLocation}
+      className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border text-sm font-medium transition-all whitespace-nowrap ${
+        sortByProximity
+          ? "border-green-300 bg-green-50 text-green-700 shadow-sm"
+          : "border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:text-red-600 hover:bg-red-50/50"
+      }`}
+      aria-label="Sort by proximity"
+      aria-pressed={sortByProximity}
+    >
+      {isLocating ? (
+        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+      ) : (
+        <Navigation className="w-3.5 h-3.5" />
+      )}
+      {isBn ? "কাছের" : "Near Me"}
+    </button>
+  );
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       <Navbar />
@@ -541,6 +563,7 @@ function DonorsContent() {
               </div>
             )}
             <MapToggle value={viewMode} onChange={setViewMode} />
+            <div className="md:hidden">{nearMeButton}</div>
           </div>
         </div>
 
@@ -568,11 +591,20 @@ function DonorsContent() {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleAiSearch();
                 }}
-                className="pl-9 pr-16 py-2.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none w-full text-sm bg-white"
+                className="pl-9 pr-24 py-2.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none w-full text-sm bg-white"
                 aria-label="Search donors by name, phone, or location"
               />
-              <span className="absolute right-2.5 top-1/2 -translate-y-1/2">
+              <span className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
                 <AiThinkingBadge loading={isAiLoading} />
+                <button
+                  type="button"
+                  onClick={handleAiSearch}
+                  className="flex items-center justify-center w-8 h-8 rounded-lg bg-red-600 text-white shadow-sm hover:bg-red-700 active:scale-95 transition-all"
+                  aria-label={isBn ? "খুঁজুন" : "Search"}
+                  title={isBn ? "খুঁজুন" : "Search"}
+                >
+                  <Search className="w-4 h-4" />
+                </button>
               </span>
             </div>
 
@@ -628,23 +660,7 @@ function DonorsContent() {
                   label=""
                 />
               )}
-              <button
-                onClick={handleGetLocation}
-                className={`flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border text-sm font-medium transition-all whitespace-nowrap ${
-                  sortByProximity
-                    ? "border-green-300 bg-green-50 text-green-700 shadow-sm"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-red-300 hover:text-red-600 hover:bg-red-50/50"
-                }`}
-                aria-label="Sort by proximity"
-                aria-pressed={sortByProximity}
-              >
-                {isLocating ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <Navigation className="w-3.5 h-3.5" />
-                )}
-                {isBn ? "কাছের" : "Near Me"}
-              </button>
+              <div className="hidden md:block">{nearMeButton}</div>
             </div>
           </div>
 
