@@ -576,7 +576,7 @@ function DonorsContent() {
               </span>
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <ModernSelect
                 value={selectedDistrict}
                 onChange={(v) => { setSelectedDistrict(v); setSelectedUpazila(""); setSelectedUnion(""); }}
@@ -590,7 +590,7 @@ function DonorsContent() {
                 locale={locale as "en" | "bn"}
                 searchable
                 clearable
-                className="min-w-[130px] sm:min-w-[140px]"
+                className="flex-1 min-w-[45%] sm:min-w-[140px] sm:flex-none"
                 label=""
               />
               <ModernSelect
@@ -607,7 +607,7 @@ function DonorsContent() {
                 searchable
                 clearable
                 disabled={!selectedDistrict}
-                className="min-w-[130px] sm:min-w-[140px]"
+                className="flex-1 min-w-[45%] sm:min-w-[140px] sm:flex-none"
                 label=""
               />
               {availableUnions.length > 0 && (
@@ -624,7 +624,7 @@ function DonorsContent() {
                   locale={locale as "en" | "bn"}
                   searchable
                   clearable
-                  className="min-w-[130px] sm:min-w-[140px]"
+                  className="flex-1 min-w-[45%] sm:min-w-[140px] sm:flex-none"
                   label=""
                 />
               )}
@@ -791,12 +791,12 @@ function DonorsContent() {
 
         {/* Tab Navigation for Tools */}
         <div
-          className="mb-4 md:mb-6 flex flex-nowrap sm:flex-wrap gap-1.5 sm:gap-2 border-b border-slate-200 pb-2 md:pb-3 overflow-x-auto scrollbar-hide"
+          className="mb-4 md:mb-6 flex flex-wrap gap-1 sm:gap-2 border-b border-slate-200 pb-2 md:pb-3 overflow-x-auto scrollbar-hide"
           role="tablist"
         >
           <button
             onClick={() => setActiveTab("donors")}
-            className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
+            className={`px-2 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
               activeTab === "donors"
                 ? "bg-red-600 text-white shadow-lg shadow-red-200"
                 : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
@@ -812,7 +812,7 @@ function DonorsContent() {
           </button>
           <button
             onClick={() => setActiveTab("eligibility")}
-            className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
+            className={`px-2 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
               activeTab === "eligibility"
                 ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200"
                 : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
@@ -825,7 +825,7 @@ function DonorsContent() {
           </button>
           <button
             onClick={() => setActiveTab("compatibility")}
-            className={`px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
+            className={`px-2 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center gap-1.5 whitespace-nowrap flex-shrink-0 ${
               activeTab === "compatibility"
                 ? "bg-purple-600 text-white shadow-lg shadow-purple-200"
                 : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"

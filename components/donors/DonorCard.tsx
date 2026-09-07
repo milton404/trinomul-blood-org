@@ -339,7 +339,7 @@ export default function DonorCard({ donor }: DonorCardProps) {
   })();
 
   return (
-    <div className="bg-white p-4 sm:p-5 md:p-6 rounded-2xl sm:rounded-3xl border border-gray-200 shadow-[0_3px_10px_rgba(0,0,0,0.06)] hover:shadow-[0_8px_25px_rgba(0,0,0,0.12)] transition-all group">
+    <div className="bg-white p-4 sm:p-5 md:p-6 rounded-2xl sm:rounded-3xl border-2 border-slate-300 shadow-[0_3px_10px_rgba(0,0,0,0.06)] hover:shadow-[0_8px_25px_rgba(0,0,0,0.12)] transition-all group">
       <div className="flex items-start justify-between mb-3 sm:mb-4">
         <div className="relative">
           <div className={`
