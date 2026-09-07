@@ -21,16 +21,16 @@ interface DonorQrCardProps {
 /**
  * Donor QR card with a blood-drop SVG icon overlaid in the center.
  *
- * The QR encodes `{ type: "donor", id, bg, d, v }` so a scanner can deep-link
- * to the donor profile. errorCorrectionLevel "H" (30%) survives the center
- * icon occlusion. The blood-drop SVG sits directly on the QR — no circular
- * border (per design preference).
+ * The QR encodes a direct link to the donor's public profile page
+ * (`/donors?donor=<id>`). This makes it work everywhere:
+ *  - the app's own QR scanner deep-links straight to the donor, and
+ *  - any normal phone camera (or WhatsApp/Google Lens) opens the donor page.
+ * errorCorrectionLevel "H" (30%) survives the center icon occlusion. The
+ * blood-drop SVG sits directly on the QR — no circular border.
  */
 export default function DonorQrCard({
   donorId,
   bloodGroup,
-  district,
-  isVerified,
   donorName,
   compact = false,
 }: DonorQrCardProps) {
@@ -40,20 +40,17 @@ export default function DonorQrCard({
   const [downloading, setDownloading] = useState(false);
   const frameRef = useRef<HTMLDivElement>(null);
 
-  // QR payload — compact JSON for scanners.
-  const payload = JSON.stringify({
-    type: "donor",
-    id: donorId,
-    bg: bloodGroup,
-    d: district,
-    v: isVerified ? 1 : 0,
-  });
+  // QR payload — direct link to the donor's profile so every scanner works.
+  const donorUrl =
+    typeof window !== "undefined"
+      ? `${window.location.origin}/${locale}/donors?donor=${donorId}`
+      : "https://trinomul-blood-bank.vercel.app/donors";
 
   const generateQr = useCallback(async () => {
     try {
       const size = compact ? 320 : 1024;
       const canvas = document.createElement("canvas");
-      const dataUrl = await QRCode.toDataURL(payload, {
+      const dataUrl = await QRCode.toDataURL(donorUrl, {
         width: size,
         margin: 2,
         errorCorrectionLevel: "H",
@@ -104,7 +101,7 @@ export default function DonorQrCard({
     } catch {
       setQrDataUrl(null);
     }
-  }, [payload, compact]);
+  }, [donorUrl, compact]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
