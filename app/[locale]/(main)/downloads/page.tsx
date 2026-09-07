@@ -43,11 +43,50 @@ export default function DownloadsPage() {
   const [device, setDevice] = useState<DeviceType>('unknown');
   const [qrUrl, setQrUrl] = useState<string>('');
   const [isStandalone, setIsStandalone] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [installing, setInstalling] = useState(false);
+  const [installResult, setInstallResult] = useState<'success' | 'dismissed' | null>(null);
 
   useEffect(() => {
     setDevice(detectDevice());
     setIsStandalone(window.matchMedia('(display-mode: standalone)').matches);
     const currentUrl = window.location.origin + '/' + locale;
+
+    const onBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+    };
+    const onAppInstalled = () => {
+      setIsStandalone(true);
+      setInstallResult('success');
+    };
+    window.addEventListener('beforeinstallprompt', onBeforeInstall);
+    window.addEventListener('appinstalled', onAppInstalled);
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onBeforeInstall);
+      window.removeEventListener('appinstalled', onAppInstalled);
+    };
+  }, [locale]);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) return;
+    setInstalling(true);
+    try {
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      if (outcome === 'accepted') {
+        setInstallResult('success');
+        setIsStandalone(true);
+      } else {
+        setInstallResult('dismissed');
+      }
+    } catch {
+      // ignore
+    }
+    setDeferredPrompt(null);
+    setInstalling(false);
+  };
     QRCode.toDataURL(currentUrl, {
       width: 400,
       margin: 2,
@@ -277,18 +316,48 @@ export default function DownloadsPage() {
                 {t('Ready to Install?', 'ইনস্টল করতে প্রস্তুত?')}
               </h3>
               <p className="text-sm text-red-100 mb-4">
-                {t(
-                  'Click the button below or use the install icon in your browser address bar',
-                  'নিচের বাটনে ক্লিক করুন বা ব্রাউজার ঠিকানার বারের install আইকন ব্যবহার করুন'
-                )}
+                {deferredPrompt
+                  ? t('Click the button below to install the app directly', 'নিচের বাটনে ক্লিক করে সরাসরি অ্যাপ ইনস্টল করুন')
+                  : device === 'ios'
+                    ? t('Use Safari and follow the steps below to install', 'Safari ব্যবহার করুন ও নিচের ধাপ অনুসরণ করুন')
+                    : t('Use the install icon in your browser address bar or follow the steps below', 'ব্রাউজার ঠিকানার বারের install আইকন ব্যবহার করুন বা নিচের ধাপ অনুসরণ করুন')}
               </p>
-              <a
-                href={`/${locale}`}
-                className="inline-flex items-center gap-2 bg-white text-red-600 px-6 py-3 rounded-xl font-bold hover:bg-red-50 transition-colors shadow-lg"
-              >
-                <Plus className="w-5 h-5" />
-                {t('Go to App & Install', 'অ্যাপে যান ও ইনস্টল করুন')}
-              </a>
+
+              {deferredPrompt ? (
+                <button
+                  onClick={handleInstallClick}
+                  disabled={installing}
+                  className="inline-flex items-center gap-2 bg-white text-red-600 px-6 py-3 rounded-xl font-bold hover:bg-red-50 transition-colors shadow-lg disabled:opacity-60"
+                >
+                  <Download className="w-5 h-5" />
+                  {installing
+                    ? t('Installing...', 'ইনস্টল হচ্ছে...')
+                    : t('Install Now', 'এখনই ইনস্টল করুন')}
+                </button>
+              ) : (
+                <a
+                  href={`/${locale}`}
+                  className="inline-flex items-center gap-2 bg-white text-red-600 px-6 py-3 rounded-xl font-bold hover:bg-red-50 transition-colors shadow-lg"
+                >
+                  <Plus className="w-5 h-5" />
+                  {t('Open App & Install', 'অ্যাপ খুলুন ও ইনস্টল করুন')}
+                </a>
+              )}
+
+              {installResult === 'dismissed' && (
+                <p className="text-sm text-red-200 mt-3">
+                  {t('Install cancelled. You can try again anytime.', 'ইনস্টল বাতিল হয়েছে। যেকোনো সময় আবার চেষ্টা করতে পারেন।')}
+                </p>
+              )}
+            </div>
+          )}
+
+          {isStandalone && installResult === 'success' && (
+            <div className="bg-green-50 border border-green-200 rounded-2xl shadow-sm p-5 sm:p-6 text-center mb-6">
+              <Check className="w-8 h-8 text-green-600 mx-auto mb-2" />
+              <h3 className="text-lg font-bold text-green-800">
+                {t('App Installed Successfully!', 'অ্যাপ সফলভাবে ইনস্টল হয়েছে!')}
+              </h3>
             </div>
           )}
 
