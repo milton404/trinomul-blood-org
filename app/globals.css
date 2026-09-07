@@ -10,10 +10,24 @@
 html,
 body {
   overflow-x: clip;
+  /* Native app feel: no pull-to-refresh / rubber-band bounce at page edges. */
+  overscroll-behavior-y: none;
 }
 
 body {
   font-family: var(--font-sans);
+  /* Removes the 300ms tap delay + double-tap zoom while still allowing
+     scrolling inside native-scrolling containers (e.g. Leaflet map). */
+  touch-action: manipulation;
+}
+
+/* Avoid accidental text-selection / zoom feel on tap targets (app-like). */
+a,
+button,
+[role="button"],
+input[type="submit"] {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
 }
 
 /* Keep page content clear of the fixed mobile bottom tab bar. */
