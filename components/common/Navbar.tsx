@@ -100,7 +100,7 @@ export default function Navbar() {
       >
         <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-red-500/40 to-transparent" />
 
-        <div className="flex items-center justify-between h-14 sm:h-16 md:h-18 px-3 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 max-w-[1600px] mx-auto">
+        <div className="flex items-center justify-between h-12 sm:h-14 md:h-16 px-3 sm:px-6 lg:px-8 xl:px-12 2xl:px-16 max-w-[1600px] mx-auto">
 
           {/* ── Logo ── */}
           <Link
