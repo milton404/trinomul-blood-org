@@ -423,6 +423,18 @@ export default function RegisterForm({ defaultRole }: RegisterFormProps) {
           )}
         </button>
       </form>
+
+      <div className="mt-6 text-center">
+        <p className="text-center text-sm text-slate-600 mb-3 flex items-center justify-center gap-2">
+          {t("has_account") || "Already have an account?"}
+          <Link
+            href="/login"
+            className="inline-block bg-slate-900 text-white py-1.5 px-4 rounded-lg text-sm font-semibold hover:bg-slate-800 transition-all"
+          >
+            {tCommon("login")}
+          </Link>
+        </p>
+      </div>
     </div>
   );
 }
