@@ -130,15 +130,17 @@ export default function DonorVerificationPanel({
     }
   };
 
-  const fmtDate = (iso: string | null) => {
+  const fmtDate = (iso: string | Date | null) => {
     if (!iso) return "—";
     try {
-      return new Date(iso.includes("T") ? iso : iso.replace(" ", "T") + "Z").toLocaleDateString(
+      const s = String(iso);
+      const d = iso instanceof Date ? iso : new Date(s.includes("T") ? s : s.replace(" ", "T") + "Z");
+      return d.toLocaleDateString(
         isBn ? "bn-BD" : "en-US",
         { day: "numeric", month: "short", year: "numeric" },
       );
     } catch {
-      return iso;
+      return String(iso);
     }
   };
 

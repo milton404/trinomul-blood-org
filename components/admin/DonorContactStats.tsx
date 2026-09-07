@@ -65,9 +65,9 @@ export default function DonorContactStats({ donorId }: DonorContactStatsProps) {
     );
   }
 
-  const formatTime = (ts: string) => {
+  const formatTime = (ts: string | Date) => {
     try {
-      const d = new Date(ts.includes("T") ? ts : ts.replace(" ", "T") + "Z");
+      const d = ts instanceof Date ? ts : new Date(String(ts).includes("T") ? String(ts) : String(ts).replace(" ", "T") + "Z");
       return d.toLocaleString(isBn ? "bn-BD" : "en-US", {
         day: "numeric",
         month: "short",
@@ -75,7 +75,7 @@ export default function DonorContactStats({ donorId }: DonorContactStatsProps) {
         minute: "2-digit",
       });
     } catch {
-      return ts;
+      return String(ts);
     }
   };
 

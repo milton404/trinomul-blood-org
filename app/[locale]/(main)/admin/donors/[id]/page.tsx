@@ -122,23 +122,25 @@ const DONATION_TYPE_LABELS: Record<string, string> = {
   plasma: 'Plasma',
 };
 
-function formatDate(iso: string | null | undefined): string {
+function formatDate(iso: string | Date | null | undefined): string {
   if (!iso) return '—';
   try {
-    return new Date(iso.replace(' ', 'T') + (iso.includes('T') ? '' : 'Z')).toLocaleDateString('en-US', {
+    const d = iso instanceof Date ? iso : new Date(String(iso).replace(' ', 'T') + (String(iso).includes('T') ? '' : 'Z'));
+    return d.toLocaleDateString('en-US', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
     });
   } catch {
-    return iso;
+    return String(iso);
   }
 }
 
-function formatDateTime(iso: string | null | undefined): string {
+function formatDateTime(iso: string | Date | null | undefined): string {
   if (!iso) return '—';
   try {
-    return new Date(iso.replace(' ', 'T') + (iso.includes('T') ? '' : 'Z')).toLocaleString('en-US', {
+    const d = iso instanceof Date ? iso : new Date(String(iso).replace(' ', 'T') + (String(iso).includes('T') ? '' : 'Z'));
+    return d.toLocaleString('en-US', {
       day: 'numeric',
       month: 'short',
       year: 'numeric',
@@ -146,7 +148,8 @@ function formatDateTime(iso: string | null | undefined): string {
       minute: '2-digit',
     });
   } catch {
-    return iso;
+
+    return String(iso);
   }
 }
 
