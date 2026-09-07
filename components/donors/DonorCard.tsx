@@ -100,6 +100,12 @@ export default function DonorCard({ donor }: DonorCardProps) {
   const [qrLinkCopied, setQrLinkCopied] = useState(false);
   const [copyingText, setCopyingText] = useState(false);
   const [textCopied, setTextCopied] = useState(false);
+
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 30000);
+    return () => clearInterval(interval);
+  }, []);
   const shareRef = useRef<HTMLDivElement>(null);
   const qrFrameRef = useRef<HTMLDivElement>(null);
 
@@ -308,18 +314,17 @@ export default function DonorCard({ donor }: DonorCardProps) {
     if (!donor.last_active_at) return null;
     try {
       const last = new Date(donor.last_active_at.includes("T") ? donor.last_active_at : donor.last_active_at.replace(" ", "T") + "Z").getTime();
-      // eslint-disable-next-line react-hooks/purity
-      const diffMs = Date.now() - last;
+      const diffMs = now - last;
       if (diffMs < 0) return null;
 
       const min = Math.floor(diffMs / 60000);
       const hr = Math.floor(diffMs / 3600000);
       const day = Math.floor(diffMs / 86400000);
 
-      if (min < 5) return { color: "bg-green-500", ring: "ring-green-400", label: isBn ? "এখন সক্রিয়" : "Active now", dot: "bg-green-500" };
+      if (min < 2) return { color: "bg-green-500", ring: "ring-green-400", label: isBn ? "এখন সক্রিয়" : "Active now", dot: "bg-green-500" };
       if (min < 15) return { color: "bg-green-500", ring: "ring-green-400", label: isBn ? `${min} মিনিট আগে সক্রিয়` : `Active ${min}m ago`, dot: "bg-green-500" };
       if (min < 60) return { color: "bg-green-400", ring: "ring-green-300", label: isBn ? `${min} মিনিট আগে সক্রিয়` : `Active ${min}m ago`, dot: "bg-green-400" };
-      if (hr < 24) return { color: "bg-amber-400", ring: "ring-amber-300", label: isBn ? `${hr} ঘণ্টা আগে সক্রিয়` : `Active ${hr}h ago`, dot: "bg-amber-400" };
+      if (hr < 24) return { color: "bg-amber-400", ring: "ring-amber-300", label: isBn ? `${hr} ঘণ্টা আগে সর্বশেষ` : `Last seen ${hr}h ago`, dot: "bg-amber-400" };
       if (day < 7) return { color: "bg-slate-400", ring: "ring-slate-300", label: isBn ? `${day} দিন আগে সর্বশেষ` : `Last seen ${day}d ago`, dot: "bg-slate-400" };
       return { color: "bg-slate-300", ring: "ring-slate-200", label: isBn ? "অফলাইন" : "Offline", dot: "bg-slate-300" };
     } catch {
@@ -381,17 +386,17 @@ export default function DonorCard({ donor }: DonorCardProps) {
             {typeCount === 0 ? (
               <span className="flex items-center gap-1 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-amber-600 leading-none">
                 <Clock className="w-2.5 h-2.5" />
-                Cooling Down
+                {isBn ? "কুলিং ডাউন" : "Cooling Down"}
               </span>
             ) : (
               <span
                 className={`text-[10px] sm:text-xs font-bold uppercase tracking-wider leading-none ${donor.is_active ? "text-green-500" : "text-slate-400"}`}
               >
                 {typeCount > 0
-                  ? `✓ Available${typeCount < 3 ? ` (${typeCount}/3)` : ""}`
+                  ? `${isBn ? "✓ উপলব্ধ" : "✓ Available"}${typeCount < 3 ? ` (${typeCount}/3)` : ""}`
                   : donor.is_active
-                    ? "Available"
-                    : "Unavailable"}
+                    ? (isBn ? "উপলব্ধ" : "Available")
+                    : (isBn ? "অনুপলব্ধ" : "Unavailable")}
               </span>
             )}
             {donor.hb_status && (
@@ -405,26 +410,26 @@ export default function DonorCard({ donor }: DonorCardProps) {
                 }`}
                 title={
                   donor.hb_status === "eligible"
-                    ? "Hemoglobin verified"
+                    ? (isBn ? "হিমোগ্লোবিন যাচাইকৃত" : "Hemoglobin verified")
                     : donor.hb_status === "low_hb"
-                      ? "Hemoglobin is below the safe donation threshold"
-                      : "Hemoglobin has not been tested yet"
+                      ? (isBn ? "হিমোগ্লোবিন নিরাপদ সীমার নিচে" : "Hemoglobin is below the safe donation threshold")
+                      : (isBn ? "হিমোগ্লোবিন এখনো পরীক্ষিত নয়" : "Hemoglobin has not been tested yet")
                 }
               >
                 {donor.hb_status === "eligible" ? (
                   <span className="inline-flex items-center gap-1">
                     <HeartPulse className="h-3 w-3" aria-hidden="true" />
-                    Hb Verified
+                    {isBn ? "Hb যাচাইকৃত" : "Hb Verified"}
                   </span>
                 ) : donor.hb_status === "low_hb" ? (
                   <span className="inline-flex items-center gap-1">
                     <HeartPulse className="h-3 w-3" aria-hidden="true" />
-                    Low Hb - Deferred
+                    {isBn ? "কম Hb - স্থগিত" : "Low Hb - Deferred"}
                   </span>
                 ) : (
                   <span className="inline-flex items-center gap-1">
                     <HeartPulse className="h-3 w-3" aria-hidden="true" />
-                    Hb Not Tested
+                    {isBn ? "Hb পরীক্ষিত নয়" : "Hb Not Tested"}
                   </span>
                 )}
               </span>
@@ -468,12 +473,12 @@ export default function DonorCard({ donor }: DonorCardProps) {
       {/* === Per-Type Availability Badges === */}
       <div className="flex flex-wrap gap-1.5 mb-3 sm:mb-4">
         <span className={typeBadgeClass(donor.eligible_whole_blood)}>
-          🩸 Whole Blood
+          🩸 {isBn ? "সম্পূর্ণ রক্ত" : "Whole Blood"}
         </span>
         <span className={typeBadgeClass(donor.eligible_platelets)}>
-          🔴 Platelets
+          🔴 {isBn ? "প্লাটিলেট" : "Platelets"}
         </span>
-        <span className={typeBadgeClass(donor.eligible_plasma)}>💉 Plasma</span>
+        <span className={typeBadgeClass(donor.eligible_plasma)}>💉 {isBn ? "প্লাজমা" : "Plasma"}</span>
       </div>
 
       <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-4 sm:mb-6">
@@ -492,17 +497,17 @@ export default function DonorCard({ donor }: DonorCardProps) {
           <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0" />
           <div>
             <p className="text-xs font-semibold text-amber-800">
-              Cooling Down (
+              {isBn ? "কুলিং ডাউন (" : "Cooling Down ("}
               {donor.donation_type === "platelets"
-                ? "Platelets"
+                ? (isBn ? "প্লাটিলেট" : "Platelets")
                 : donor.donation_type === "plasma"
-                  ? "Plasma"
-                  : "Whole Blood"}
+                  ? (isBn ? "প্লাজমা" : "Plasma")
+                  : (isBn ? "সম্পূর্ণ রক্ত" : "Whole Blood")}
               )
             </p>
             <p className="text-[10px] text-amber-600">
-              Eligible from:{" "}
-              {new Date(donor.next_eligible_date).toLocaleDateString("en-US", {
+              {isBn ? "এই তারিখ থেকে উপযুক্ত: " : "Eligible from: "}
+              {new Date(donor.next_eligible_date).toLocaleDateString(isBn ? "bn-BD" : "en-US", {
                 day: "numeric",
                 month: "short",
                 year: "numeric",

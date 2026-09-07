@@ -869,7 +869,7 @@ export async function findMatchingDonorsPg(
      FROM profiles p
      LEFT JOIN per_type pt ON p.id = pt.donor_id
      LEFT JOIN (SELECT donor_id, COUNT(*) as donation_count FROM donations GROUP BY donor_id) d ON p.id = d.donor_id
-     WHERE p.role = 'donor' AND p.is_active = TRUE AND p.blood_group IN (${placeholders})
+      WHERE p.role = 'donor' AND p.is_active = TRUE AND p.is_approved = TRUE AND p.blood_group IN (${placeholders})
        AND p.full_name_en IS NOT NULL AND p.full_name_en != ''
        AND p.phone IS NOT NULL AND p.phone != ''
        AND NOT ((p.sex = 'female' AND p.hb_level IS NOT NULL AND p.hb_level < 12.5) OR (p.sex != 'female' AND p.hb_level IS NOT NULL AND p.hb_level < 13.0))`,

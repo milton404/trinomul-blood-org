@@ -13,8 +13,8 @@ export default function Footer() {
       {/* Subtle red radial glow accent */}
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(220,38,38,0.08),transparent_70%)] pointer-events-none" />
       <div className="relative max-w-7xl mx-auto px-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-          <div className="md:col-span-2">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-6 mb-6">
+          <div className="col-span-2 md:col-span-2">
             <div className="flex items-center gap-2 mb-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -52,7 +52,7 @@ export default function Footer() {
             </div>
           </div>
           <div>
-            <h4 className="font-bold mb-2 text-white text-sm">Quick Links</h4>
+            <h4 className="font-bold mb-2 text-white text-sm">{t("quick_links")}</h4>
             <ul className="space-y-1 text-slate-400 text-sm">
               <li>
                 <Link href="/" className="hover:text-white transition-colors">
@@ -60,35 +60,33 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
-                <Link
-                  href="/donors"
-                  className="hover:text-white transition-colors"
-                >
+                <Link href="/donors" className="hover:text-white transition-colors">
                   {t("donors")}
                 </Link>
               </li>
               <li>
-                <Link
-                  href="/requests"
-                  className="hover:text-white transition-colors"
-                >
+                <Link href="/requests" className="hover:text-white transition-colors">
                   {t("requests")}
                 </Link>
               </li>
               <li>
-                <Link
-                  href="/map"
-                  className="hover:text-white transition-colors"
-                >
+                <Link href="/map" className="hover:text-white transition-colors">
                   {t("map")}
                 </Link>
               </li>
               <li>
-                <Link
-                  href="/blood-bank"
-                  className="hover:text-white transition-colors"
-                >
-                  {locale === "bn" ? "ব্লাড ব্যাংক এলাকা" : "Blood Bank Areas"}
+                <Link href="/become-donor" className="hover:text-white transition-colors">
+                  {t("become_donor")}
+                </Link>
+              </li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-bold mb-2 text-white text-sm">{t("resources")}</h4>
+            <ul className="space-y-1 text-slate-400 text-sm">
+              <li>
+                <Link href="/blood-bank" className="hover:text-white transition-colors">
+                  {t("blood_bank_areas")}
                 </Link>
               </li>
               <li>
@@ -103,56 +101,31 @@ export default function Footer() {
               </li>
               <li>
                 <Link href="/downloads" className="hover:text-white transition-colors">
-                  {locale === "bn" ? "অ্যাপ ডাউনলোড" : "Download App"}
-                </Link>
-              </li>
-              <li>
-                <Link href="/become-donor" className="hover:text-white transition-colors">
-                  {t("become_donor")}
+                  {t("download_app")}
                 </Link>
               </li>
             </ul>
           </div>
           <div>
-            <h4 className="font-bold mb-2 text-white text-sm">Support</h4>
+            <h4 className="font-bold mb-2 text-white text-sm">{t("support")}</h4>
             <ul className="space-y-1 text-slate-400 text-sm">
               <li>
-                <a
-                  href="/about"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-white transition-colors"
-                >
+                <a href="/about" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">
                   {t("about_us")}
                 </a>
               </li>
               <li>
-                <a
-                  href="/contact"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-white transition-colors"
-                >
+                <a href="/contact" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">
                   {t("contact")}
                 </a>
               </li>
               <li>
-                <a
-                  href="/privacy"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-white transition-colors"
-                >
+                <a href="/privacy" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">
                   {t("privacy_policy")}
                 </a>
               </li>
               <li>
-                <a
-                  href="/terms"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-white transition-colors"
-                >
+                <a href="/terms" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">
                   {t("terms_of_service")}
                 </a>
               </li>

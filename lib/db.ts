@@ -2446,6 +2446,7 @@ export function findMatchingDonors(
       ) d ON p.id = d.donor_id
       WHERE p.role = 'donor'
         AND p.is_active = 1
+        AND p.is_approved = 1
         AND p.blood_group IN (${placeholders})
         AND p.full_name_en IS NOT NULL AND p.full_name_en != ''
         AND p.phone IS NOT NULL AND p.phone != ''
@@ -3482,7 +3483,7 @@ export function getDonorsWithStats() {
       LEFT JOIN per_type pt ON p.id = pt.donor_id
       LEFT JOIN donor_stats ds ON p.id = ds.donor_id
       LEFT JOIN ref_stats r ON p.id = r.referrer_profile_id
-      WHERE p.role = 'donor' AND p.is_active = 1
+      WHERE p.role = 'donor' AND p.is_active = 1 AND p.is_approved = 1
         AND p.blood_group IS NOT NULL
         AND p.full_name_en IS NOT NULL AND p.full_name_en != ''
         AND p.phone IS NOT NULL AND p.phone != ''
@@ -4570,8 +4571,8 @@ export function seedSampleData() {
   }
 
   const insertProfile = db.prepare(`
-    INSERT INTO profiles (email, password_hash, full_name_en, full_name_bn, phone, blood_group, role, district, upazila, sex, is_active, show_on_leaderboard)
-    VALUES (@email, @password_hash, @full_name_en, @full_name_bn, @phone, @blood_group, @role, @district, @upazila, @sex, @is_active, @show_on_leaderboard)
+    INSERT INTO profiles (email, password_hash, full_name_en, full_name_bn, phone, blood_group, role, district, upazila, sex, is_active, show_on_leaderboard, is_approved, verification_status)
+    VALUES (@email, @password_hash, @full_name_en, @full_name_bn, @phone, @blood_group, @role, @district, @upazila, @sex, @is_active, @show_on_leaderboard, 1, 'verified')
   `);
   const insertDonation = db.prepare(`
     INSERT INTO donations (donor_id, blood_group, units, hospital_name, donation_date)
