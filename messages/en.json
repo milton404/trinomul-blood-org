@@ -40,6 +40,7 @@
     "guide": "Guide",
     "track": "Track",
     "scan_qr": "Scan QR",
+    "scan": "Scan",
     "track_title": "Track a Blood Request",
     "track_desc": "Enter the tracking code shown on your request to see its live status.",
     "track_placeholder": "Enter tracking code (e.g. REQ-AB12CD)",

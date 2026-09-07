@@ -29,6 +29,7 @@ import { useState, useEffect } from "react";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { clearSession } from "@/components/providers/AuthProvider";
 import QrScannerModal from "./QrScannerModal";
+import BottomNav from "./BottomNav";
 
 export default function Navbar() {
   const t = useTranslations("common");
@@ -392,6 +393,8 @@ export default function Navbar() {
       )}
 
       {isScanOpen && <QrScannerModal onClose={() => setIsScanOpen(false)} />}
+
+      <BottomNav />
     </>
   );
 }

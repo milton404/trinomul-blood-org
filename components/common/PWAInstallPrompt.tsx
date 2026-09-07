@@ -125,7 +125,7 @@ export default function PWAInstallPrompt() {
   // iOS Install Instructions
   if (isIOS) {
     return (
-      <div className="fixed bottom-4 left-2 right-2 sm:left-4 sm:right-auto sm:max-w-sm z-50 animate-in slide-in-from-bottom duration-300">
+      <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-2 right-2 sm:left-4 sm:right-auto sm:max-w-sm z-50 animate-in slide-in-from-bottom duration-300">
         <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 p-4 sm:p-5 relative">
           <button
             onClick={handleDismiss}
@@ -176,7 +176,7 @@ export default function PWAInstallPrompt() {
 
   // Android/Other Install Prompt
   return (
-    <div className="fixed bottom-4 left-2 right-2 sm:left-4 sm:right-auto sm:max-w-sm z-50 animate-in slide-in-from-bottom duration-300">
+    <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] left-2 right-2 sm:left-4 sm:right-auto sm:max-w-sm z-50 animate-in slide-in-from-bottom duration-300">
       <div className="bg-white rounded-2xl shadow-2xl border border-red-100 p-4 sm:p-5 relative">
         <button
           onClick={handleDismiss}

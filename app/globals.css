@@ -7,8 +7,20 @@
   --font-sans: var(--font-hind-siliguri), ui-sans-serif, system-ui, sans-serif;
 }
 
+html,
+body {
+  overflow-x: clip;
+}
+
 body {
   font-family: var(--font-sans);
+}
+
+/* Keep page content clear of the fixed mobile bottom tab bar. */
+@media (max-width: 767.98px) {
+  body:has(.bottom-nav) {
+    padding-bottom: calc(4rem + env(safe-area-inset-bottom));
+  }
 }
 
 .scrollbar-hide {

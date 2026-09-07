@@ -106,6 +106,11 @@ export default function Footer() {
                   {locale === "bn" ? "অ্যাপ ডাউনলোড" : "Download App"}
                 </Link>
               </li>
+              <li>
+                <Link href="/register?role=donor" className="hover:text-white transition-colors">
+                  {t("become_donor")}
+                </Link>
+              </li>
             </ul>
           </div>
           <div>

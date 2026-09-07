@@ -298,7 +298,7 @@ export default function ChatWidget() {
     <>
       {/* Floating button */}
       {!isOpen && (
-        <div className="fixed bottom-8 right-4 z-40 md:bottom-16 md:right-6">
+        <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] right-4 z-40 md:bottom-16 md:right-6">
           <button
             onClick={() => setIsOpen(true)}
             aria-label={t("open_chat")}
