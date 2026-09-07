@@ -6,13 +6,14 @@ import { Link, usePathname } from "@/i18n/routing";
 import {
   Heart,
   Users,
-  AlertCircle,
+  Droplets,
   ScanLine,
   MessageCircle,
   User,
   type LucideIcon,
 } from "lucide-react";
 import QrScannerModal from "./QrScannerModal";
+import { useScrollDirection } from "@/hooks/use-scroll-direction";
 
 type BottomTab = {
   key: string;
@@ -26,11 +27,14 @@ export default function BottomNav() {
   const t = useTranslations("common");
   const pathname = usePathname();
   const [isScanOpen, setIsScanOpen] = useState(false);
+  const { direction, atTop } = useScrollDirection();
+  // Facebook-style: hide the bottom tabs when scrolling down (phone only).
+  const hideNav = !atTop && direction === "down";
 
   const tabs: BottomTab[] = [
     { key: "home", href: "/", label: t("home"), icon: Heart, exact: true },
     { key: "donors", href: "/donors", label: t("donors"), icon: Users },
-    { key: "requests", href: "/requests", label: t("requests"), icon: AlertCircle },
+    { key: "requests", href: "/requests", label: t("requests"), icon: Droplets },
     { key: "scan", href: null, label: t("scan"), icon: ScanLine },
     { key: "community", href: "/feed", label: t("community"), icon: MessageCircle },
     { key: "profile", href: "/profile", label: t("profile"), icon: User },
@@ -45,8 +49,10 @@ export default function BottomNav() {
   return (
     <>
       <nav
-        className="bottom-nav fixed inset-x-0 bottom-0 z-50 md:hidden
-          pb-[env(safe-area-inset-bottom)]"
+        className={`bottom-nav fixed inset-x-0 bottom-0 z-50 md:hidden
+          pb-[env(safe-area-inset-bottom)] transition-transform duration-300 ease-out ${
+            hideNav ? "translate-y-full" : "translate-y-0"
+          }`}
         aria-label="Bottom navigation"
       >
         <div

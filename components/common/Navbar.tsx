@@ -13,7 +13,7 @@ import {
   Settings,
   Heart,
   Users,
-  AlertCircle,
+  Droplets,
   MapPin,
   Trophy,
   MessageCircle,
@@ -29,6 +29,7 @@ import LanguageSwitcher from "./LanguageSwitcher";
 import { clearSession } from "@/components/providers/AuthProvider";
 import QrScannerModal from "./QrScannerModal";
 import BottomNav from "./BottomNav";
+import { useScrollDirection } from "@/hooks/use-scroll-direction";
 
 export default function Navbar() {
   const t = useTranslations("common");
@@ -39,6 +40,9 @@ export default function Navbar() {
   const [isScanOpen, setIsScanOpen] = useState(false);
   const [trackCode, setTrackCode] = useState("");
   const pathname = usePathname();
+  const { direction, atTop } = useScrollDirection();
+  // Facebook-style: hide the header when scrolling up (phone only).
+  const hideHeader = !atTop && direction === "up";
 
   useEffect(() => {
     setIsTrackOpen(false);
@@ -76,7 +80,7 @@ export default function Navbar() {
   const navLinks = [
     { href: "/", label: t("home"), ariaLabel: "Go to homepage", icon: Heart },
     { href: "/donors", label: t("donors"), ariaLabel: "View donor directory", icon: Users },
-    { href: "/requests", label: t("requests"), ariaLabel: "View blood requests", icon: AlertCircle },
+    { href: "/requests", label: t("requests"), ariaLabel: "View blood requests", icon: Droplets },
     { href: "/map", label: t("map"), ariaLabel: "View donor and request map", icon: MapPin },
     { href: "/leaderboard", label: t("leaderboard"), ariaLabel: "View donor leaderboard", icon: Trophy },
     { href: "/feed", label: t("community"), ariaLabel: "Community feed", icon: MessageCircle },
@@ -89,7 +93,9 @@ export default function Navbar() {
   return (
     <>
       <header
-        className="sticky top-0 z-50 bg-white/85 backdrop-blur-2xl border-b border-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_32px_-16px_rgba(220,38,38,0.1)]"
+        className={`sticky top-0 z-50 bg-white/85 backdrop-blur-2xl border-b border-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.04),0_8px_32px_-16px_rgba(220,38,38,0.1)] transition-transform duration-300 ease-out ${
+          hideHeader ? "-translate-y-full" : "translate-y-0"
+        } md:translate-y-0`}
         role="banner"
       >
         <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-red-500/40 to-transparent" />
