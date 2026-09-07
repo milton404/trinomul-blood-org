@@ -1080,8 +1080,8 @@ export default function RequestsPage() {
             Every filter is visible; nothing hidden behind toggles. */}
         <div className="mb-4 sm:mb-5 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
           {/* Row 1: Search + view toggle + Post CTA */}
-          <div className="flex items-center gap-1.5 sm:gap-2 p-2 sm:p-2.5">
-            <div className="relative flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 p-2 sm:p-2.5">
+            <div className="relative w-full sm:w-auto sm:flex-1 sm:min-w-0">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-violet-400 pointer-events-none" />
               <input
                 type="text"
