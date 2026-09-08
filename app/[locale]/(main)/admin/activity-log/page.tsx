@@ -114,7 +114,7 @@ export default function AdminActivityLogPage() {
       )
     : logs;
 
-  const formatDate = (ts: string) => {
+  const formatDate = (ts: string | Date) => {
     try {
       return new Date(ts).toLocaleString(locale === 'bn' ? 'bn-BD' : 'en-US', {
         month: 'short',
@@ -124,7 +124,7 @@ export default function AdminActivityLogPage() {
         minute: '2-digit',
       });
     } catch {
-      return ts;
+      return ts instanceof Date ? ts.toISOString() : String(ts ?? '');
     }
   };
 
