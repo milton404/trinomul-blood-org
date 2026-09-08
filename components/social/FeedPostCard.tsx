@@ -29,6 +29,7 @@ import {
   serverPinPost,
   serverSharePost,
 } from "@/lib/db-actions";
+import ImageLightbox from "./ImageLightbox";
 
 
 interface FeedPost {
@@ -79,37 +80,25 @@ function initials(name: string): string {
 
 function SmartImage({
   src,
-  onDoubleTap,
+  onTap,
   ariaLabel,
 }: {
   src: string;
-  onDoubleTap: () => void;
+  onTap: () => void;
   ariaLabel: string;
 }) {
-  const [ratio, setRatio] = useState<number | null>(null);
-  let aspect = "aspect-square";
-  if (ratio !== null) {
-    if (ratio > 1.15) aspect = "aspect-[4/3]";
-    else if (ratio < 0.85) aspect = "aspect-[4/5]";
-  }
   return (
     <button
       type="button"
-      onClick={onDoubleTap}
-      className={`block w-full overflow-hidden bg-black ${aspect}`}
+      onClick={onTap}
+      className="block w-full cursor-pointer bg-black"
       aria-label={ariaLabel}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={src}
         alt=""
-        onLoad={(e) => {
-          const el = e.currentTarget;
-          if (el.naturalWidth && el.naturalHeight) {
-            setRatio(el.naturalWidth / el.naturalHeight);
-          }
-        }}
-        className="h-full w-full object-cover"
+        className="mx-auto block max-h-[440px] w-auto max-w-full"
       />
     </button>
   );
@@ -149,6 +138,8 @@ export default function FeedPostCard({
   const [currentImageIdx, setCurrentImageIdx] = useState(0);
   const imageTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const optionsRef = useRef<HTMLDivElement>(null);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
 
   const canModify = currentUser && (currentUser.id === post.authorId || isAdmin);
   const roleBadge = ROLE_BADGE[post.authorRole] || ROLE_BADGE.donor;
@@ -180,6 +171,25 @@ export default function FeedPostCard({
       setTimeout(() => setDoubleTapLike(false), 500);
       handleLike();
     }
+  };
+
+  const handleImageTap = () => {
+    if (imageTapTimer.current) {
+      clearTimeout(imageTapTimer.current);
+      imageTapTimer.current = null;
+      handleDoubleTapLike();
+      return;
+    }
+    imageTapTimer.current = setTimeout(() => {
+      imageTapTimer.current = null;
+      setLightboxIndex(0);
+      setLightboxOpen(true);
+    }, 280);
+  };
+
+  const openLightboxAt = (idx: number) => {
+    setLightboxIndex(idx);
+    setLightboxOpen(true);
   };
 
   const loadComments = async () => {
@@ -428,7 +438,7 @@ export default function FeedPostCard({
           {singleImage ? (
             <SmartImage
               src={images[0]}
-              onDoubleTap={handleDoubleTapLike}
+              onTap={handleImageTap}
               ariaLabel={t("like")}
             />
           ) : (
@@ -437,13 +447,20 @@ export default function FeedPostCard({
                 className="flex transition-transform duration-300"
                 style={{ transform: `translateX(-${currentImageIdx * 100}%)` }}
               >
-                {images.map((u) => (
-                  <img
+                {images.map((u, i) => (
+                  <button
                     key={u}
-                    src={u}
-                    alt=""
-                    className="w-full shrink-0 aspect-[4/5] sm:aspect-square object-cover"
-                  />
+                    type="button"
+                    onClick={() => openLightboxAt(i)}
+                    className="relative aspect-[4/5] w-full shrink-0 cursor-pointer bg-black sm:aspect-square"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={u}
+                      alt=""
+                      className="absolute inset-0 h-full w-full object-contain"
+                    />
+                  </button>
                 ))}
               </div>
               {images.length > 1 && (
@@ -680,6 +697,14 @@ export default function FeedPostCard({
             </p>
           )}
         </div>
+      )}
+
+      {lightboxOpen && hasImages && !editing && (
+        <ImageLightbox
+          images={images}
+          index={lightboxIndex}
+          onClose={() => setLightboxOpen(false)}
+        />
       )}
     </article>
   );
