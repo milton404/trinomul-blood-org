@@ -1303,7 +1303,8 @@ export async function bulkDeleteDonationsPg(ids: number[]): Promise<number> {
 function mapSocialPostRow(r: any, viewerId: number | null) {
   return {
     kind: "post" as const, id: r.id, postId: r.id, authorId: r.author_id,
-    authorName: r.author_name || "User", authorRole: r.author_role, content: r.content,
+    authorName: r.author_name || "User", authorRole: r.author_role,
+    authorAvatarUrl: r.author_avatar_url || null, content: r.content,
     images: r.images ? JSON.parse(r.images) : [], postType: r.post_type,
     relatedRequestId: r.related_request_id, pinned: !!r.pinned, isPublic: !!r.is_public,
     status: r.status, likeCount: r.like_count || 0, commentCount: r.comment_count || 0,
@@ -1335,7 +1336,7 @@ export async function getSocialFeedPg(opts: {
   const { viewerId = null, isAdmin = false, limit = 30, offset = 0, filter = "all" } = opts;
 
   const { rows: postRows } = await query(
-    `SELECT p.*, pr.full_name_en AS author_name,
+    `SELECT p.*, pr.full_name_en AS author_name, pr.avatar_url AS author_avatar_url,
        (SELECT COUNT(*) FROM social_post_likes l WHERE l.post_id = p.id) AS like_count,
        (SELECT COUNT(*) FROM social_post_comments c WHERE c.post_id = p.id) AS comment_count,
        (SELECT COUNT(*) FROM social_post_likes l2 WHERE l2.post_id = p.id AND l2.user_id = $1) AS my_like
@@ -1393,10 +1394,10 @@ export async function createSocialPostPg(input: {
 
 export async function getSocialPostByIdPg(id: number) {
   const { rows } = await query(
-    `SELECT p.*, pr.full_name_en AS author_name,
+    `SELECT p.*, pr.full_name_en AS author_name, pr.avatar_url AS author_avatar_url,
        (SELECT COUNT(*) FROM social_post_likes l WHERE l.post_id = p.id) AS like_count,
        (SELECT COUNT(*) FROM social_post_comments c WHERE c.post_id = p.id) AS comment_count
-     FROM social_posts p LEFT JOIN profiles pr ON pr.id = p.author_id WHERE p.id = $1`,
+      FROM social_posts p LEFT JOIN profiles pr ON pr.id = p.author_id WHERE p.id = $1`,
     [id],
   );
   const row = rows[0] as any;

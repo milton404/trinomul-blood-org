@@ -368,12 +368,6 @@
     "image_right": "Move right",
     "image_down": "Move down",
     "image_reset": "Reset position",
-    "hb_level": "Hemoglobin Level (g/dL)",
-    "hb_hint": "Optional — below 12.5 (female) or 13.0 (male) temporarily defers you",
-    "last_hb_test_date": "Last Hb Test Date",
-    "hb_reminder_title": "Hb Test Reminder",
-    "hb_reminder_body": "Please get your hemoglobin level tested before your next donation, then update it in your profile.",
-    "email": "Email",
     "emergency_contact_hint": "For emergency situations"
   },
   "request": {
@@ -809,7 +803,6 @@
     "donation_select_donor": "Please select a donor",
     "search_donors_placeholder": "Search donor by name or phone...",
     "donation_type": "Donation Type",
-    "units": "Units",
     "record": "Record",
     "notes_optional": "Notes (optional)",
     "hospital_name_optional": "Hospital (optional)",
@@ -876,7 +869,6 @@
     "needed_time": "Needed time",
     "total_entries": "Total Entries",
     "search": "Search",
-    "date": "Date",
     "get_directions": "Get Directions",
     "edit_request": "Edit Request",
     "donations": "Donations",
@@ -1070,7 +1062,10 @@
     "impactTitle": "Together, we save lives",
     "impactDescription": "Every post, share, and donation update helps the right people connect when it matters.",
     "communityFeedHeading": "Community feed",
-    "requestBlood": "Request blood"
+    "requestBlood": "Request blood",
+    "options": "Options",
+    "likeCount": "{count} likes",
+    "likeCountOne": "1 like"
   },
   "donor_application": {
     "page_title": "Become a Blood Donor",

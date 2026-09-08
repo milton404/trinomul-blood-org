@@ -5,16 +5,20 @@ import {
   Heart,
   MessageCircle,
   Share2,
+  Ellipsis,
+  Bookmark,
+
+  Smile,
+  X,
+  Loader2,
   Pin,
   PinOff,
   Trash2,
   Pencil,
-  X,
-  Loader2,
   Globe,
   Lock,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { formatPostedAt } from "@/lib/format-time";
 import {
   serverToggleLike,
@@ -26,13 +30,15 @@ import {
   serverSharePost,
 } from "@/lib/db-actions";
 
-type FeedPost = {
+
+interface FeedPost {
   kind: "post";
   id: number;
   postId: number;
   authorId: number;
   authorName: string;
   authorRole: string;
+  authorAvatarUrl: string | null;
   content: string;
   images: string[];
   postType: string;
@@ -44,55 +50,20 @@ type FeedPost = {
   shareCount: number;
   likedByMe: boolean;
   createdAt: string;
-};
+}
 
-const ROLE_BADGE: Record<
-  string,
-  { en: string; bn: string; cls: string }
-> = {
-  donor: {
-    en: "Donor",
-    bn: "দাতা",
-    cls: "bg-rose-50 text-rose-700 border border-rose-200",
-  },
-  patient: {
-    en: "Requester",
-    bn: "অনুরোধকারী",
-    cls: "bg-sky-50 text-sky-700 border border-sky-200",
-  },
-  hospital: {
-    en: "Hospital",
-    bn: "হাসপাতাল",
-    cls: "bg-violet-50 text-violet-700 border border-violet-200",
-  },
-  admin: {
-    en: "Admin",
-    bn: "অ্যাডমিন",
-    cls: "bg-amber-50 text-amber-700 border border-amber-200",
-  },
-  super_admin: {
-    en: "Admin",
-    bn: "অ্যাডমিন",
-    cls: "bg-amber-50 text-amber-700 border border-amber-200",
-  },
+const ROLE_BADGE: Record<string, { en: string; bn: string; cls: string }> = {
+  donor: { en: "Donor", bn: "দাতা", cls: "bg-rose-50 text-rose-700 border border-rose-200" },
+  patient: { en: "Requester", bn: "অনুরোধকারী", cls: "bg-sky-50 text-sky-700 border border-sky-200" },
+  hospital: { en: "Hospital", bn: "হাসপাতাল", cls: "bg-violet-50 text-violet-700 border border-violet-200" },
+  admin: { en: "Admin", bn: "অ্যাডমিন", cls: "bg-amber-50 text-amber-700 border border-amber-300" },
+  super_admin: { en: "Admin", bn: "অ্যাডমিন", cls: "bg-amber-50 text-amber-700 border border-amber-300" },
 };
 
 const POST_TYPE_BADGE: Record<string, { en: string; bn: string; cls: string }> = {
-  admin_announcement: {
-    en: "Announcement",
-    bn: "ঘোষণা",
-    cls: "bg-amber-100 text-amber-800 border border-amber-300",
-  },
-  donation_update: {
-    en: "Donation Update",
-    bn: "রক্তদান আপডেট",
-    cls: "bg-emerald-100 text-emerald-800 border border-emerald-300",
-  },
-  blood_request: {
-    en: "Request",
-    bn: "অনুরোধ",
-    cls: "bg-red-100 text-red-700 border border-red-300",
-  },
+  admin_announcement: { en: "Announcement", bn: "ঘোষণা", cls: "bg-amber-100 text-amber-800 border border-amber-300" },
+  donation_update: { en: "Donation Update", bn: "রক্তদান আপডেট", cls: "bg-emerald-100 text-emerald-800 border border-emerald-300" },
+  blood_request: { en: "Request", bn: "অনুরোধ", cls: "bg-red-100 text-red-700 border border-red-300" },
   general: { en: "Post", bn: "পোস্ট", cls: "" },
 };
 
@@ -135,13 +106,17 @@ export default function FeedPostCard({
   const [images, setImages] = useState<string[]>(post.images || []);
   const [isPublic, setIsPublic] = useState(post.isPublic);
   const [busy, setBusy] = useState(false);
+  const [showOptions, setShowOptions] = useState(false);
+  const [doubleTapLike, setDoubleTapLike] = useState(false);
+  const [currentImageIdx, setCurrentImageIdx] = useState(0);
+  const imageTapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const optionsRef = useRef<HTMLDivElement>(null);
 
-  const canModify =
-    currentUser && (currentUser.id === post.authorId || isAdmin);
+  const canModify = currentUser && (currentUser.id === post.authorId || isAdmin);
   const roleBadge = ROLE_BADGE[post.authorRole] || ROLE_BADGE.donor;
   const typeBadge = POST_TYPE_BADGE[post.postType] || POST_TYPE_BADGE.general;
 
-  const handleLike = async () => {
+  const handleLike = useCallback(async () => {
     if (!currentUser) return;
     if (liking) return;
     setLiking(true);
@@ -158,6 +133,15 @@ export default function FeedPostCard({
       setLikeCount(prevCount);
     }
     setLiking(false);
+  }, [currentUser, liking, liked, likeCount, post.id]);
+
+  const handleDoubleTapLike = () => {
+    if (!currentUser) return;
+    if (!liked) {
+      setDoubleTapLike(true);
+      setTimeout(() => setDoubleTapLike(false), 500);
+      handleLike();
+    }
   };
 
   const loadComments = async () => {
@@ -221,9 +205,6 @@ export default function FeedPostCard({
     setBusy(false);
   };
 
-  const handleToggleImages = (url: string) =>
-    setImages((prev) => prev.filter((u) => u !== url));
-
   const handlePin = async () => {
     setBusy(true);
     try {
@@ -260,98 +241,229 @@ export default function FeedPostCard({
     }
   };
 
-  return (
-    <article
-      className={`bg-white rounded-2xl border shadow-sm transition-all ${
-        post.pinned ? "border-amber-300 ring-2 ring-amber-100" : "border-slate-200"
-      }`}
-    >
-      {/* Header */}
-      <div className="flex items-start gap-3 p-4">
-        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-red-500 to-rose-600 text-white flex items-center justify-center font-bold shrink-0">
-          {initials(post.authorName || "U")}
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      if (optionsRef.current && !optionsRef.current.contains(e.target as Node)) {
+        setShowOptions(false);
+      }
+    };
+    if (showOptions) document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
+  }, [showOptions]);
+
+  const avatar = post.authorAvatarUrl ? (
+    <img
+      src={post.authorAvatarUrl}
+      alt={post.authorName}
+      className="h-8 w-8 sm:h-9 sm:w-9 rounded-full object-cover"
+    />
+  ) : (
+    <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-gradient-to-br from-red-500 to-rose-600 text-white flex items-center justify-center font-bold text-xs sm:text-sm">
+      {initials(post.authorName || "U")}
+    </div>
+  );
+
+  const renderComments = () =>
+    comments.slice(0, 2).map((c: any) => (
+      <div key={c.id} className="flex items-start gap-2 py-1">
+        <div className="w-5 h-5 rounded-full bg-slate-200 flex items-center justify-center text-[8px] font-bold text-slate-600 shrink-0 mt-0.5">
+          {initials(c.author_name || "U")}
         </div>
+        <div className="flex-1 min-w-0">
+          <span className="text-xs font-semibold text-slate-800 mr-1.5">
+            {c.author_name}
+          </span>
+          <span className="text-xs text-slate-700 break-words">{c.content}</span>
+        </div>
+      </div>
+    ));
+
+  const singleImage = images.length === 1;
+  const hasImages = images.length > 0;
+
+  return (
+    <article className="bg-white border border-slate-100 sm:border-transparent sm:shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-2.5 px-3 sm:px-4 py-3">
+        {avatar}
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-slate-900 truncate">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-semibold text-sm text-slate-900 truncate">
               {post.authorName}
             </span>
             <span
-              className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${roleBadge.cls}`}
+              className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide ${roleBadge.cls}`}
             >
               {locale === "bn" ? roleBadge.bn : roleBadge.en}
             </span>
             {typeBadge.cls && post.postType !== "general" && (
               <span
-                className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${typeBadge.cls}`}
+                className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wide ${typeBadge.cls}`}
               >
                 {locale === "bn" ? typeBadge.bn : typeBadge.en}
               </span>
             )}
             {post.pinned && (
-              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-700">
-                <Pin className="w-3 h-3" />
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-100 text-amber-700">
+                <Pin className="w-2.5 h-2.5" />
                 {t("pinned")}
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5">
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
             <span>{formatPostedAt(post.createdAt)}</span>
+            <span className="w-0.5 h-0.5 rounded-full bg-slate-300" />
             {post.isPublic ? (
               <span className="inline-flex items-center gap-0.5">
-                <Globe className="w-3 h-3" />
-                {t("public")}
+                <Globe className="w-2.5 h-2.5" />
               </span>
             ) : (
               <span className="inline-flex items-center gap-0.5">
-                <Lock className="w-3 h-3" />
-                {t("private")}
+                <Lock className="w-2.5 h-2.5" />
               </span>
             )}
           </div>
         </div>
 
-        {/* Manage menu (author + admin) */}
+        {/* Options menu */}
         {canModify && !editing && (
-          <div className="flex items-center gap-1 shrink-0">
-            {!isAdmin && (
-              <button
-                onClick={() => setEditing(true)}
-                title={t("edit")}
-                className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"
-              >
-                <Pencil className="w-4 h-4" />
-              </button>
-            )}
+          <div className="relative" ref={optionsRef}>
             <button
-              onClick={handleDelete}
-              title={t("delete")}
-              className="p-1.5 rounded-lg hover:bg-red-50 text-red-500"
+              onClick={() => setShowOptions((v) => !v)}
+              className="p-1.5 rounded-full hover:bg-slate-100 text-slate-500 transition-colors"
+              aria-label={t("options")}
             >
-              <Trash2 className="w-4 h-4" />
+              <Ellipsis className="w-4 h-4" />
             </button>
-          </div>
-        )}
-        {isAdmin && !editing && (
-          <button
-            onClick={handlePin}
-            disabled={busy}
-            title={post.pinned ? t("unpin") : t("pin")}
-            className={`p-1.5 rounded-lg hover:bg-amber-50 ${
-              post.pinned ? "text-amber-600" : "text-slate-400"
-            }`}
-          >
-            {post.pinned ? (
-              <PinOff className="w-4 h-4" />
-            ) : (
-              <Pin className="w-4 h-4" />
+            {showOptions && (
+              <div className="absolute right-0 top-full mt-1 z-20 bg-white rounded-xl shadow-lg border border-slate-200 py-1 min-w-[140px]">
+                {!isAdmin && (
+                  <button
+                    onClick={() => {
+                      setEditing(true);
+                      setShowOptions(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    {t("edit")}
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    handleDelete();
+                    setShowOptions(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  {t("delete")}
+                </button>
+                {isAdmin && (
+                  <>
+                    <div className="border-t border-slate-100 my-1" />
+                    <button
+                      onClick={() => {
+                        handlePin();
+                        setShowOptions(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-3 py-2 text-sm text-amber-700 hover:bg-amber-50"
+                    >
+                      {post.pinned ? (
+                        <PinOff className="w-3.5 h-3.5" />
+                      ) : (
+                        <Pin className="w-3.5 h-3.5" />
+                      )}
+                      {post.pinned ? t("unpin") : t("pin")}
+                    </button>
+                  </>
+                )}
+              </div>
             )}
-          </button>
+          </div>
         )}
       </div>
 
-      {/* Body */}
-      <div className="px-4 pb-2">
+      {/* Body — images */}
+      {hasImages && !editing && (
+        <div className="relative w-full">
+          {singleImage ? (
+            <button
+              type="button"
+              onClick={handleDoubleTapLike}
+              className="block w-full"
+              aria-label={t("like")}
+            >
+              <img
+                src={images[0]}
+                alt=""
+                className="w-full max-h-[480px] object-cover"
+              />
+            </button>
+          ) : (
+            <div className="relative overflow-hidden">
+              <div
+                className="flex transition-transform duration-300"
+                style={{ transform: `translateX(-${currentImageIdx * 100}%)` }}
+              >
+                {images.map((u) => (
+                  <img
+                    key={u}
+                    src={u}
+                    alt=""
+                    className="w-full shrink-0 aspect-[4/5] sm:aspect-[16/10] object-cover"
+                  />
+                ))}
+              </div>
+              {images.length > 1 && (
+                <>
+                  {/* Dots */}
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5">
+                    {images.map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setCurrentImageIdx(i)}
+                        className={`h-1.5 rounded-full transition-all duration-200 ${
+                          i === currentImageIdx ? "w-5 bg-white" : "w-1.5 bg-white/60"
+                        }`}
+                        aria-label={`Slide ${i + 1}`}
+                      />
+                    ))}
+                  </div>
+                  {/* Nav arrows on hover (desktop) */}
+                  {currentImageIdx > 0 && (
+                    <button
+                      onClick={() => setCurrentImageIdx((i) => Math.max(0, i - 1))}
+                      className="hidden sm:flex absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 text-white items-center justify-center hover:bg-black/50 transition-colors"
+                      aria-label="Previous"
+                    >
+                      <span className="text-lg">‹</span>
+                    </button>
+                  )}
+                  {currentImageIdx < images.length - 1 && (
+                    <button
+                      onClick={() => setCurrentImageIdx((i) => Math.min(images.length - 1, i + 1))}
+                      className="hidden sm:flex absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/30 text-white items-center justify-center hover:bg-black/50 transition-colors"
+                      aria-label="Next"
+                    >
+                      <span className="text-lg">›</span>
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+          {/* Double-tap like animation */}
+          {doubleTapLike && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <Heart className="w-16 h-16 text-white fill-white animate-[heart-pop_0.6s_ease-out] drop-shadow-lg" />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Caption / Body */}
+      <div className="px-3 sm:px-4 pt-3 pb-1.5">
         {editing ? (
           <div className="space-y-2">
             <textarea
@@ -364,14 +476,13 @@ export default function FeedPostCard({
               <div className="flex flex-wrap gap-2">
                 {images.map((u) => (
                   <div key={u} className="relative">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={u}
                       alt=""
                       className="w-16 h-16 object-cover rounded-lg"
                     />
                     <button
-                      onClick={() => handleToggleImages(u)}
+                      onClick={() => setImages((prev) => prev.filter((x) => x !== u))}
                       className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"
                     >
                       <X className="w-3 h-3" />
@@ -410,127 +521,133 @@ export default function FeedPostCard({
           </div>
         ) : (
           post.content && (
-            <p className="text-sm text-slate-800 whitespace-pre-wrap break-words leading-relaxed">
-              {post.content}
+            <p className="text-sm text-slate-800 leading-relaxed">
+              <span className="font-semibold mr-1.5">{post.authorName}</span>
+              <span className="break-words whitespace-pre-wrap">{post.content}</span>
             </p>
           )
         )}
-
-        {!editing && images.length > 0 && (
-          <div
-            className={`mt-3 grid gap-2 ${
-              images.length === 1
-                ? "grid-cols-1"
-                : images.length === 2
-                  ? "grid-cols-2"
-                  : "grid-cols-3"
-            }`}
-          >
-            {images.map((u) => (
-              <a
-                key={u}
-                href={u}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block overflow-hidden rounded-xl border border-slate-100"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={u}
-                  alt=""
-                  className="w-full h-40 sm:h-56 object-cover hover:scale-[1.02] transition-transform"
-                />
-              </a>
-            ))}
-          </div>
-        )}
       </div>
 
-      {/* Action bar */}
-      <div className="px-4 py-2 flex items-center gap-1 border-t border-slate-100">
-        <button
-          onClick={handleLike}
-          className={`flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition-colors ${
-            liked ? "text-rose-600 bg-rose-50" : "text-slate-500 hover:bg-slate-50"
-          }`}
-        >
-          <Heart className={`w-4 h-4 ${liked ? "fill-rose-600" : ""}`} />
-          {likeCount > 0 ? likeCount : t("like")}
-        </button>
-        <button
-          onClick={loadComments}
-          className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-50"
-        >
-          <MessageCircle className="w-4 h-4" />
-          {post.commentCount > 0 ? post.commentCount : t("comment")}
-        </button>
-        <button
-          onClick={handleShare}
-          className="flex-1 inline-flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium text-slate-500 hover:bg-slate-50"
-        >
-          <Share2 className="w-4 h-4" />
-          {shareCount > 0 ? shareCount : t("share")}
-        </button>
-      </div>
-
-      {/* Comments */}
-      {showComments && (
-        <div className="px-4 pb-4 pt-1 border-t border-slate-100 bg-slate-50/50 rounded-b-2xl">
-          {currentUser ? (
-            <div className="flex items-center gap-2 pt-2">
-              <input
-                value={commentText}
-                onChange={(e) => setCommentText(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleComment()}
-                placeholder={t("writeComment")}
-                className="flex-1 px-3 py-2 rounded-full border border-slate-200 bg-white text-sm outline-none focus:ring-2 focus:ring-red-300"
+      {/* Action bar — Instagram style */}
+      {!editing && (
+        <div className="px-3 sm:px-4 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleLike}
+              className="flex items-center justify-center w-9 h-9 -ml-2 rounded-full hover:bg-slate-100 transition-colors"
+              aria-label={liked ? t("unlike") : t("like")}
+            >
+              <Heart
+                className={`w-6 h-6 transition-all duration-200 ${
+                  liked ? "text-red-600 fill-red-600 scale-110" : "text-slate-700"
+                }`}
               />
-              <button
-                onClick={handleComment}
-                disabled={submittingComment || !commentText.trim()}
-                className="px-3 py-2 rounded-full bg-red-600 text-white text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
-              >
-                {submittingComment ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  t("send")
-                )}
-              </button>
+            </button>
+            <button
+              onClick={loadComments}
+              className="flex items-center justify-center w-9 h-9 rounded-full hover:bg-slate-100 transition-colors"
+              aria-label={t("comment")}
+            >
+              <MessageCircle className="w-6 h-6 text-slate-700 rotate-flip" />
+            </button>
+            <button
+              onClick={handleShare}
+              className="flex items-center justify-center w-9 h-9 rounded-full hover:bg-slate-100 transition-colors"
+              aria-label={t("share")}
+            >
+              <Share2 className="w-5.5 h-5.5 text-slate-700 -rotate-45" />
+            </button>
+          </div>
+          <button
+            className="flex items-center justify-center w-9 h-9 rounded-full hover:bg-slate-100 transition-colors"
+            aria-label={t("save")}
+          >
+            <Bookmark className={`w-5.5 h-5.5 text-slate-700`} />
+          </button>
+        </div>
+      )}
+
+      {/* Like count */}
+      {!editing && likeCount > 0 && (
+        <div className="px-3 sm:px-4 pb-1">
+          <button
+            onClick={handleLike}
+            className="text-sm font-bold text-slate-900 hover:opacity-80 transition-opacity"
+          >
+            {likeCount === 1
+              ? t("likeCountOne", { count: likeCount })
+              : t("likeCount", { count: likeCount })}
+          </button>
+        </div>
+      )}
+
+      {/* View all comments link */}
+      {!editing && post.commentCount > 0 && (
+        <div className="px-3 sm:px-4 pb-1">
+          <button
+            onClick={loadComments}
+            className="text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors"
+          >
+            {locale === "bn"
+              ? `সব মন্তব্য দেখুন (${post.commentCount})`
+              : `View all ${post.commentCount} comments`}
+          </button>
+        </div>
+      )}
+
+      {/* Comments preview (top 2) */}
+      {!editing && showComments && comments.length > 0 && (
+        <div className="px-3 sm:px-4 pb-2 space-y-1">
+          {renderComments()}
+        </div>
+      )}
+
+      {/* Timestamp */}
+      {!editing && (
+        <div className="px-3 sm:px-4 pb-3">
+          <span className="text-[10.5px] uppercase tracking-wide text-slate-400 font-medium">
+            {formatPostedAt(post.createdAt)}
+          </span>
+        </div>
+      )}
+
+      {/* Add comment input */}
+      {!editing && (
+        <div className="border-t border-slate-100 px-3 sm:px-4 py-2.5">
+          {currentUser ? (
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 flex-1">
+                <Smile className="w-4 h-4 text-slate-400 shrink-0" />
+                <input
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleComment()}
+                  placeholder={locale === "bn" ? "মন্তব্য লিখুন…" : "Write a comment…"}
+                  className="flex-1 text-sm bg-transparent outline-none placeholder:text-slate-400 text-slate-800"
+                />
+              </div>
+              {commentText.trim() && (
+                <button
+                  onClick={handleComment}
+                  disabled={submittingComment}
+                  className="text-xs font-bold text-red-600 hover:text-red-700 disabled:opacity-50"
+                >
+                  {submittingComment ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : locale === "bn" ? (
+                    "পোস্ট"
+                  ) : (
+                    "Post"
+                  )}
+                </button>
+              )}
             </div>
           ) : (
-            <p className="text-xs text-slate-400 py-2">{t("loginToComment")}</p>
+            <p className="text-xs text-slate-400">
+              {t("loginToComment")}
+            </p>
           )}
-
-          <div className="mt-3 space-y-2">
-            {loadingComments && (
-              <Loader2 className="w-4 h-4 animate-spin text-slate-400 mx-auto" />
-            )}
-            {!loadingComments && comments.length === 0 && (
-              <p className="text-xs text-slate-400 text-center py-1">
-                {t("noComments")}
-              </p>
-            )}
-            {comments.map((c: any) => (
-              <div key={c.id} className="flex gap-2">
-                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-slate-400 to-slate-500 text-white flex items-center justify-center text-[10px] font-bold shrink-0">
-                  {initials(c.author_name || "U")}
-                </div>
-                <div className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-slate-800">
-                      {c.author_name}
-                    </span>
-                    <span className="text-[10px] text-slate-400">
-                      {formatPostedAt(c.created_at)}
-                    </span>
-                  </div>
-                  <p className="text-sm text-slate-700 break-words">
-                    {c.content}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
         </div>
       )}
     </article>

@@ -11,20 +11,17 @@ export default function FeedPage() {
   return (
     <>
       <Navbar />
-      <main className="min-h-screen overflow-x-hidden bg-[radial-gradient(circle_at_top,_#fff1f2_0,_#f8fafc_34rem,_#f8fafc_100%)]">
-        <div className="mx-auto w-full max-w-[680px] px-3 py-5 sm:px-5 lg:py-8">
-          <header className="mb-4 sm:mb-5">
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-red-600">
-              {t("title")}
-            </p>
-            <h1 className="mt-1 flex items-center gap-2 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-              <Users className="h-6 w-6 text-red-600 sm:h-7 sm:w-7" />
-              {t("communityFeedHeading")}
-            </h1>
-            <p className="mt-1 max-w-xl text-sm text-slate-500">{t("subtitle")}</p>
-          </header>
+      <main className="min-h-screen bg-slate-50 sm:bg-white">
+        <div className="mx-auto w-full max-w-[680px]">
+          {/* Instagram-style header — sticky, minimal */}
+          <div className="sticky top-[56px] md:top-[60px] z-40 bg-white/90 backdrop-blur-md border-b border-slate-100 px-4 py-3 sm:hidden">
+            <div className="flex items-center gap-2">
+              <p className="text-[15px] font-black tracking-tight text-slate-900">
+                {t("community")}
+              </p>
+            </div>
+          </div>
 
-          {/* Facebook-style centered feed: composer + filter tabs + posts & requests */}
           <FeedList />
         </div>
       </main>

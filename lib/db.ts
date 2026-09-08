@@ -2890,6 +2890,7 @@ function mapSocialPostRow(r: any, viewerId: number | null) {
     authorId: r.author_id,
     authorName: r.author_name || "User",
     authorRole: r.author_role,
+    authorAvatarUrl: r.author_avatar_url || null,
     content: r.content,
     images: r.images ? JSON.parse(r.images) : [],
     postType: r.post_type,
@@ -2971,7 +2972,7 @@ export function getSocialFeed(opts: FeedFilter = {}) {
     .prepare(
       `
       SELECT p.*,
-        pr.full_name_en AS author_name,
+        pr.full_name_en AS author_name, pr.avatar_url AS author_avatar_url,
         (SELECT COUNT(*) FROM social_post_likes l WHERE l.post_id = p.id) AS like_count,
         (SELECT COUNT(*) FROM social_post_comments c WHERE c.post_id = p.id) AS comment_count,
         (SELECT COUNT(*) FROM social_post_likes l2 WHERE l2.post_id = p.id AND l2.user_id = ?) AS my_like
@@ -3059,7 +3060,7 @@ export function getSocialPostById(id: number) {
     .prepare(
       `
       SELECT p.*,
-        pr.full_name_en AS author_name,
+        pr.full_name_en AS author_name, pr.avatar_url AS author_avatar_url,
         (SELECT COUNT(*) FROM social_post_likes l WHERE l.post_id = p.id) AS like_count,
         (SELECT COUNT(*) FROM social_post_comments c WHERE c.post_id = p.id) AS comment_count
       FROM social_posts p
