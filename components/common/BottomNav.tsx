@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/routing";
 import {
@@ -12,8 +13,12 @@ import {
   User,
   type LucideIcon,
 } from "lucide-react";
-import QrScannerModal from "./QrScannerModal";
 import { useScrollDirection } from "@/hooks/use-scroll-direction";
+
+const QrScannerModal = dynamic(() => import("./QrScannerModal"), {
+  ssr: false,
+  loading: () => null,
+});
 
 type BottomTab = {
   key: string;
@@ -31,14 +36,17 @@ export default function BottomNav() {
   // Facebook-style: hide the bottom tabs when scrolling down (phone only).
   const hideNav = !atTop && direction === "down";
 
-  const tabs: BottomTab[] = [
-    { key: "home", href: "/", label: t("home"), icon: Heart, exact: true },
-    { key: "donors", href: "/donors", label: t("donors"), icon: Users },
-    { key: "requests", href: "/requests", label: t("requests"), icon: Droplets },
-    { key: "scan", href: null, label: t("scan"), icon: ScanLine },
-    { key: "community", href: "/feed", label: t("community"), icon: MessageCircle },
-    { key: "profile", href: "/profile", label: t("profile"), icon: User },
-  ];
+  const tabs = useMemo<BottomTab[]>(
+    () => [
+      { key: "home", href: "/", label: t("home"), icon: Heart, exact: true },
+      { key: "donors", href: "/donors", label: t("donors"), icon: Users },
+      { key: "requests", href: "/requests", label: t("requests"), icon: Droplets },
+      { key: "scan", href: null, label: t("scan"), icon: ScanLine },
+      { key: "community", href: "/feed", label: t("community"), icon: MessageCircle },
+      { key: "profile", href: "/profile", label: t("profile"), icon: User },
+    ],
+    [t]
+  );
 
   const isActive = (tab: BottomTab) => {
     if (!tab.href) return false;
@@ -56,7 +64,7 @@ export default function BottomNav() {
         aria-label="Bottom navigation"
       >
         <div
-          className="pointer-events-auto relative mx-auto mb-1.5 grid max-w-[26rem] grid-cols-6 items-end gap-1
+          className="pointer-events-auto relative mx-auto mb-1.5 grid max-w-[26rem] grid-cols-6 items-end gap-1.5
             rounded-[24px] border border-white/60 bg-white/70 px-2 pt-1.5 pb-1
             backdrop-blur-2xl backdrop-saturate-150
             shadow-[0_-2px_24px_-6px_rgba(148,163,184,0.35),0_8px_32px_-12px_rgba(220,38,38,0.28),inset_0_1px_0_rgba(255,255,255,0.9),inset_0_-6px_12px_-8px_rgba(220,38,38,0.12)]"
@@ -73,7 +81,7 @@ export default function BottomNav() {
             const content = (
               <>
                 <span
-                  className={`relative flex h-7 w-12 items-center justify-center rounded-full transition-all duration-300 ${
+                  className={`relative flex h-8 w-11 items-center justify-center rounded-full transition-all duration-300 ${
                     active
                       ? "bg-gradient-to-b from-red-500 to-red-600 text-white ring-2 ring-white/70 shadow-[0_6px_20px_-4px_rgba(220,38,38,0.7),0_2px_8px_-2px_rgba(220,38,38,0.45),inset_0_1px_0_rgba(255,255,255,0.5),inset_0_-5px_10px_-6px_rgba(127,29,29,0.65)] animate-[bottom-nav-pop_0.4s_ease-out_both]"
                       : "text-red-500"

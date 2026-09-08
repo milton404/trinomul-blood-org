@@ -397,14 +397,14 @@ export default function HomePage() {
 
       <main id="main-content" role="main">
         {/* Hero Section */}
-        <section className="relative bg-gradient-to-br from-red-700 via-red-600 to-rose-800 text-white overflow-hidden min-h-[100vh] flex flex-col justify-start pt-[14vh] md:pt-[6vh]">
+        <section className="relative bg-gradient-to-br from-red-700 via-red-600 to-rose-800 text-white overflow-hidden min-h-[100vh] flex flex-col justify-start pt-[8vh] md:pt-[6vh]">
           {/* Layered background: dot grid + soft radial glows + bottom fade */}
           <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48Y2lyY2xlIGN4PSIzMCIgY3k9IjMwIiByPSIyIi8+PC9nPjwvZz48L3N2Zz4=')] opacity-25" />
           <div className="absolute -top-32 -left-32 w-[28rem] h-[28rem] rounded-full bg-rose-400/25 blur-3xl pointer-events-none" />
           <div className="absolute -bottom-40 -right-24 w-[32rem] h-[32rem] rounded-full bg-red-900/40 blur-3xl pointer-events-none" />
           <div className="absolute inset-x-0 bottom-0 h-28 bg-gradient-to-t from-black/15 to-transparent pointer-events-none" />
 
-          <div className="max-w-7xl mx-auto px-4 py-8 sm:py-10 md:py-14 relative z-10 w-full">
+          <div className="max-w-7xl mx-auto px-4 pt-4 pb-8 sm:py-10 md:py-14 relative z-10 w-full">
             <div className="text-center mb-5 sm:mb-7">
               <div className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur-md px-3 py-1 rounded-full text-[11px] sm:text-xs font-medium ring-1 ring-white/25 shadow-sm mb-3 sm:mb-4">
                 <Droplets className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
@@ -715,7 +715,7 @@ export default function HomePage() {
             </div>
 
             {/* Quick Action Buttons — full-width stacked on mobile */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4 mt-7 max-w-[calc(100%-2rem)] sm:max-w-none mx-auto">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-4 mt-5 sm:mt-7 max-w-[calc(100%-2rem)] sm:max-w-none mx-auto">
               <Link
                 href="/request"
                 className="group relative overflow-hidden bg-white text-red-700 px-4 py-2.5 sm:px-6 sm:py-3 sm:w-80 rounded-xl font-bold text-[13px] sm:text-sm flex items-center justify-center gap-2 hover:-translate-y-0.5 active:translate-y-0 transition-all duration-300 shadow-xl shadow-red-950/25 hover:shadow-2xl hover:shadow-red-950/30 ring-1 ring-white"
