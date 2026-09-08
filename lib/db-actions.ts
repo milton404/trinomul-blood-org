@@ -1579,7 +1579,7 @@ export async function getDonorsWithStatsPg() {
           ? "low_hb"
           : "eligible";
 
-    const coords = resolveCoordsLocal(null, null, d.district, d.upazila, d.union_name);
+    const coords = resolveCoordsLocal(d.lat, d.lng, d.district, d.upazila, d.union_name);
 
     return {
       ...d,
@@ -1667,7 +1667,7 @@ export async function getDonorByIdWithStatsPg(id: number) {
         ? "low_hb"
         : "eligible";
 
-  const coords = resolveCoordsLocal(null, null, d.district, d.upazila, d.union_name);
+  const coords = resolveCoordsLocal(d.lat, d.lng, d.district, d.upazila, d.union_name);
 
   return {
     ...d,
