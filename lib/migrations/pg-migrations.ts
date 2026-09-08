@@ -29,6 +29,42 @@ const pgMigrations: PgMigration[] = [
       await client.query(sql);
     },
   },
+  {
+    id: "002_social_stories_saves_push",
+    name: "Add stories, social_post_saves, push_subscriptions tables",
+    up: async (client) => {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS stories (
+          id BIGSERIAL PRIMARY KEY,
+          author_id BIGINT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+          image_url TEXT,
+          content TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          expires_at TIMESTAMPTZ NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_stories_author ON stories(author_id);
+        CREATE INDEX IF NOT EXISTS idx_stories_expires ON stories(expires_at);
+
+        CREATE TABLE IF NOT EXISTS social_post_saves (
+          id BIGSERIAL PRIMARY KEY,
+          post_id BIGINT NOT NULL REFERENCES social_posts(id) ON DELETE CASCADE,
+          user_id BIGINT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          UNIQUE (post_id, user_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_social_saves_post ON social_post_saves(post_id);
+
+        CREATE TABLE IF NOT EXISTS push_subscriptions (
+          id BIGSERIAL PRIMARY KEY,
+          user_id BIGINT REFERENCES profiles(id) ON DELETE CASCADE,
+          endpoint TEXT NOT NULL UNIQUE,
+          p256dh TEXT NOT NULL,
+          auth_key TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+      `);
+    },
+  },
 ];
 
 async function ensureTrackingTable(client: NonNullable<SupabaseAdminClient>): Promise<void> {

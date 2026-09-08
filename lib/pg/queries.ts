@@ -1308,7 +1308,9 @@ function mapSocialPostRow(r: any, viewerId: number | null) {
     images: r.images ? JSON.parse(r.images) : [], postType: r.post_type,
     relatedRequestId: r.related_request_id, pinned: !!r.pinned, isPublic: !!r.is_public,
     status: r.status, likeCount: r.like_count || 0, commentCount: r.comment_count || 0,
-    shareCount: r.share_count || 0, likedByMe: viewerId ? r.my_like > 0 : false, createdAt: r.created_at,
+    shareCount: r.share_count || 0, likedByMe: viewerId ? r.my_like > 0 : false,
+    saveCount: r.save_count || 0, savedByMe: viewerId ? r.my_save > 0 : false,
+    createdAt: r.created_at,
   };
 }
 
@@ -1342,7 +1344,9 @@ export async function getSocialFeedPg(opts: {
     `SELECT p.*, pr.full_name_en AS author_name, pr.avatar_url AS author_avatar_url,
        (SELECT COUNT(*) FROM social_post_likes l WHERE l.post_id = p.id) AS like_count,
        (SELECT COUNT(*) FROM social_post_comments c WHERE c.post_id = p.id) AS comment_count,
-       (SELECT COUNT(*) FROM social_post_likes l2 WHERE l2.post_id = p.id AND l2.user_id = $1) AS my_like
+       (SELECT COUNT(*) FROM social_post_likes l2 WHERE l2.post_id = p.id AND l2.user_id = $1) AS my_like,
+       (SELECT COUNT(*) FROM social_post_saves s WHERE s.post_id = p.id) AS save_count,
+       (SELECT COUNT(*) FROM social_post_saves s2 WHERE s2.post_id = p.id AND s2.user_id = $1) AS my_save
      FROM social_posts p LEFT JOIN profiles pr ON pr.id = p.author_id
      WHERE p.status = 'active' ORDER BY p.created_at DESC`,
     [viewerId ?? -1],
@@ -1399,7 +1403,8 @@ export async function getSocialPostByIdPg(id: number) {
   const { rows } = await query(
     `SELECT p.*, pr.full_name_en AS author_name, pr.avatar_url AS author_avatar_url,
        (SELECT COUNT(*) FROM social_post_likes l WHERE l.post_id = p.id) AS like_count,
-       (SELECT COUNT(*) FROM social_post_comments c WHERE c.post_id = p.id) AS comment_count
+       (SELECT COUNT(*) FROM social_post_comments c WHERE c.post_id = p.id) AS comment_count,
+       (SELECT COUNT(*) FROM social_post_saves s WHERE s.post_id = p.id) AS save_count
       FROM social_posts p LEFT JOIN profiles pr ON pr.id = p.author_id WHERE p.id = $1`,
     [id],
   );
@@ -1478,6 +1483,85 @@ export async function adminGetSocialPostsPg(opts: { filter?: string; page?: numb
   );
   const total = await countSql(`SELECT COUNT(*) as count FROM social_posts p WHERE ${where}`);
   return { items: (rows as any[]).map((r) => mapSocialPostRow(r, null)), total, hasMore: page * pageSize < total };
+}
+
+// ── Stories (24h auto-expire) ────────────────────────────────────────
+
+export async function createStoryPg(input: {
+  authorId: number; imageUrl?: string | null; content?: string | null;
+}): Promise<number> {
+  const { rows } = await query<{ id: number }>(
+    `INSERT INTO stories (author_id, image_url, content, expires_at)
+     VALUES ($1, $2, $3, NOW() + INTERVAL '24 hours') RETURNING id`,
+    [input.authorId, input.imageUrl ?? null, input.content ?? null],
+  );
+  return rows[0].id;
+}
+
+export async function getStoriesPg() {
+  const { rows } = await query(
+    `SELECT s.*, pr.full_name_en AS author_name, pr.avatar_url AS author_avatar_url
+       FROM stories s LEFT JOIN profiles pr ON pr.id = s.author_id
+      WHERE s.expires_at > NOW() ORDER BY s.created_at DESC LIMIT 200`,
+  );
+  return rows;
+}
+
+export async function deleteStoryPg(id: number, authorId: number): Promise<number> {
+  const { rowCount } = await query(
+    "DELETE FROM stories WHERE id = $1 AND author_id = $2",
+    [id, authorId],
+  );
+  return rowCount || 0;
+}
+
+// ── Post saves / bookmarks ───────────────────────────────────────────
+
+export async function toggleSocialPostSavePg(postId: number, userId: number) {
+  const { rows } = await query(
+    "SELECT id FROM social_post_saves WHERE post_id = $1 AND user_id = $2",
+    [postId, userId],
+  );
+  let saved: boolean;
+  if (rows.length > 0) {
+    await query("DELETE FROM social_post_saves WHERE post_id = $1 AND user_id = $2", [postId, userId]);
+    saved = false;
+  } else {
+    await query("INSERT INTO social_post_saves (post_id, user_id) VALUES ($1, $2)", [postId, userId]);
+    saved = true;
+  }
+  const { rows: countRows } = await query(
+    "SELECT COUNT(*) AS c FROM social_post_saves WHERE post_id = $1",
+    [postId],
+  );
+  return { saved, saveCount: Number((countRows[0] as any)?.c || 0) };
+}
+
+// ── Web Push subscriptions ───────────────────────────────────────────
+
+export async function addPushSubscriptionPg(input: {
+  userId?: number | null; endpoint: string; p256dh: string; auth: string;
+}): Promise<void> {
+  await query(
+    `INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth_key)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (endpoint) DO UPDATE SET p256dh = EXCLUDED.p256dh, auth_key = EXCLUDED.auth_key`,
+    [input.userId ?? null, input.endpoint, input.p256dh, input.auth],
+  );
+}
+
+export async function deletePushSubscriptionPg(endpoint: string): Promise<void> {
+  await query("DELETE FROM push_subscriptions WHERE endpoint = $1", [endpoint]);
+}
+
+export async function getAllPushSubscriptionsPg() {
+  const { rows } = await query(
+    "SELECT endpoint, p256dh, auth_key FROM push_subscriptions",
+  );
+  return (rows as any[]).map((r) => ({
+    endpoint: r.endpoint,
+    keys: { p256dh: r.p256dh, auth: r.auth_key },
+  }));
 }
 
 // ── Bookmarks ────────────────────────────────────────────────────────

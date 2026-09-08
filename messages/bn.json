@@ -1067,7 +1067,20 @@
     "likeCount": "{count} জনের পছন্দ",
     "likeCountOne": "1 জনের পছন্দ",
     "unlike": "আনলাইক",
-    "community": "কমিউনিটি"
+    "community": "কমিউনিটি",
+    "saved": "সংরক্ষিত",
+    "loginToLike": "লাইক করতে লগ ইন করুন।",
+    "loginToSave": "সংরক্ষণ করতে লগ ইন করুন।",
+    "yourStory": "আপনার স্টোরি",
+    "addStory": "স্টোরি যোগ করুন",
+    "storyPlaceholder": "ক্যাপশন যোগ করুন…",
+    "postStory": "স্টোরি পোস্ট করুন",
+    "storyHint": "স্টোরি ২৪ ঘণ্টা পরে মুছে যায়।",
+    "deleteStory": "স্টোরি মুছুন",
+    "notifications": "নোটিফিকেশন",
+    "enableNotifications": "নোটিফিকেশন চালু করুন",
+    "notificationsOn": "নোটিফিকেশন চালু",
+    "notificationsBlocked": "ব্লক করা — ব্রাউজার সেটিংসে চালু করুন"
   },
   "donor_application": {
     "page_title": "রক্তদাতা হিসেবে নিবন্ধন করুন",

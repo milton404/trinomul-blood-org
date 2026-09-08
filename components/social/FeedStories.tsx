@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { Plus } from "lucide-react";
 
 interface Story {
   id: string | number;
@@ -13,6 +14,13 @@ interface Story {
 interface FeedStoriesProps {
   stories: Story[];
   onStoryPress?: (story: Story) => void;
+  youStory?: {
+    onClick: () => void;
+    avatarUrl?: string | null;
+    initials?: string;
+    hasStory?: boolean;
+    label?: string;
+  };
 }
 
 function storyInitials(name: string): string {
@@ -25,7 +33,7 @@ function storyInitials(name: string): string {
     .toUpperCase();
 }
 
-export default function FeedStories({ stories, onStoryPress }: FeedStoriesProps) {
+export default function FeedStories({ stories, onStoryPress, youStory }: FeedStoriesProps) {
   const uniqueStories = useMemo(() => {
     const seen = new Set<string | number>();
     return stories.filter((s) => {
@@ -35,11 +43,42 @@ export default function FeedStories({ stories, onStoryPress }: FeedStoriesProps)
     });
   }, [stories]);
 
-  if (uniqueStories.length === 0) return null;
+  if (uniqueStories.length === 0 && !youStory) return null;
 
   return (
     <div className="relative -mx-3 sm:-mx-5 px-3 sm:px-5 py-3 bg-white border-b border-slate-100">
       <div className="flex items-center gap-3 overflow-x-auto pb-1 scrollbar-hide snap-x snap-mandatory -mx-1 px-1">
+        {youStory && (
+          <button
+            type="button"
+            onClick={youStory.onClick}
+            className="flex flex-col items-center gap-1.5 shrink-0 w-18 group snap-center"
+            aria-label={youStory.label || "Your story"}
+          >
+            <div className="relative p-[2px] rounded-full bg-slate-200 group-active:scale-95 transition-transform duration-200">
+              <div className="overflow-hidden rounded-full bg-white p-[2px]">
+                {youStory.avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={youStory.avatarUrl}
+                    alt={youStory.label || "Your story"}
+                    className="h-14 w-14 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-14 w-14 items-center justify-center bg-gradient-to-br from-red-100 to-rose-200 text-red-700 font-bold text-sm">
+                    {youStory.initials || "U"}
+                  </div>
+                )}
+              </div>
+              <span className="absolute -bottom-0.5 right-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-white shadow-sm ring-2 ring-white">
+                <Plus className="h-3 w-3" />
+              </span>
+            </div>
+            <span className="text-[10px] sm:text-[11px] font-medium text-slate-600 max-w-[60px] truncate text-center">
+              {youStory.label || "Your story"}
+            </span>
+          </button>
+        )}
         {uniqueStories.map((story) => {
           const initials = story.initials || storyInitials(story.name);
           return (

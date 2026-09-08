@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { X } from "lucide-react";
-import { formatPostedAt } from "@/lib/format-time";
+import { formatTimeAgo } from "@/lib/format-time";
 
 export interface StorySlide {
   id: string;
@@ -190,7 +190,7 @@ export default function FeedStoryViewer({
             {story.name}
           </span>
           <span className="text-xs text-white/60">
-            {formatPostedAt(slide.createdAt)}
+            {formatTimeAgo(slide.createdAt)}
           </span>
           <button
             onClick={close}

@@ -1067,7 +1067,20 @@
     "likeCount": "{count} likes",
     "likeCountOne": "1 like",
     "unlike": "Unlike",
-    "community": "Community"
+    "community": "Community",
+    "saved": "Saved",
+    "loginToLike": "Log in to like.",
+    "loginToSave": "Log in to save.",
+    "yourStory": "Your story",
+    "addStory": "Add story",
+    "storyPlaceholder": "Add a caption…",
+    "postStory": "Post story",
+    "storyHint": "Stories disappear after 24h.",
+    "deleteStory": "Delete story",
+    "notifications": "Notifications",
+    "enableNotifications": "Enable notifications",
+    "notificationsOn": "Notifications on",
+    "notificationsBlocked": "Blocked — enable in browser settings"
   },
   "donor_application": {
     "page_title": "Become a Blood Donor",

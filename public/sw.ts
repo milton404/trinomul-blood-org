@@ -161,3 +161,45 @@ self.addEventListener("activate", (event) => {
     })(),
   );
 });
+
+// ── Web Push notifications (PWA) ─────────────────────────────────────
+self.addEventListener("push", (event) => {
+  let data: any = { title: "Trinomul Blood Bank", body: "", url: "/feed", tag: "default" };
+  try {
+    if (event.data) data = { ...data, ...event.data.json() };
+  } catch {
+    try {
+      if (event.data) data.body = event.data.text();
+    } catch {
+      /* ignore */
+    }
+  }
+  event.waitUntil(
+    (self as any).registration.showNotification(data.title, {
+      body: data.body,
+      icon: "/android-chrome-192x192.png",
+      badge: "/android-chrome-192x192.png",
+      tag: data.tag || "default",
+      data: { url: data.url || "/feed" },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = (event.notification.data && event.notification.data.url) || "/feed";
+  event.waitUntil(
+    (self as any).clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((clientList: any[]) => {
+        for (const client of clientList) {
+          if (client.url.includes(self.location.origin) && "focus" in client) {
+            return client.focus();
+          }
+        }
+        if ((self as any).clients.openWindow) {
+          return (self as any).clients.openWindow(targetUrl);
+        }
+      }),
+  );
+});

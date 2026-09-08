@@ -1,7 +1,7 @@
 "use client";
 
 import { useTranslations, useLocale } from "next-intl";
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Loader2,
   Users,
@@ -12,13 +12,15 @@ import {
 } from "lucide-react";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { useAuthStore } from "@/store/authStore";
-import { serverGetFeed } from "@/lib/db-actions";
+import { serverGetFeed, serverGetStories } from "@/lib/db-actions";
 import FeedComposer from "./FeedComposer";
 import FeedPostCard from "./FeedPostCard";
 import FeedStories from "./FeedStories";
 import FeedStoryViewer, {
   type FeedStory,
 } from "./FeedStoryViewer";
+import FeedStoryComposer from "./FeedStoryComposer";
+import NotificationSubscribeButton from "./NotificationSubscribeButton";
 import RequestCard from "@/components/requests/RequestCard";
 
 const TABS = [
@@ -30,7 +32,6 @@ const TABS = [
 
 type TabKey = (typeof TABS)[number]["key"];
 
-const STORY_TTL_MS = 24 * 60 * 60 * 1000;
 
 function initialsOf(name: string): string {
   return (
@@ -44,16 +45,6 @@ function initialsOf(name: string): string {
   );
 }
 
-function toMs(v: unknown): number {
-  if (v == null) return NaN;
-  if (typeof v === "number") return v;
-  const s = typeof v === "string" ? v : (v as Date).toISOString();
-  const normalized = s.includes("T") ? s : s.replace(" ", "T");
-  const hasTz =
-    /[+-]\d{2}:?\d{2}$/.test(normalized) || normalized.endsWith("Z");
-  const t = new Date(hasTz ? normalized : normalized + "Z").getTime();
-  return Number.isNaN(t) ? NaN : t;
-}
 
 type FeedListProps = {
   onItemsChange?: (items: any[]) => void;
@@ -83,8 +74,44 @@ export default function FeedList({ onItemsChange }: FeedListProps) {
   );
   const [viewerOpen, setViewerOpen] = useState(false);
   const [viewerStoryIdx, setViewerStoryIdx] = useState(0);
+  const [stories, setStories] = useState<FeedStory[]>([]);
+  const [storyComposerOpen, setStoryComposerOpen] = useState(false);
 
   const PAGE = 15;
+
+  const loadStories = useCallback(async () => {
+    try {
+      const rows = (await serverGetStories()) as any[];
+      const byAuthor = new Map<number, FeedStory>();
+      for (const r of rows) {
+        const authorId = Number(r.author_id);
+        let st = byAuthor.get(authorId);
+        if (!st) {
+          st = {
+            id: authorId,
+            name: r.author_name || "User",
+            avatarUrl: r.author_avatar_url || null,
+            initials: initialsOf(r.author_name || ""),
+            slides: [],
+          };
+          byAuthor.set(authorId, st);
+        }
+        st.slides.push({
+          id: String(r.id),
+          imageUrl: r.image_url || null,
+          content: r.content || "",
+          createdAt: r.created_at,
+        });
+      }
+      setStories(Array.from(byAuthor.values()).filter((s) => s.slides.length > 0));
+    } catch {
+      /* ignore */
+    }
+  }, []);
+
+  useEffect(() => {
+    loadStories();
+  }, [loadStories]);
 
   const load = useCallback(
     async (nextOffset: number, replace: boolean, currentTab: TabKey) => {
@@ -135,47 +162,23 @@ export default function FeedList({ onItemsChange }: FeedListProps) {
     onItemsChangeRef.current?.(nextItems);
   };
 
-  // Build 24h stories grouped by author. Story rings expire after 24h; the
-  // underlying posts persist until an admin or the author deletes them.
-  const stories = useMemo<FeedStory[]>(() => {
-    const now = Date.now();
-    const byAuthor = new Map<number, FeedStory>();
-    for (const it of items) {
-      if (it.kind !== "post") continue;
-      const ms = toMs(it.createdAt);
-      if (Number.isFinite(ms) && now - ms > STORY_TTL_MS) continue;
-      let st = byAuthor.get(it.authorId);
-      if (!st) {
-        st = {
-          id: it.authorId,
-          name: it.authorName,
-          avatarUrl: it.authorAvatarUrl || null,
-          initials: initialsOf(it.authorName || ""),
-          slides: [],
-        };
-        byAuthor.set(it.authorId, st);
-      }
-      const images = Array.isArray(it.images) ? it.images : [];
-      if (images.length) {
-        images.forEach((img: string, i: number) => {
-          st!.slides.push({
-            id: `${it.id}-${i}`,
-            imageUrl: img,
-            content: it.content,
-            createdAt: it.createdAt,
-          });
-        });
-      } else if (it.content) {
-        st!.slides.push({
-          id: `${it.id}-text`,
-          imageUrl: null,
-          content: it.content,
-          createdAt: it.createdAt,
-        });
-      }
-    }
-    return Array.from(byAuthor.values()).filter((s) => s.slides.length > 0);
-  }, [items]);
+  const handleStoryPosted = () => {
+    loadStories();
+  };
+
+  const goLogin = () => {
+    window.location.href = `/${locale}/login?redirect=/${locale}/feed`;
+  };
+
+  const youStory = {
+    onClick: currentUser ? () => setStoryComposerOpen(true) : goLogin,
+    avatarUrl: null,
+    initials: "You",
+    hasStory: currentUser
+      ? stories.some((s) => s.id === Number(user?.id))
+      : false,
+    label: t("yourStory"),
+  };
 
   return (
     <div className="space-y-0">
@@ -186,10 +189,14 @@ export default function FeedList({ onItemsChange }: FeedListProps) {
         initialMode={composerMode}
       />
 
-      {/* Stories row — Instagram-style */}
+      {/* Notifications + Stories row — Instagram-style */}
       <div className="md:hidden">
+        <div className="flex items-center justify-end px-3 sm:px-4 pt-2">
+          <NotificationSubscribeButton />
+        </div>
         <FeedStories
           stories={stories}
+          youStory={youStory}
           onStoryPress={(s) => {
             const idx = stories.findIndex((x) => x.id === s.id);
             setViewerStoryIdx(idx >= 0 ? idx : 0);
@@ -205,6 +212,12 @@ export default function FeedList({ onItemsChange }: FeedListProps) {
           onClose={() => setViewerOpen(false)}
         />
       )}
+
+      <FeedStoryComposer
+        open={storyComposerOpen}
+        onClose={() => setStoryComposerOpen(false)}
+        onPosted={handleStoryPosted}
+      />
 
       {/* Instagram-style segmented tabs — sticky on mobile */}
       <div className="sticky top-[56px] md:top-[60px] z-30 bg-white/90 backdrop-blur-md border-b border-slate-100">

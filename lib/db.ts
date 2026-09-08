@@ -471,6 +471,46 @@ function initTables(db: Database.Database) {
     )
   `);
 
+  // ── Stories (Instagram-style, auto-expire after 24h) ───────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS stories (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      author_id INTEGER NOT NULL,
+      image_url TEXT,
+      content TEXT,
+      created_at TEXT DEFAULT (datetime('now')),
+      expires_at TEXT NOT NULL,
+      FOREIGN KEY (author_id) REFERENCES profiles(id) ON DELETE CASCADE
+    )
+  `);
+  db.exec("CREATE INDEX IF NOT EXISTS idx_stories_author ON stories(author_id)");
+  db.exec("CREATE INDEX IF NOT EXISTS idx_stories_expires ON stories(expires_at)");
+
+  // ── Post saves / bookmarks (separate from donor bookmarks) ─────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS social_post_saves (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      post_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL,
+      created_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(post_id, user_id),
+      FOREIGN KEY (post_id) REFERENCES social_posts(id) ON DELETE CASCADE
+    )
+  `);
+  db.exec("CREATE INDEX IF NOT EXISTS idx_social_saves_post ON social_post_saves(post_id)");
+
+  // ── Web Push subscriptions (PWA notifications) ─────────────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER,
+      endpoint TEXT NOT NULL UNIQUE,
+      p256dh TEXT NOT NULL,
+      auth_key TEXT NOT NULL,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+
   // Server-side auth rate limiting (replaces the in-memory client limiter).
   db.exec(`
     CREATE TABLE IF NOT EXISTS auth_rate_limits (
@@ -2902,6 +2942,8 @@ function mapSocialPostRow(r: any, viewerId: number | null) {
     commentCount: r.comment_count || 0,
     shareCount: r.share_count || 0,
     likedByMe: viewerId ? r.my_like > 0 : false,
+    saveCount: r.save_count || 0,
+    savedByMe: viewerId ? r.my_save > 0 : false,
     createdAt: r.created_at,
   };
 }
@@ -2975,14 +3017,16 @@ export function getSocialFeed(opts: FeedFilter = {}) {
         pr.full_name_en AS author_name, pr.avatar_url AS author_avatar_url,
         (SELECT COUNT(*) FROM social_post_likes l WHERE l.post_id = p.id) AS like_count,
         (SELECT COUNT(*) FROM social_post_comments c WHERE c.post_id = p.id) AS comment_count,
-        (SELECT COUNT(*) FROM social_post_likes l2 WHERE l2.post_id = p.id AND l2.user_id = ?) AS my_like
+        (SELECT COUNT(*) FROM social_post_likes l2 WHERE l2.post_id = p.id AND l2.user_id = ?) AS my_like,
+        (SELECT COUNT(*) FROM social_post_saves s WHERE s.post_id = p.id) AS save_count,
+        (SELECT COUNT(*) FROM social_post_saves s2 WHERE s2.post_id = p.id AND s2.user_id = ?) AS my_save
       FROM social_posts p
       LEFT JOIN profiles pr ON pr.id = p.author_id
       WHERE p.status = 'active'
       ORDER BY p.created_at DESC
     `,
     )
-    .all(viewerId ?? -1) as any[];
+    .all(viewerId ?? -1, viewerId ?? -1) as any[];
 
   let posts = postRows
     .map((r) => mapSocialPostRow(r, viewerId))
@@ -3062,7 +3106,8 @@ export function getSocialPostById(id: number) {
       SELECT p.*,
         pr.full_name_en AS author_name, pr.avatar_url AS author_avatar_url,
         (SELECT COUNT(*) FROM social_post_likes l WHERE l.post_id = p.id) AS like_count,
-        (SELECT COUNT(*) FROM social_post_comments c WHERE c.post_id = p.id) AS comment_count
+        (SELECT COUNT(*) FROM social_post_comments c WHERE c.post_id = p.id) AS comment_count,
+        (SELECT COUNT(*) FROM social_post_saves s WHERE s.post_id = p.id) AS save_count
       FROM social_posts p
       LEFT JOIN profiles pr ON pr.id = p.author_id
       WHERE p.id = ?
@@ -3216,6 +3261,92 @@ export function adminGetSocialPosts(opts: {
     total,
     hasMore: page * pageSize < total,
   };
+}
+
+// ── Stories (Instagram-style, auto-expire after 24h) ──────────────────
+
+export function createStory(input: {
+  authorId: number;
+  imageUrl?: string | null;
+  content?: string | null;
+}): number {
+  const db = getDb();
+  return db
+    .prepare(
+      `INSERT INTO stories (author_id, image_url, content, created_at, expires_at)
+       VALUES (?, ?, ?, datetime('now'), datetime('now', '+24 hours'))`,
+    )
+    .run(input.authorId, input.imageUrl ?? null, input.content ?? null)
+    .lastInsertRowid as number;
+}
+
+export function getStories() {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT s.*, pr.full_name_en AS author_name, pr.avatar_url AS author_avatar_url
+         FROM stories s LEFT JOIN profiles pr ON pr.id = s.author_id
+        WHERE s.expires_at > datetime('now') ORDER BY s.created_at DESC LIMIT 200`,
+    )
+    .all();
+}
+
+export function deleteStory(id: number, authorId: number): number {
+  const db = getDb();
+  return db
+    .prepare("DELETE FROM stories WHERE id = ? AND author_id = ?")
+    .run(id, authorId).changes;
+}
+
+// ── Post saves / bookmarks ────────────────────────────────────────────
+
+export function toggleSocialPostSave(postId: number, userId: number) {
+  const db = getDb();
+  const existing = db
+    .prepare("SELECT id FROM social_post_saves WHERE post_id = ? AND user_id = ?")
+    .get(postId, userId);
+  let saved: boolean;
+  if (existing) {
+    db.prepare("DELETE FROM social_post_saves WHERE post_id = ? AND user_id = ?").run(postId, userId);
+    saved = false;
+  } else {
+    db.prepare("INSERT INTO social_post_saves (post_id, user_id) VALUES (?, ?)").run(postId, userId);
+    saved = true;
+  }
+  const saveCount = (
+    db.prepare("SELECT COUNT(*) AS c FROM social_post_saves WHERE post_id = ?").get(postId) as any
+  ).c;
+  return { saved, saveCount };
+}
+
+// ── Web Push subscriptions ────────────────────────────────────────────
+
+export function addPushSubscription(input: {
+  userId?: number | null;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}): void {
+  const db = getDb();
+  db.prepare(
+    `INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth_key)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(endpoint) DO UPDATE SET p256dh = excluded.p256dh, auth_key = excluded.auth_key`,
+  ).run(input.userId ?? null, input.endpoint, input.p256dh, input.auth);
+}
+
+export function deletePushSubscription(endpoint: string): void {
+  const db = getDb();
+  db.prepare("DELETE FROM push_subscriptions WHERE endpoint = ?").run(endpoint);
+}
+
+export function getAllPushSubscriptions() {
+  const db = getDb();
+  const rows = db.prepare("SELECT endpoint, p256dh, auth_key FROM push_subscriptions").all() as any[];
+  return rows.map((r) => ({
+    endpoint: r.endpoint,
+    keys: { p256dh: r.p256dh, auth: r.auth_key },
+  }));
 }
 
 // Password reset queries

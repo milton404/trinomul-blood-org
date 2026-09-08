@@ -98,6 +98,11 @@ import {
   incrementSocialPostShare,
   pinSocialPost,
   adminGetSocialPosts,
+  createStory,
+  getStories,
+  deleteStory,
+  toggleSocialPostSave,
+
   runRequestLifecycleSweep,
   purgeOldArchivedRequests,
   toggleBookmark as dbToggleBookmark,
@@ -144,6 +149,7 @@ import {
   getEmailSettingInt,
 } from "./email/template-settings";
 import { isSupabaseAvailable, query as pgQuery } from "@/lib/supabase/client";
+import { sendPushToAll, savePushSubscription, removePushSubscription } from "./push";
 import {
   getVisibleBloodRequestsPg,
   getActiveBloodRequestsPg,
@@ -238,6 +244,11 @@ import {
   incrementSocialPostSharePg,
   pinSocialPostPg,
   adminGetSocialPostsPg,
+  createStoryPg,
+  getStoriesPg,
+  deleteStoryPg,
+  toggleSocialPostSavePg,
+
   toggleBookmarkPg,
   isBookmarkedPg,
   getBookmarkedDonorIdsPg,
@@ -834,6 +845,14 @@ export async function serverCreateBloodRequest(request: Record<string, any>) {
       { sos: isSos },
     ).catch(() => {});
   }, delaySec * 1_000);
+
+  // Best-effort PWA push notification for new blood requests.
+  void sendPushToAll({
+    title: `🩸 Blood needed: ${request.blood_group || ""}`.trim(),
+    body: `${request.patient_name || "A patient"} needs ${request.units_needed || 1} unit(s) at ${request.hospital_name || "a hospital"}`.slice(0, 140),
+    url: "/feed",
+    tag: "blood-request",
+  }).catch(() => {});
 
   return requestId;
 }
@@ -3316,6 +3335,22 @@ export async function serverCreatePost(input: CreatePostInput) {
   } catch (e) {
     console.error("Failed to record activity log:", e);
   }
+
+  // Best-effort PWA push notification for new community posts.
+  void sendPushToAll({
+    title:
+      postType === "admin_announcement"
+        ? "📢 New announcement"
+        : postType === "donation_update"
+          ? "🩸 New donation update"
+          : "📝 New community post",
+    body: content
+      ? content.slice(0, 120)
+      : "A new post was shared in the community.",
+    url: "/feed",
+    tag: "social-post",
+  }).catch(() => {});
+
   return id;
 }
 
@@ -3501,6 +3536,82 @@ export async function serverAdminDeletePost(postId: number) {
     console.error("Failed to record activity log:", e);
   }
   return changes;
+}
+
+// ── Stories (Instagram-style, 24h auto-expire) ───────────────────────
+
+export interface CreateStoryInput {
+  imageUrl?: string | null;
+  content?: string | null;
+}
+
+/** Create a story that auto-expires after 24h. Requires login. */
+export async function serverCreateStory(input: CreateStoryInput): Promise<number> {
+  const me = await getCurrentProfile();
+  if (!me) throw new Error("You must be logged in to post a story.");
+  const content = (input.content || "").trim();
+  const imageUrl = input.imageUrl?.trim() || null;
+  if (!content && !imageUrl) throw new Error("Story cannot be empty.");
+
+  const id = isSupabaseAvailable()
+    ? await createStoryPg({ authorId: me.id, imageUrl, content })
+    : createStory({ authorId: me.id, imageUrl, content });
+
+  void sendPushToAll({
+    title: "✨ New story",
+    body: `${me.name} posted a new story`,
+    url: "/feed",
+    tag: "social-story",
+  }).catch(() => {});
+
+  return id;
+}
+
+/** Active (non-expired) stories, grouped for the story rings. */
+export async function serverGetStories() {
+  return isSupabaseAvailable() ? getStoriesPg() : getStories();
+}
+
+/** Delete your own story. */
+export async function serverDeleteStory(storyId: number): Promise<number> {
+  const me = await getCurrentProfile();
+  if (!me) throw new Error("You must be logged in.");
+  return isSupabaseAvailable()
+    ? deleteStoryPg(storyId, me.id)
+    : deleteStory(storyId, me.id);
+}
+
+// ── Post saves / bookmarks ───────────────────────────────────────────
+
+/** Save / unsave a post. Requires login. */
+export async function serverToggleSave(postId: number) {
+  const me = await getCurrentProfile();
+  if (!me) throw new Error("You must be logged in to save posts.");
+  const post = isSupabaseAvailable() ? await getSocialPostByIdPg(postId) : getSocialPostById(postId);
+  if (!post || post.status === "deleted") throw new Error("Post not found.");
+  return isSupabaseAvailable()
+    ? toggleSocialPostSavePg(postId, me.id)
+    : toggleSocialPostSave(postId, me.id);
+}
+
+// ── Web Push subscriptions (PWA notifications) ───────────────────────
+
+export async function serverSavePushSubscription(sub: {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}) {
+  const me = await getCurrentProfile();
+  return savePushSubscription({
+    userId: me?.id ?? null,
+    endpoint: sub.endpoint,
+    p256dh: sub.p256dh,
+    auth: sub.auth,
+  });
+}
+
+export async function serverDeletePushSubscription(endpoint: string) {
+  return removePushSubscription(endpoint);
 }
 
 // ── Bengali share-text translation ──────────────────────────────────

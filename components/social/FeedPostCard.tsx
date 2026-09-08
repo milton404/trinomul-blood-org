@@ -19,7 +19,7 @@ import {
   Lock,
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
-import { formatPostedAt } from "@/lib/format-time";
+import { formatTimeAgo } from "@/lib/format-time";
 import {
   serverToggleLike,
   serverAddComment,
@@ -28,6 +28,7 @@ import {
   serverUpdatePost,
   serverPinPost,
   serverSharePost,
+  serverToggleSave,
 } from "@/lib/db-actions";
 import ImageLightbox from "./ImageLightbox";
 
@@ -50,6 +51,8 @@ interface FeedPost {
   commentCount: number;
   shareCount: number;
   likedByMe: boolean;
+  saveCount: number;
+  savedByMe: boolean;
   createdAt: string;
 }
 
@@ -122,6 +125,8 @@ export default function FeedPostCard({
   const [liked, setLiked] = useState(post.likedByMe);
   const [likeCount, setLikeCount] = useState(post.likeCount);
   const [shareCount, setShareCount] = useState(post.shareCount);
+  const [saved, setSaved] = useState(post.savedByMe);
+  const [saving, setSaving] = useState(false);
   const [liking, setLiking] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<any[]>([]);
@@ -145,8 +150,15 @@ export default function FeedPostCard({
   const roleBadge = ROLE_BADGE[post.authorRole] || ROLE_BADGE.donor;
   const typeBadge = POST_TYPE_BADGE[post.postType] || POST_TYPE_BADGE.general;
 
+  const goLogin = useCallback(() => {
+    window.location.href = `/${locale}/login?redirect=/${locale}/feed`;
+  }, [locale]);
+
   const handleLike = useCallback(async () => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      goLogin();
+      return;
+    }
     if (liking) return;
     setLiking(true);
     const prev = liked;
@@ -162,10 +174,13 @@ export default function FeedPostCard({
       setLikeCount(prevCount);
     }
     setLiking(false);
-  }, [currentUser, liking, liked, likeCount, post.id]);
+  }, [currentUser, liking, liked, likeCount, post.id, goLogin]);
 
   const handleDoubleTapLike = () => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      goLogin();
+      return;
+    }
     if (!liked) {
       setDoubleTapLike(true);
       setTimeout(() => setDoubleTapLike(false), 500);
@@ -193,6 +208,10 @@ export default function FeedPostCard({
   };
 
   const loadComments = async () => {
+    if (!currentUser) {
+      goLogin();
+      return;
+    }
     if (showComments) {
       setShowComments(false);
       return;
@@ -210,7 +229,10 @@ export default function FeedPostCard({
   };
 
   const handleComment = async () => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      goLogin();
+      return;
+    }
     const text = commentText.trim();
     if (!text || submittingComment) return;
     setSubmittingComment(true);
@@ -223,6 +245,24 @@ export default function FeedPostCard({
       /* ignore */
     }
     setSubmittingComment(false);
+  };
+
+  const handleSave = async () => {
+    if (!currentUser) {
+      goLogin();
+      return;
+    }
+    if (saving) return;
+    setSaving(true);
+    const prev = saved;
+    setSaved(!saved);
+    try {
+      const res = await serverToggleSave(post.id);
+      setSaved(res.saved);
+    } catch {
+      setSaved(prev);
+    }
+    setSaving(false);
   };
 
   const handleDelete = async () => {
@@ -359,7 +399,7 @@ export default function FeedPostCard({
             )}
           </div>
           <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
-            <span>{formatPostedAt(post.createdAt)}</span>
+            <span>{formatTimeAgo(post.createdAt, locale)}</span>
             <span className="w-0.5 h-0.5 rounded-full bg-slate-300" />
             {post.isPublic ? (
               <span className="inline-flex items-center gap-0.5">
@@ -608,10 +648,15 @@ export default function FeedPostCard({
             </button>
           </div>
           <button
+            onClick={handleSave}
             className="flex items-center justify-center w-9 h-9 rounded-full hover:bg-slate-100 transition-colors"
             aria-label={t("save")}
           >
-            <Bookmark className={`w-5.5 h-5.5 text-slate-700`} />
+            <Bookmark
+              className={`w-5.5 h-5.5 transition-all duration-200 ${
+                saved ? "text-slate-900 fill-slate-900 scale-110" : "text-slate-700"
+              }`}
+            />
           </button>
         </div>
       )}
@@ -655,7 +700,7 @@ export default function FeedPostCard({
       {!editing && (
         <div className="px-3 sm:px-4 pb-3">
           <span className="text-[10.5px] uppercase tracking-wide text-slate-400 font-medium">
-            {formatPostedAt(post.createdAt)}
+            {formatTimeAgo(post.createdAt, locale)}
           </span>
         </div>
       )}
@@ -692,9 +737,12 @@ export default function FeedPostCard({
               )}
             </div>
           ) : (
-            <p className="text-xs text-slate-400">
+            <button
+              onClick={goLogin}
+              className="text-xs text-slate-400 hover:text-red-600 transition-colors"
+            >
               {t("loginToComment")}
-            </p>
+            </button>
           )}
         </div>
       )}

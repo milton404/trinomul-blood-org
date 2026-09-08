@@ -216,6 +216,40 @@ CREATE TABLE IF NOT EXISTS social_post_shares (
   UNIQUE (post_id, user_id)
 );
 
+-- ── stories (Instagram-style, auto-expire after 24h) ──────────────────────
+CREATE TABLE IF NOT EXISTS stories (
+  id BIGSERIAL PRIMARY KEY,
+  author_id BIGINT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  image_url TEXT,
+  content TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  expires_at TIMESTAMPTZ NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_stories_author ON stories(author_id);
+CREATE INDEX IF NOT EXISTS idx_stories_expires ON stories(expires_at);
+
+-- ── social_post_saves (post bookmarks, separate from donor bookmarks) ──────
+CREATE TABLE IF NOT EXISTS social_post_saves (
+  id BIGSERIAL PRIMARY KEY,
+  post_id BIGINT NOT NULL REFERENCES social_posts(id) ON DELETE CASCADE,
+  user_id BIGINT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (post_id, user_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_social_saves_post ON social_post_saves(post_id);
+
+-- ── push_subscriptions (PWA web push) ─────────────────────────────────────
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT REFERENCES profiles(id) ON DELETE CASCADE,
+  endpoint TEXT NOT NULL UNIQUE,
+  p256dh TEXT NOT NULL,
+  auth_key TEXT NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- ── auth_rate_limits ──────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS auth_rate_limits (
   identifier TEXT PRIMARY KEY,
