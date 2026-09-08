@@ -77,6 +77,44 @@ function initials(name: string): string {
     .toUpperCase();
 }
 
+function SmartImage({
+  src,
+  onDoubleTap,
+  ariaLabel,
+}: {
+  src: string;
+  onDoubleTap: () => void;
+  ariaLabel: string;
+}) {
+  const [ratio, setRatio] = useState<number | null>(null);
+  let aspect = "aspect-square";
+  if (ratio !== null) {
+    if (ratio > 1.15) aspect = "aspect-[4/3]";
+    else if (ratio < 0.85) aspect = "aspect-[4/5]";
+  }
+  return (
+    <button
+      type="button"
+      onClick={onDoubleTap}
+      className={`block w-full overflow-hidden bg-black ${aspect}`}
+      aria-label={ariaLabel}
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={src}
+        alt=""
+        onLoad={(e) => {
+          const el = e.currentTarget;
+          if (el.naturalWidth && el.naturalHeight) {
+            setRatio(el.naturalWidth / el.naturalHeight);
+          }
+        }}
+        className="h-full w-full object-cover"
+      />
+    </button>
+  );
+}
+
 export default function FeedPostCard({
   post,
   currentUser,
@@ -388,18 +426,11 @@ export default function FeedPostCard({
       {hasImages && !editing && (
         <div className="relative w-full">
           {singleImage ? (
-            <button
-              type="button"
-              onClick={handleDoubleTapLike}
-              className="block w-full"
-              aria-label={t("like")}
-            >
-              <img
-                src={images[0]}
-                alt=""
-                className="w-full max-h-[480px] object-cover"
-              />
-            </button>
+            <SmartImage
+              src={images[0]}
+              onDoubleTap={handleDoubleTapLike}
+              ariaLabel={t("like")}
+            />
           ) : (
             <div className="relative overflow-hidden">
               <div
@@ -411,7 +442,7 @@ export default function FeedPostCard({
                     key={u}
                     src={u}
                     alt=""
-                    className="w-full shrink-0 aspect-[4/5] sm:aspect-[16/10] object-cover"
+                    className="w-full shrink-0 aspect-[4/5] sm:aspect-square object-cover"
                   />
                 ))}
               </div>

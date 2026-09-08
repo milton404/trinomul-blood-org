@@ -39,7 +39,7 @@ export default function FeedStories({ stories, onStoryPress }: FeedStoriesProps)
 
   return (
     <div className="relative -mx-3 sm:-mx-5 px-3 sm:px-5 py-3 bg-white border-b border-slate-100">
-      <div className="flex items-center gap-3 overflow-x-auto pb-1 scrollbar-hide -mx-1 px-1">
+      <div className="flex items-center gap-3 overflow-x-auto pb-1 scrollbar-hide snap-x snap-mandatory -mx-1 px-1">
         {uniqueStories.map((story) => {
           const initials = story.initials || storyInitials(story.name);
           return (
@@ -47,7 +47,7 @@ export default function FeedStories({ stories, onStoryPress }: FeedStoriesProps)
               key={story.id}
               type="button"
               onClick={() => onStoryPress?.(story)}
-              className="flex flex-col items-center gap-1.5 shrink-0 w-18 group"
+              className="flex flex-col items-center gap-1.5 shrink-0 w-18 group snap-center"
               aria-label={story.name}
             >
               <div

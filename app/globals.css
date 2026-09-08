@@ -72,6 +72,16 @@ input[type="submit"] {
   transform: scaleX(-1);
 }
 
+/* Story progress bar fill (Instagram stories) */
+@keyframes story-progress {
+  0% { transform: scaleX(0); }
+  100% { transform: scaleX(1); }
+}
+.story-progress-animate {
+  animation: story-progress 5s linear forwards;
+  transform-origin: left;
+}
+
 .leaflet-container {
   font-family: inherit;
 }

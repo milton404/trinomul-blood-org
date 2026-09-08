@@ -16,6 +16,9 @@ import { serverGetFeed } from "@/lib/db-actions";
 import FeedComposer from "./FeedComposer";
 import FeedPostCard from "./FeedPostCard";
 import FeedStories from "./FeedStories";
+import FeedStoryViewer, {
+  type FeedStory,
+} from "./FeedStoryViewer";
 import RequestCard from "@/components/requests/RequestCard";
 
 const TABS = [
@@ -26,6 +29,31 @@ const TABS = [
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
+
+const STORY_TTL_MS = 24 * 60 * 60 * 1000;
+
+function initialsOf(name: string): string {
+  return (
+    (name || "")
+      .split(" ")
+      .map((p) => p[0])
+      .filter(Boolean)
+      .slice(0, 2)
+      .join("")
+      .toUpperCase() || "U"
+  );
+}
+
+function toMs(v: unknown): number {
+  if (v == null) return NaN;
+  if (typeof v === "number") return v;
+  const s = typeof v === "string" ? v : (v as Date).toISOString();
+  const normalized = s.includes("T") ? s : s.replace(" ", "T");
+  const hasTz =
+    /[+-]\d{2}:?\d{2}$/.test(normalized) || normalized.endsWith("Z");
+  const t = new Date(hasTz ? normalized : normalized + "Z").getTime();
+  return Number.isNaN(t) ? NaN : t;
+}
 
 type FeedListProps = {
   onItemsChange?: (items: any[]) => void;
@@ -53,6 +81,8 @@ export default function FeedList({ onItemsChange }: FeedListProps) {
   const [composerMode, setComposerMode] = useState<"general" | "donation">(
     "general",
   );
+  const [viewerOpen, setViewerOpen] = useState(false);
+  const [viewerStoryIdx, setViewerStoryIdx] = useState(0);
 
   const PAGE = 15;
 
@@ -105,28 +135,46 @@ export default function FeedList({ onItemsChange }: FeedListProps) {
     onItemsChangeRef.current?.(nextItems);
   };
 
-  // Build stories from unique post authors
-  const stories = useMemo(() => {
-    const seen = new Set<number>();
-    const result: { id: string | number; name: string; avatarUrl: string | null; initials: string }[] = [];
+  // Build 24h stories grouped by author. Story rings expire after 24h; the
+  // underlying posts persist until an admin or the author deletes them.
+  const stories = useMemo<FeedStory[]>(() => {
+    const now = Date.now();
+    const byAuthor = new Map<number, FeedStory>();
     for (const it of items) {
       if (it.kind !== "post") continue;
-      if (seen.has(it.authorId)) continue;
-      seen.add(it.authorId);
-      result.push({
-        id: it.authorId,
-        name: it.authorName,
-        avatarUrl: it.authorAvatarUrl || null,
-        initials: it.authorName
-          ?.split(" ")
-          .map((p: string) => p[0])
-          .filter(Boolean)
-          .slice(0, 2)
-          .join("")
-          .toUpperCase() || "U",
-      });
+      const ms = toMs(it.createdAt);
+      if (Number.isFinite(ms) && now - ms > STORY_TTL_MS) continue;
+      let st = byAuthor.get(it.authorId);
+      if (!st) {
+        st = {
+          id: it.authorId,
+          name: it.authorName,
+          avatarUrl: it.authorAvatarUrl || null,
+          initials: initialsOf(it.authorName || ""),
+          slides: [],
+        };
+        byAuthor.set(it.authorId, st);
+      }
+      const images = Array.isArray(it.images) ? it.images : [];
+      if (images.length) {
+        images.forEach((img: string, i: number) => {
+          st!.slides.push({
+            id: `${it.id}-${i}`,
+            imageUrl: img,
+            content: it.content,
+            createdAt: it.createdAt,
+          });
+        });
+      } else if (it.content) {
+        st!.slides.push({
+          id: `${it.id}-text`,
+          imageUrl: null,
+          content: it.content,
+          createdAt: it.createdAt,
+        });
+      }
     }
-    return result;
+    return Array.from(byAuthor.values()).filter((s) => s.slides.length > 0);
   }, [items]);
 
   return (
@@ -138,10 +186,25 @@ export default function FeedList({ onItemsChange }: FeedListProps) {
         initialMode={composerMode}
       />
 
-      {/* Stories row — Instagram-style, only on mobile */}
+      {/* Stories row — Instagram-style */}
       <div className="md:hidden">
-        <FeedStories stories={stories} />
+        <FeedStories
+          stories={stories}
+          onStoryPress={(s) => {
+            const idx = stories.findIndex((x) => x.id === s.id);
+            setViewerStoryIdx(idx >= 0 ? idx : 0);
+            setViewerOpen(true);
+          }}
+        />
       </div>
+
+      {viewerOpen && (
+        <FeedStoryViewer
+          stories={stories}
+          startIndex={viewerStoryIdx}
+          onClose={() => setViewerOpen(false)}
+        />
+      )}
 
       {/* Instagram-style segmented tabs — sticky on mobile */}
       <div className="sticky top-[56px] md:top-[60px] z-30 bg-white/90 backdrop-blur-md border-b border-slate-100">
