@@ -312,9 +312,32 @@ export async function serverGetProfileByPhone(phone: string) {
   return getProfileByPhone(phone);
 }
 
+/**
+ * If the payload has no valid lat/lng but includes district/upazila/union,
+ * auto-resolve coordinates from the geographic hierarchy so the donor
+ * shows on the map at their upazila/union centroid even without a map pick.
+ *
+ * - lat/lng present & valid → kept as-is (user picked a precise location)
+ * - lat/lng absent (key not in object) → not touched (preserves existing DB coords)
+ * - lat/lng explicitly null + district/upazila/union present → resolved
+ */
+function withResolvedCoords(data: Record<string, any>): Record<string, any> {
+  const valid = toValidBangladeshCoordinates(data.lat, data.lng);
+  if (valid) return data;
+  if (!("lat" in data) && !("lng" in data)) return data;
+  if (data.district || data.upazila || data.union_name) {
+    const coords = resolveCoordsLocal(
+      null, null, data.district, data.upazila, data.union_name,
+    );
+    return { ...data, lat: coords.lat, lng: coords.lng };
+  }
+  return data;
+}
+
 export async function serverCreateProfile(profile: Record<string, any>) {
-  if (isSupabaseAvailable()) return createProfilePg(profile);
-  return dbCreateProfile(profile);
+  const resolved = withResolvedCoords(profile);
+  if (isSupabaseAvailable()) return createProfilePg(resolved);
+  return dbCreateProfile(resolved);
 }
 
 /**
@@ -548,7 +571,7 @@ export async function serverUpdateProfile(
   // Own-profile edit (donor/patient/hospital settings page): allowed, but
   // protected fields are stripped so users can't escalate privileges.
   if (Number(session.sub) === id) {
-    const safe = { ...data };
+    const safe = withResolvedCoords({ ...data });
     for (const f of PROTECTED_PROFILE_FIELDS) delete safe[f];
     if (usePg) return updateProfilePg(id, safe);
     return dbUpdateProfile(id, safe);
@@ -566,14 +589,15 @@ export async function serverUpdateProfile(
       throw new Error("Forbidden: district admins cannot modify admin accounts");
     }
     assertDistrictAllowed(ctx, target.district);
-    const safe = { ...data };
+    const safe = withResolvedCoords({ ...data });
     for (const f of PROTECTED_PROFILE_FIELDS) delete safe[f];
     if (usePg) return updateProfilePg(id, safe);
     return dbUpdateProfile(id, safe);
   }
 
-  if (usePg) return updateProfilePg(id, data);
-  return dbUpdateProfile(id, data);
+  const resolved = withResolvedCoords(data);
+  if (usePg) return updateProfilePg(id, resolved);
+  return dbUpdateProfile(id, resolved);
 }
 
 export async function serverGetAllProfiles() {

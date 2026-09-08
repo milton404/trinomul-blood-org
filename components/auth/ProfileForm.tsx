@@ -198,6 +198,11 @@ export default function ProfileForm() {
     role?: string;
     hb_level?: number | null;
   } | null>(null);
+  // Preserve existing map-picked coords; null triggers auto-resolve from district/upazila/union.
+  const [profileCoords, setProfileCoords] = useState<{
+    lat: number | null;
+    lng: number | null;
+  }>({ lat: null, lng: null });
   const [newPatient, setNewPatient] = useState({
     name: "",
     age: "",
@@ -298,6 +303,10 @@ export default function ProfileForm() {
       setCurrentProfile({
         role: profile.role,
         hb_level: profile.hb_level ?? null,
+      });
+      setProfileCoords({
+        lat: typeof profile.lat === "number" ? profile.lat : null,
+        lng: typeof profile.lng === "number" ? profile.lng : null,
       });
 
       if (profile.avatar_url) {
@@ -558,6 +567,8 @@ export default function ProfileForm() {
         has_chronic_disease: values.hasChronicDisease ? 1 : 0,
         disease_details: values.diseaseDetails,
         is_active: values.isActive ? 1 : 0,
+        lat: profileCoords.lat,
+        lng: profileCoords.lng,
       });
       toast.success(t("profile_updated"));
       setIsEditingProfile(false);
@@ -586,6 +597,8 @@ export default function ProfileForm() {
         address: values.address,
         date_of_birth: values.dateOfBirth,
         alternative_phone: values.alternativePhone || null,
+        lat: profileCoords.lat,
+        lng: profileCoords.lng,
       });
       toast.success(t("profile_updated"));
       setIsEditingProfile(false);
@@ -611,6 +624,8 @@ export default function ProfileForm() {
         address: values.address,
         license_number: values.licenseNumber,
         website: values.website || null,
+        lat: profileCoords.lat,
+        lng: profileCoords.lng,
       });
       toast.success(t("profile_updated"));
     } catch (error: any) {

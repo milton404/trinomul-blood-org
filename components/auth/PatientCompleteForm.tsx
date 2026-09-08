@@ -97,6 +97,8 @@ export default function PatientCompleteForm({ user, onComplete }: PatientComplet
         address: values.address || null,
         alternative_phone: values.alternativePhone || null,
         role: 'patient',
+        lat: null,
+        lng: null,
       });
 
       toast.success(t('profile_completed'));

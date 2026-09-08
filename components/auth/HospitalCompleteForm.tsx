@@ -72,6 +72,8 @@ export default function HospitalCompleteForm({
         license_number: values.licenseNumber || null,
         website: values.website || null,
         role: "hospital",
+        lat: null,
+        lng: null,
       });
 
       toast.success(t("profile_completed"));
