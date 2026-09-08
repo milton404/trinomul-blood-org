@@ -525,6 +525,23 @@ function initTables(db: Database.Database) {
   `);
   db.exec("CREATE INDEX IF NOT EXISTS idx_story_views_story ON story_views(story_id)");
 
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      actor_id INTEGER,
+      type TEXT NOT NULL,
+      post_id INTEGER,
+      content TEXT,
+      is_read INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES profiles(id) ON DELETE CASCADE,
+      FOREIGN KEY (actor_id) REFERENCES profiles(id) ON DELETE CASCADE,
+      FOREIGN KEY (post_id) REFERENCES social_posts(id) ON DELETE CASCADE
+    )
+  `);
+  db.exec("CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC)");
+
   // social_posts.view_count (added for post impression counts)
   try {
     db.exec("ALTER TABLE social_posts ADD COLUMN view_count INTEGER NOT NULL DEFAULT 0");
@@ -3137,6 +3154,122 @@ export function getSocialPostById(id: number) {
     )
     .get(id) as any;
   return row ? mapSocialPostRow(row, null) : null;
+}
+
+/** Full single post (with viewer like/save state) for the deep-link page. */
+export function getSocialPostFull(id: number, viewerId: number | null) {
+  const db = getDb();
+  const row = db
+    .prepare(
+      `
+      SELECT p.*,
+        pr.full_name_en AS author_name, pr.avatar_url AS author_avatar_url,
+        (SELECT COUNT(*) FROM social_post_likes l WHERE l.post_id = p.id) AS like_count,
+        (SELECT COUNT(*) FROM social_post_comments c WHERE c.post_id = p.id) AS comment_count,
+        (SELECT COUNT(*) FROM social_post_likes l2 WHERE l2.post_id = p.id AND l2.user_id = ?) AS my_like,
+        (SELECT COUNT(*) FROM social_post_saves s WHERE s.post_id = p.id) AS save_count,
+        (SELECT COUNT(*) FROM social_post_saves s2 WHERE s2.post_id = p.id AND s2.user_id = ?) AS my_save
+      FROM social_posts p
+      LEFT JOIN profiles pr ON pr.id = p.author_id
+      WHERE p.id = ?
+    `,
+    )
+    .get(viewerId ?? -1, viewerId ?? -1, id) as any;
+  return row ? mapSocialPostRow(row, viewerId) : null;
+}
+
+/** All active posts by a user (for the profile "My Posts" tab). */
+export function getMyPosts(authorId: number, viewerId: number | null) {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `
+      SELECT p.*,
+        pr.full_name_en AS author_name, pr.avatar_url AS author_avatar_url,
+        (SELECT COUNT(*) FROM social_post_likes l WHERE l.post_id = p.id) AS like_count,
+        (SELECT COUNT(*) FROM social_post_comments c WHERE c.post_id = p.id) AS comment_count,
+        (SELECT COUNT(*) FROM social_post_likes l2 WHERE l2.post_id = p.id AND l2.user_id = ?) AS my_like,
+        (SELECT COUNT(*) FROM social_post_saves s WHERE s.post_id = p.id) AS save_count,
+        (SELECT COUNT(*) FROM social_post_saves s2 WHERE s2.post_id = p.id AND s2.user_id = ?) AS my_save
+      FROM social_posts p
+      LEFT JOIN profiles pr ON pr.id = p.author_id
+      WHERE p.author_id = ? AND p.status = 'active'
+      ORDER BY p.created_at DESC
+    `,
+    )
+    .all(viewerId ?? -1, viewerId ?? -1, authorId) as any[];
+  return rows.map((r) => mapSocialPostRow(r, viewerId));
+}
+
+/** Posts saved by a user (for the profile "Saved" tab). */
+export function getSavedPosts(userId: number) {
+  const db = getDb();
+  const rows = db
+    .prepare(
+      `
+      SELECT p.*,
+        pr.full_name_en AS author_name, pr.avatar_url AS author_avatar_url,
+        (SELECT COUNT(*) FROM social_post_likes l WHERE l.post_id = p.id) AS like_count,
+        (SELECT COUNT(*) FROM social_post_comments c WHERE c.post_id = p.id) AS comment_count,
+        (SELECT COUNT(*) FROM social_post_likes l2 WHERE l2.post_id = p.id AND l2.user_id = ?) AS my_like,
+        (SELECT COUNT(*) FROM social_post_saves s WHERE s.post_id = p.id) AS save_count,
+        (SELECT COUNT(*) FROM social_post_saves s2 WHERE s2.post_id = p.id AND s2.user_id = ?) AS my_save
+      FROM social_post_saves sv
+      JOIN social_posts p ON p.id = sv.post_id
+      LEFT JOIN profiles pr ON pr.id = p.author_id
+      WHERE sv.user_id = ? AND p.status = 'active'
+      ORDER BY sv.created_at DESC
+    `,
+    )
+    .all(userId, userId, userId) as any[];
+  return rows.map((r) => mapSocialPostRow(r, userId));
+}
+
+// ── Notifications (in-app) ───────────────────────────────────────────
+
+export function createNotification(input: {
+  userId: number;
+  actorId: number | null;
+  type: string;
+  postId?: number | null;
+  content?: string | null;
+}) {
+  if (input.userId === input.actorId) return 0;
+  const db = getDb();
+  const { changes } = db
+    .prepare(
+      `INSERT INTO notifications (user_id, actor_id, type, post_id, content) VALUES (?, ?, ?, ?, ?)`,
+    )
+    .run(input.userId, input.actorId, input.type, input.postId ?? null, input.content ?? null);
+  return changes || 0;
+}
+
+export function getMyNotifications(userId: number, limit = 50) {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT n.*, pa.full_name_en AS actor_name, pa.avatar_url AS actor_avatar_url
+       FROM notifications n
+       LEFT JOIN profiles pa ON pa.id = n.actor_id
+       WHERE n.user_id = ? ORDER BY n.created_at DESC LIMIT ?`,
+    )
+    .all(userId, limit) as any[];
+}
+
+export function markNotificationRead(id: number, userId: number) {
+  const db = getDb();
+  const { changes } = db
+    .prepare(`UPDATE notifications SET is_read = 1 WHERE id = ? AND user_id = ?`)
+    .run(id, userId);
+  return changes || 0;
+}
+
+export function markAllNotificationsRead(userId: number) {
+  const db = getDb();
+  const { changes } = db
+    .prepare(`UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0`)
+    .run(userId);
+  return changes || 0;
 }
 
 export function updateSocialPost(

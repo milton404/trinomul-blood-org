@@ -1538,6 +1538,94 @@ export async function toggleSocialPostSavePg(postId: number, userId: number) {
   return { saved, saveCount: Number((countRows[0] as any)?.c || 0) };
 }
 
+// ── Single post / My posts / Saved posts ────────────────────────────
+
+export async function getSocialPostFullPg(id: number, viewerId: number | null) {
+  const { rows } = await query(
+    `SELECT p.*, pr.full_name_en AS author_name, pr.avatar_url AS author_avatar_url,
+       (SELECT COUNT(*) FROM social_post_likes l WHERE l.post_id = p.id) AS like_count,
+       (SELECT COUNT(*) FROM social_post_comments c WHERE c.post_id = p.id) AS comment_count,
+       (SELECT COUNT(*) FROM social_post_likes l2 WHERE l2.post_id = p.id AND l2.user_id = $1) AS my_like,
+       (SELECT COUNT(*) FROM social_post_saves s WHERE s.post_id = p.id) AS save_count,
+       (SELECT COUNT(*) FROM social_post_saves s2 WHERE s2.post_id = p.id AND s2.user_id = $1) AS my_save
+     FROM social_posts p LEFT JOIN profiles pr ON pr.id = p.author_id WHERE p.id = $2`,
+    [viewerId ?? -1, id],
+  );
+  const row = rows[0] as any;
+  return row ? mapSocialPostRow(row, viewerId) : null;
+}
+
+export async function getMyPostsPg(authorId: number, viewerId: number | null) {
+  const { rows } = await query(
+    `SELECT p.*, pr.full_name_en AS author_name, pr.avatar_url AS author_avatar_url,
+       (SELECT COUNT(*) FROM social_post_likes l WHERE l.post_id = p.id) AS like_count,
+       (SELECT COUNT(*) FROM social_post_comments c WHERE c.post_id = p.id) AS comment_count,
+       (SELECT COUNT(*) FROM social_post_likes l2 WHERE l2.post_id = p.id AND l2.user_id = $1) AS my_like,
+       (SELECT COUNT(*) FROM social_post_saves s WHERE s.post_id = p.id) AS save_count,
+       (SELECT COUNT(*) FROM social_post_saves s2 WHERE s2.post_id = p.id AND s2.user_id = $1) AS my_save
+     FROM social_posts p LEFT JOIN profiles pr ON pr.id = p.author_id
+     WHERE p.author_id = $2 AND p.status = 'active' ORDER BY p.created_at DESC`,
+    [viewerId ?? -1, authorId],
+  );
+  return (rows as any[]).map((r) => mapSocialPostRow(r, viewerId));
+}
+
+export async function getSavedPostsPg(userId: number) {
+  const { rows } = await query(
+    `SELECT p.*, pr.full_name_en AS author_name, pr.avatar_url AS author_avatar_url,
+       (SELECT COUNT(*) FROM social_post_likes l WHERE l.post_id = p.id) AS like_count,
+       (SELECT COUNT(*) FROM social_post_comments c WHERE c.post_id = p.id) AS comment_count,
+       (SELECT COUNT(*) FROM social_post_likes l2 WHERE l2.post_id = p.id AND l2.user_id = $1) AS my_like,
+       (SELECT COUNT(*) FROM social_post_saves s WHERE s.post_id = p.id) AS save_count,
+       (SELECT COUNT(*) FROM social_post_saves s2 WHERE s2.post_id = p.id AND s2.user_id = $1) AS my_save
+     FROM social_post_saves sv JOIN social_posts p ON p.id = sv.post_id
+     LEFT JOIN profiles pr ON pr.id = p.author_id
+     WHERE sv.user_id = $2 AND p.status = 'active' ORDER BY sv.created_at DESC`,
+    [userId, userId],
+  );
+  return (rows as any[]).map((r) => mapSocialPostRow(r, userId));
+}
+
+// ── Notifications (in-app) ──────────────────────────────────────────
+
+export async function createNotificationPg(input: {
+  userId: number; actorId: number | null; type: string;
+  postId?: number | null; content?: string | null;
+}): Promise<number> {
+  if (input.userId === input.actorId) return 0;
+  const { rowCount } = await query(
+    `INSERT INTO notifications (user_id, actor_id, type, post_id, content) VALUES ($1,$2,$3,$4,$5)`,
+    [input.userId, input.actorId, input.type, input.postId ?? null, input.content ?? null],
+  );
+  return rowCount || 0;
+}
+
+export async function getMyNotificationsPg(userId: number, limit = 50) {
+  const { rows } = await query(
+    `SELECT n.*, pa.full_name_en AS actor_name, pa.avatar_url AS actor_avatar_url
+     FROM notifications n LEFT JOIN profiles pa ON pa.id = n.actor_id
+     WHERE n.user_id = $1 ORDER BY n.created_at DESC LIMIT $2`,
+    [userId, limit],
+  );
+  return rows;
+}
+
+export async function markNotificationReadPg(id: number, userId: number): Promise<number> {
+  const { rowCount } = await query(
+    `UPDATE notifications SET is_read = TRUE WHERE id = $1 AND user_id = $2`,
+    [id, userId],
+  );
+  return rowCount || 0;
+}
+
+export async function markAllNotificationsReadPg(userId: number): Promise<number> {
+  const { rowCount } = await query(
+    `UPDATE notifications SET is_read = TRUE WHERE user_id = $1 AND is_read = FALSE`,
+    [userId],
+  );
+  return rowCount || 0;
+}
+
 // ── Web Push subscriptions ───────────────────────────────────────────
 
 export async function addPushSubscriptionPg(input: {

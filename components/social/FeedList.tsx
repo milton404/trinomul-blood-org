@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { CardSkeleton } from "@/components/ui/Skeleton";
 import { useAuthStore } from "@/store/authStore";
-import { serverGetFeed, serverGetStories } from "@/lib/db-actions";
+import { serverGetFeed, serverGetStories, serverGetMyAvatarInfo } from "@/lib/db-actions";
 import FeedComposer from "./FeedComposer";
 import FeedPostCard from "./FeedPostCard";
 import FeedStories from "./FeedStories";
@@ -76,8 +76,16 @@ export default function FeedList({ onItemsChange }: FeedListProps) {
   const [viewerStoryIdx, setViewerStoryIdx] = useState(0);
   const [stories, setStories] = useState<FeedStory[]>([]);
   const [storyComposerOpen, setStoryComposerOpen] = useState(false);
+  const [myAvatar, setMyAvatar] = useState<{ avatarUrl: string | null; name: string } | null>(null);
 
   const PAGE = 15;
+
+  useEffect(() => {
+    if (!user) return;
+    serverGetMyAvatarInfo()
+      .then((info) => setMyAvatar(info as any))
+      .catch(() => {});
+  }, [user]);
 
   const loadStories = useCallback(async () => {
     try {
@@ -170,15 +178,24 @@ export default function FeedList({ onItemsChange }: FeedListProps) {
     window.location.href = `/${locale}/login?redirect=/${locale}/feed`;
   };
 
+  const myHasStory = currentUser ? stories.some((s) => s.id === Number(user?.id)) : false;
+  const lowResAvatar = (url: string | null | undefined): string | null => {
+    if (!url) return null;
+    return url.replace(/\/image\/upload\//, "/image/upload/w_64,h_64,c_fill,q_auto,f_auto/");
+  };
+  const myInitials = myAvatar?.name
+    ? myAvatar.name.split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase()
+    : "U";
+
   const youStory = {
     onClick: currentUser ? () => setStoryComposerOpen(true) : goLogin,
-    avatarUrl: null,
-    initials: "You",
-    hasStory: currentUser
-      ? stories.some((s) => s.id === Number(user?.id))
-      : false,
+    avatarUrl: currentUser ? lowResAvatar(myAvatar?.avatarUrl) : null,
+    initials: currentUser ? myInitials : "You",
+    hasStory: myHasStory,
     label: t("yourStory"),
   };
+
+  const storyAuthorIds = new Set(stories.map((s) => Number(s.id)));
 
   return (
     <div className="space-y-0">
@@ -288,6 +305,7 @@ export default function FeedList({ onItemsChange }: FeedListProps) {
                 post={it}
                 currentUser={currentUser}
                 isAdmin={isAdmin}
+                authorHasStory={storyAuthorIds.has(Number(it.authorId))}
                 onDeleted={handleDeleted}
                 onChanged={() => load(0, true, tab)}
               />

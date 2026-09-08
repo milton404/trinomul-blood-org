@@ -7,7 +7,6 @@ import {
   Share2,
   Ellipsis,
   Bookmark,
-
   Smile,
   X,
   Loader2,
@@ -18,6 +17,7 @@ import {
   Globe,
   Lock,
   Eye,
+  ImagePlus,
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { formatTimeAgo } from "@/lib/format-time";
@@ -32,6 +32,10 @@ import {
   serverToggleSave,
   serverIncrementPostView,
 } from "@/lib/db-actions";
+import {
+  isCloudinaryConfigured,
+  uploadImagesToCloudinary,
+} from "@/lib/cloudinary";
 import ImageLightbox from "./ImageLightbox";
 
 
@@ -116,12 +120,14 @@ export default function FeedPostCard({
   post,
   currentUser,
   isAdmin,
+  authorHasStory = false,
   onDeleted,
   onChanged,
 }: {
   post: FeedPost;
   currentUser: { id: number; role: string } | null;
   isAdmin: boolean;
+  authorHasStory?: boolean;
   onDeleted: (id: number) => void;
   onChanged: () => void;
 }) {
@@ -151,6 +157,9 @@ export default function FeedPostCard({
   const optionsRef = useRef<HTMLDivElement>(null);
   const [lightboxOpen, setLightboxOpen] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [editUploading, setEditUploading] = useState(false);
+  const editFileRef = useRef<HTMLInputElement>(null);
+  const cloudConfigured = isCloudinaryConfigured();
 
   const canModify = currentUser && (currentUser.id === post.authorId || isAdmin);
   const roleBadge = ROLE_BADGE[post.authorRole] || ROLE_BADGE.donor;
@@ -306,6 +315,20 @@ export default function FeedPostCard({
     setBusy(false);
   };
 
+  const onEditPickFiles = async (files: FileList | null) => {
+    if (!files || !files.length) return;
+    if (!cloudConfigured) return;
+    setEditUploading(true);
+    try {
+      const urls = await uploadImagesToCloudinary(Array.from(files), () => {});
+      setImages((prev) => [...prev, ...urls].slice(0, 4));
+    } catch {
+      /* ignore */
+    }
+    setEditUploading(false);
+    if (editFileRef.current) editFileRef.current.value = "";
+  };
+
   const handlePin = async () => {
     setBusy(true);
     try {
@@ -325,7 +348,7 @@ export default function FeedPostCard({
     } catch {
       /* ignore */
     }
-    const url = `${window.location.origin}/${locale}/feed`;
+    const url = `${window.location.origin}/${locale}/feed/${post.id}`;
     if (navigator.share) {
       try {
         await navigator.share({ title: "Trinomul Blood Bank", url });
@@ -352,7 +375,8 @@ export default function FeedPostCard({
     return () => document.removeEventListener("mousedown", onClick);
   }, [showOptions]);
 
-  const avatar = post.authorAvatarUrl ? (
+  const avatarInner = post.authorAvatarUrl ? (
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       src={post.authorAvatarUrl}
       alt={post.authorName}
@@ -362,6 +386,14 @@ export default function FeedPostCard({
     <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-full bg-gradient-to-br from-red-500 to-rose-600 text-white flex items-center justify-center font-bold text-xs sm:text-sm">
       {initials(post.authorName || "U")}
     </div>
+  );
+
+  const avatar = authorHasStory ? (
+    <div className="p-[2px] rounded-full bg-gradient-to-tr from-red-500 via-rose-400 to-amber-400">
+      <div className="p-[2px] rounded-full bg-white">{avatarInner}</div>
+    </div>
+  ) : (
+    avatarInner
   );
 
   const renderComments = () =>
@@ -443,18 +475,16 @@ export default function FeedPostCard({
             </button>
             {showOptions && (
               <div className="absolute right-0 top-full mt-1 z-20 bg-white rounded-xl shadow-lg border border-slate-200 py-1 min-w-[140px]">
-                {!isAdmin && (
-                  <button
-                    onClick={() => {
-                      setEditing(true);
-                      setShowOptions(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                    {t("edit")}
-                  </button>
-                )}
+                <button
+                  onClick={() => {
+                    setEditing(true);
+                    setShowOptions(false);
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                  {t("edit")}
+                </button>
                 <button
                   onClick={() => {
                     handleDelete();
@@ -597,6 +627,31 @@ export default function FeedPostCard({
                 ))}
               </div>
             )}
+            {cloudConfigured && images.length < 4 && (
+              <div>
+                <input
+                  ref={editFileRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  hidden
+                  onChange={(e) => onEditPickFiles(e.target.files)}
+                />
+                <button
+                  type="button"
+                  onClick={() => editFileRef.current?.click()}
+                  disabled={editUploading}
+                  className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 border border-slate-200 disabled:opacity-50"
+                >
+                  {editUploading ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : (
+                    <ImagePlus className="w-3.5 h-3.5" />
+                  )}
+                  {locale === "bn" ? "ছবি যোগ করুন" : "Add photos"}
+                </button>
+              </div>
+            )}
             <label className="inline-flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
               <input
                 type="checkbox"
@@ -664,6 +719,10 @@ export default function FeedPostCard({
             >
               <Share2 className="w-5.5 h-5.5 text-slate-700 -rotate-45" />
             </button>
+            <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 ml-0.5 select-none tabular-nums">
+              <Eye className="w-3.5 h-3.5" />
+              {viewCount}
+            </span>
           </div>
           <button
             onClick={handleSave}

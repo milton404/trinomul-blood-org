@@ -1,8 +1,22 @@
 import { NextResponse } from "next/server";
-import { serverDeletePost, serverUpdatePost } from "@/lib/db-actions";
+import { serverDeletePost, serverUpdatePost, serverGetPostById } from "@/lib/db-actions";
 import { getSession } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
+
+export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params;
+    const postId = parseInt(id);
+    if (!postId) return NextResponse.json({ error: "Invalid post ID" }, { status: 400 });
+    const post = await serverGetPostById(postId);
+    if (!post) return NextResponse.json({ error: "Post not found" }, { status: 404 });
+    return NextResponse.json({ post });
+  } catch (err: any) {
+    console.error("[api/feed/[id] GET]", err);
+    return NextResponse.json({ error: err.message || "Failed to fetch" }, { status: 500 });
+  }
+}
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {

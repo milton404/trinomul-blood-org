@@ -262,6 +262,21 @@ CREATE TABLE IF NOT EXISTS story_views (
 
 CREATE INDEX IF NOT EXISTS idx_story_views_story ON story_views(story_id);
 
+-- ── notifications (in-app: likes, comments, etc.) ──────────────────────────
+CREATE TABLE IF NOT EXISTS notifications (
+  id BIGSERIAL PRIMARY KEY,
+  user_id BIGINT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  actor_id BIGINT REFERENCES profiles(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  post_id BIGINT REFERENCES social_posts(id) ON DELETE CASCADE,
+  content TEXT,
+  is_read BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id, is_read);
+
 -- ── auth_rate_limits ──────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS auth_rate_limits (
   identifier TEXT PRIMARY KEY,

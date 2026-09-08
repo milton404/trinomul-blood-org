@@ -8,6 +8,7 @@ import { clearSession } from "@/components/providers/AuthProvider";
 import LoginForm from "./LoginForm";
 import ProfileForm from "./ProfileForm";
 import ShareToCommunityButton from "@/components/social/ShareToCommunityButton";
+import ProfileSocialTabs from "@/components/social/ProfileSocialTabs";
 
 /**
  * Gating wrapper for the /profile route (also the Profile tab in phone/PWA).
@@ -73,6 +74,7 @@ export default function ProfileGate() {
         </button>
       </div>
       <ProfileForm />
+      <ProfileSocialTabs />
     </>
   );
 }

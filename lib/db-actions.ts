@@ -105,6 +105,13 @@ import {
   incrementPostView,
   recordStoryView,
   getStoryViewers,
+  getSocialPostFull,
+  getMyPosts,
+  getSavedPosts,
+  createNotification,
+  getMyNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
 
   runRequestLifecycleSweep,
   purgeOldArchivedRequests,
@@ -254,6 +261,13 @@ import {
   incrementPostViewPg,
   recordStoryViewPg,
   getStoryViewersPg,
+  getSocialPostFullPg,
+  getMyPostsPg,
+  getSavedPostsPg,
+  createNotificationPg,
+  getMyNotificationsPg,
+  markNotificationReadPg,
+  markAllNotificationsReadPg,
   toggleBookmarkPg,
   isBookmarkedPg,
   getBookmarkedDonorIdsPg,
@@ -3440,8 +3454,15 @@ export async function serverToggleLike(postId: number) {
   if (!me) throw new Error("You must be logged in to like posts.");
   const post = isSupabaseAvailable() ? await getSocialPostByIdPg(postId) : getSocialPostById(postId);
   if (!post || post.status === "deleted") throw new Error("Post not found.");
-  if (isSupabaseAvailable()) return toggleSocialPostLikePg(postId, me.id);
-  return toggleSocialPostLike(postId, me.id);
+  const res = isSupabaseAvailable() ? await toggleSocialPostLikePg(postId, me.id) : toggleSocialPostLike(postId, me.id);
+  if (res.liked && post.authorId !== me.id) {
+    try {
+      isSupabaseAvailable()
+        ? await createNotificationPg({ userId: post.authorId, actorId: me.id, type: "like", postId })
+        : createNotification({ userId: post.authorId, actorId: me.id, type: "like", postId });
+    } catch { /* ignore */ }
+  }
+  return res;
 }
 
 /** Comment on a post. Requires login. */
@@ -3453,8 +3474,15 @@ export async function serverAddComment(postId: number, content: string) {
   if (text.length > 500) throw new Error("Comment is too long.");
   const post = isSupabaseAvailable() ? await getSocialPostByIdPg(postId) : getSocialPostById(postId);
   if (!post || post.status === "deleted") throw new Error("Post not found.");
-  if (isSupabaseAvailable()) return addSocialPostCommentPg(postId, me.id, me.role, me.name, text);
-  return addSocialPostComment(postId, me.id, me.role, me.name, text);
+  const id = isSupabaseAvailable() ? await addSocialPostCommentPg(postId, me.id, me.role, me.name, text) : addSocialPostComment(postId, me.id, me.role, me.name, text);
+  if (post.authorId !== me.id) {
+    try {
+      isSupabaseAvailable()
+        ? await createNotificationPg({ userId: post.authorId, actorId: me.id, type: "comment", postId, content: text.slice(0, 200) })
+        : createNotification({ userId: post.authorId, actorId: me.id, type: "comment", postId, content: text.slice(0, 200) });
+    } catch { /* ignore */ }
+  }
+  return id;
 }
 
 export async function serverGetComments(postId: number) {
@@ -3577,6 +3605,21 @@ export async function serverGetStories() {
   return isSupabaseAvailable() ? getStoriesPg() : getStories();
 }
 
+/** Current user's avatar + name (for the "You" story ring). */
+export async function serverGetMyAvatarInfo(): Promise<{
+  avatarUrl: string | null;
+  name: string;
+} | null> {
+  const me = await getCurrentProfile();
+  if (!me) return null;
+  const profile = (await serverGetProfileByUserId(me.id)) as any;
+  if (!profile) return { avatarUrl: null, name: me.name };
+  return {
+    avatarUrl: profile.avatar_url || null,
+    name: me.name,
+  };
+}
+
 /** Delete your own story. */
 export async function serverDeleteStory(storyId: number): Promise<number> {
   const me = await getCurrentProfile();
@@ -3597,6 +3640,53 @@ export async function serverToggleSave(postId: number) {
   return isSupabaseAvailable()
     ? toggleSocialPostSavePg(postId, me.id)
     : toggleSocialPostSave(postId, me.id);
+}
+
+/** Single post (full feed-item shape) for the /feed/[id] deep-link page. */
+export async function serverGetPostById(postId: number) {
+  const session = await getSession();
+  const viewerId = session ? Number(session.sub) : null;
+  const post = isSupabaseAvailable()
+    ? await getSocialPostFullPg(postId, viewerId)
+    : getSocialPostFull(postId, viewerId);
+  if (!post || post.status === "deleted") return null;
+  const isAdmin = session?.role === "admin" || session?.role === "super_admin";
+  if (!post.isPublic && viewerId !== post.authorId && !isAdmin) return null;
+  return post;
+}
+
+/** All active posts by the current user (profile "My Posts" tab). */
+export async function serverGetMyPosts() {
+  const me = await getCurrentProfile();
+  if (!me) throw new Error("You must be logged in.");
+  return isSupabaseAvailable() ? getMyPostsPg(me.id, me.id) : getMyPosts(me.id, me.id);
+}
+
+/** Posts saved by the current user (profile "Saved" tab). */
+export async function serverGetSavedPosts() {
+  const me = await getCurrentProfile();
+  if (!me) throw new Error("You must be logged in.");
+  return isSupabaseAvailable() ? getSavedPostsPg(me.id) : getSavedPosts(me.id);
+}
+
+// ── In-app notifications (likes / comments) ─────────────────────────
+
+export async function serverGetMyNotifications() {
+  const me = await getCurrentProfile();
+  if (!me) throw new Error("You must be logged in.");
+  return isSupabaseAvailable() ? getMyNotificationsPg(me.id) : getMyNotifications(me.id);
+}
+
+export async function serverMarkNotificationRead(id: number) {
+  const me = await getCurrentProfile();
+  if (!me) throw new Error("You must be logged in.");
+  return isSupabaseAvailable() ? markNotificationReadPg(id, me.id) : markNotificationRead(id, me.id);
+}
+
+export async function serverMarkAllNotificationsRead() {
+  const me = await getCurrentProfile();
+  if (!me) throw new Error("You must be logged in.");
+  return isSupabaseAvailable() ? markAllNotificationsReadPg(me.id) : markAllNotificationsRead(me.id);
 }
 
 // ── Web Push subscriptions (PWA notifications) ───────────────────────
