@@ -94,14 +94,14 @@ function SmartImage({
     <button
       type="button"
       onClick={onTap}
-      className="block w-full cursor-pointer bg-black"
+      className="block w-full cursor-pointer"
       aria-label={ariaLabel}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={src}
         alt=""
-        className="mx-auto block max-h-[440px] w-auto max-w-full"
+        className="block w-full h-auto"
       />
     </button>
   );
