@@ -102,6 +102,9 @@ import {
   getStories,
   deleteStory,
   toggleSocialPostSave,
+  incrementPostView,
+  recordStoryView,
+  getStoryViewers,
 
   runRequestLifecycleSweep,
   purgeOldArchivedRequests,
@@ -248,7 +251,9 @@ import {
   getStoriesPg,
   deleteStoryPg,
   toggleSocialPostSavePg,
-
+  incrementPostViewPg,
+  recordStoryViewPg,
+  getStoryViewersPg,
   toggleBookmarkPg,
   isBookmarkedPg,
   getBookmarkedDonorIdsPg,
@@ -3612,6 +3617,27 @@ export async function serverSavePushSubscription(sub: {
 
 export async function serverDeletePushSubscription(endpoint: string) {
   return removePushSubscription(endpoint);
+}
+
+// ── Post views + story viewers ───────────────────────────────────────
+
+/** Increment a post's view count (best-effort, no auth required). */
+export async function serverIncrementPostView(postId: number) {
+  if (isSupabaseAvailable()) return incrementPostViewPg(postId);
+  return incrementPostView(postId);
+}
+
+/** Record that the current user viewed a story (idempotent). */
+export async function serverRecordStoryView(storyId: number) {
+  const me = await getCurrentProfile();
+  if (!me) return;
+  if (isSupabaseAvailable()) return recordStoryViewPg(storyId, me.id);
+  return recordStoryView(storyId, me.id);
+}
+
+/** List of viewers for a story (name, avatar, viewed_at). */
+export async function serverGetStoryViewers(storyId: number) {
+  return isSupabaseAvailable() ? getStoryViewersPg(storyId) : getStoryViewers(storyId);
 }
 
 // ── Bengali share-text translation ──────────────────────────────────

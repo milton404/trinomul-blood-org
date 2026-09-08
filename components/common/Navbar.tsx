@@ -210,7 +210,7 @@ export default function Navbar() {
 
                 <button
                   onClick={handleLogout}
-                  className="p-2 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50/80 transition-all shrink-0"
+                  className="hidden sm:inline-flex p-2 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50/80 transition-all shrink-0"
                   aria-label="Sign out of your account"
                 >
                   <LogOut className="w-4 h-4" />

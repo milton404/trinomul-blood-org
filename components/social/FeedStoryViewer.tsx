@@ -1,8 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { X, Eye } from "lucide-react";
 import { formatTimeAgo } from "@/lib/format-time";
+import { useAuthStore } from "@/store/authStore";
+import { serverRecordStoryView, serverGetStoryViewers } from "@/lib/db-actions";
+import { useTranslations } from "next-intl";
 
 export interface StorySlide {
   id: string;
@@ -47,6 +50,10 @@ export default function FeedStoryViewer({
   );
   const [slideIdx, setSlideIdx] = useState(0);
   const [paused, setPaused] = useState(false);
+  const [viewers, setViewers] = useState<{ name: string; avatar_url: string | null }[]>([]);
+  const recordedRef = useRef<Set<string>>(new Set());
+  const user = useAuthStore((s) => s.user);
+  const t = useTranslations("social");
 
   const close = useCallback(() => onClose(), [onClose]);
 
@@ -88,6 +95,25 @@ export default function FeedStoryViewer({
       setSlideIdx(0);
     }
   }, [stories, storyIdx, slideIdx]);
+
+  // Record a view for the current slide (once per slide) + fetch viewers
+  // when viewing your own story (Instagram "Seen by N").
+  useEffect(() => {
+    const s = stories[storyIdx]?.slides[slideIdx];
+    if (!s) return;
+    if (!recordedRef.current.has(s.id)) {
+      recordedRef.current.add(s.id);
+      serverRecordStoryView(Number(s.id)).catch(() => {});
+    }
+    const isOwn = user != null && String(user.id) === String(stories[storyIdx]?.id);
+    if (isOwn) {
+      serverGetStoryViewers(Number(s.id))
+        .then((rows) => setViewers(rows as any[]))
+        .catch(() => setViewers([]));
+    } else {
+      setViewers([]);
+    }
+  }, [storyIdx, slideIdx, stories, user]);
 
   useEffect(() => {
     if (paused) return;
@@ -200,6 +226,37 @@ export default function FeedStoryViewer({
             <X className="h-5 w-5" />
           </button>
         </div>
+
+        {/* Seen-by list — only on your own stories (Instagram-style) */}
+        {viewers.length > 0 && (
+          <div className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/80 to-transparent px-4 pb-5 pt-10">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-white/90">
+              <Eye className="h-3.5 w-3.5" />
+              <span>{t("seenBy", { count: viewers.length })}</span>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1.5">
+              {viewers.slice(0, 12).map((v, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  {v.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={v.avatar_url}
+                      alt=""
+                      className="h-5 w-5 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-5 w-5 items-center justify-center rounded-full bg-white/20 text-[9px] font-bold text-white">
+                      {(v.name || "U").charAt(0)}
+                    </div>
+                  )}
+                  <span className="max-w-[90px] truncate text-[11px] text-white/80">
+                    {v.name || "User"}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Tap zones: left = prev, center = hold to pause, right = next */}
         <div className="absolute inset-0 z-10 flex">

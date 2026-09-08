@@ -17,6 +17,7 @@ import {
   Pencil,
   Globe,
   Lock,
+  Eye,
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { formatTimeAgo } from "@/lib/format-time";
@@ -29,6 +30,7 @@ import {
   serverPinPost,
   serverSharePost,
   serverToggleSave,
+  serverIncrementPostView,
 } from "@/lib/db-actions";
 import ImageLightbox from "./ImageLightbox";
 
@@ -53,8 +55,11 @@ interface FeedPost {
   likedByMe: boolean;
   saveCount: number;
   savedByMe: boolean;
+  viewCount: number;
   createdAt: string;
 }
+
+const viewedPosts = new Set<number>();
 
 const ROLE_BADGE: Record<string, { en: string; bn: string; cls: string }> = {
   donor: { en: "Donor", bn: "দাতা", cls: "bg-rose-50 text-rose-700 border border-rose-200" },
@@ -127,6 +132,7 @@ export default function FeedPostCard({
   const [shareCount, setShareCount] = useState(post.shareCount);
   const [saved, setSaved] = useState(post.savedByMe);
   const [saving, setSaving] = useState(false);
+  const [viewCount, setViewCount] = useState(post.viewCount);
   const [liking, setLiking] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [comments, setComments] = useState<any[]>([]);
@@ -153,6 +159,13 @@ export default function FeedPostCard({
   const goLogin = useCallback(() => {
     window.location.href = `/${locale}/login?redirect=/${locale}/feed`;
   }, [locale]);
+
+  useEffect(() => {
+    if (viewedPosts.has(post.id)) return;
+    viewedPosts.add(post.id);
+    setViewCount((c) => c + 1);
+    serverIncrementPostView(post.id).catch(() => {});
+  }, [post.id]);
 
   const handleLike = useCallback(async () => {
     if (!currentUser) {
@@ -399,8 +412,6 @@ export default function FeedPostCard({
             )}
           </div>
           <div className="flex items-center gap-1.5 text-[11px] text-slate-400 mt-0.5">
-            <span>{formatTimeAgo(post.createdAt, locale)}</span>
-            <span className="w-0.5 h-0.5 rounded-full bg-slate-300" />
             {post.isPublic ? (
               <span className="inline-flex items-center gap-0.5">
                 <Globe className="w-2.5 h-2.5" />
@@ -410,6 +421,13 @@ export default function FeedPostCard({
                 <Lock className="w-2.5 h-2.5" />
               </span>
             )}
+            <span className="w-0.5 h-0.5 rounded-full bg-slate-300" />
+            <span>{formatTimeAgo(post.createdAt, locale)}</span>
+            <span className="w-0.5 h-0.5 rounded-full bg-slate-300" />
+            <span className="inline-flex items-center gap-0.5">
+              <Eye className="w-3 h-3" />
+              {viewCount}
+            </span>
           </div>
         </div>
 

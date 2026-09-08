@@ -1080,7 +1080,8 @@
     "notifications": "Notifications",
     "enableNotifications": "Enable notifications",
     "notificationsOn": "Notifications on",
-    "notificationsBlocked": "Blocked — enable in browser settings"
+    "notificationsBlocked": "Blocked — enable in browser settings",
+    "seenBy": "Seen by {count}"
   },
   "donor_application": {
     "page_title": "Become a Blood Donor",

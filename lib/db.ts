@@ -511,6 +511,27 @@ function initTables(db: Database.Database) {
     )
   `);
 
+  // ── Story views (who viewed each story) ───────────────────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS story_views (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      story_id INTEGER NOT NULL,
+      viewer_id INTEGER NOT NULL,
+      viewed_at TEXT DEFAULT (datetime('now')),
+      UNIQUE(story_id, viewer_id),
+      FOREIGN KEY (story_id) REFERENCES stories(id) ON DELETE CASCADE,
+      FOREIGN KEY (viewer_id) REFERENCES profiles(id) ON DELETE CASCADE
+    )
+  `);
+  db.exec("CREATE INDEX IF NOT EXISTS idx_story_views_story ON story_views(story_id)");
+
+  // social_posts.view_count (added for post impression counts)
+  try {
+    db.exec("ALTER TABLE social_posts ADD COLUMN view_count INTEGER NOT NULL DEFAULT 0");
+  } catch {
+    /* column already exists */
+  }
+
   // Server-side auth rate limiting (replaces the in-memory client limiter).
   db.exec(`
     CREATE TABLE IF NOT EXISTS auth_rate_limits (
@@ -2944,6 +2965,7 @@ function mapSocialPostRow(r: any, viewerId: number | null) {
     likedByMe: viewerId ? r.my_like > 0 : false,
     saveCount: r.save_count || 0,
     savedByMe: viewerId ? r.my_save > 0 : false,
+    viewCount: r.view_count || 0,
     createdAt: r.created_at,
   };
 }
@@ -3347,6 +3369,31 @@ export function getAllPushSubscriptions() {
     endpoint: r.endpoint,
     keys: { p256dh: r.p256dh, auth: r.auth_key },
   }));
+}
+
+// ── Post views + story viewers ────────────────────────────────────────
+
+export function incrementPostView(postId: number): void {
+  const db = getDb();
+  db.prepare("UPDATE social_posts SET view_count = view_count + 1 WHERE id = ?").run(postId);
+}
+
+export function recordStoryView(storyId: number, viewerId: number): void {
+  const db = getDb();
+  db.prepare(
+    `INSERT OR IGNORE INTO story_views (story_id, viewer_id) VALUES (?, ?)`,
+  ).run(storyId, viewerId);
+}
+
+export function getStoryViewers(storyId: number) {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT sv.viewed_at, pr.full_name_en AS name, pr.avatar_url AS avatar_url
+         FROM story_views sv LEFT JOIN profiles pr ON pr.id = sv.viewer_id
+        WHERE sv.story_id = ? ORDER BY sv.viewed_at DESC`,
+    )
+    .all(storyId);
 }
 
 // Password reset queries

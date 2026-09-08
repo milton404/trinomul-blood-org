@@ -1310,6 +1310,7 @@ function mapSocialPostRow(r: any, viewerId: number | null) {
     status: r.status, likeCount: r.like_count || 0, commentCount: r.comment_count || 0,
     shareCount: r.share_count || 0, likedByMe: viewerId ? r.my_like > 0 : false,
     saveCount: r.save_count || 0, savedByMe: viewerId ? r.my_save > 0 : false,
+    viewCount: r.view_count || 0,
     createdAt: r.created_at,
   };
 }
@@ -1562,6 +1563,31 @@ export async function getAllPushSubscriptionsPg() {
     endpoint: r.endpoint,
     keys: { p256dh: r.p256dh, auth: r.auth_key },
   }));
+}
+
+// ── Post views + story viewers ───────────────────────────────────────
+
+export async function incrementPostViewPg(postId: number): Promise<void> {
+  await query("UPDATE social_posts SET view_count = view_count + 1 WHERE id = $1", [postId]);
+}
+
+export async function recordStoryViewPg(storyId: number, viewerId: number): Promise<void> {
+  await query(
+    `INSERT INTO story_views (story_id, viewer_id)
+     VALUES ($1, $2)
+     ON CONFLICT (story_id, viewer_id) DO NOTHING`,
+    [storyId, viewerId],
+  );
+}
+
+export async function getStoryViewersPg(storyId: number) {
+  const { rows } = await query(
+    `SELECT sv.viewed_at, pr.full_name_en AS name, pr.avatar_url AS avatar_url
+       FROM story_views sv LEFT JOIN profiles pr ON pr.id = sv.viewer_id
+      WHERE sv.story_id = $1 ORDER BY sv.viewed_at DESC`,
+    [storyId],
+  );
+  return rows;
 }
 
 // ── Bookmarks ────────────────────────────────────────────────────────

@@ -179,6 +179,7 @@ CREATE TABLE IF NOT EXISTS social_posts (
   status TEXT NOT NULL DEFAULT 'active'
     CHECK (status IN ('active', 'deleted')),
   share_count INTEGER NOT NULL DEFAULT 0,
+  view_count INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -249,6 +250,17 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
   auth_key TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- ── story_views (who viewed each story) ───────────────────────────────────
+CREATE TABLE IF NOT EXISTS story_views (
+  id BIGSERIAL PRIMARY KEY,
+  story_id BIGINT NOT NULL REFERENCES stories(id) ON DELETE CASCADE,
+  viewer_id BIGINT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  viewed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (story_id, viewer_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_story_views_story ON story_views(story_id);
 
 -- ── auth_rate_limits ──────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS auth_rate_limits (

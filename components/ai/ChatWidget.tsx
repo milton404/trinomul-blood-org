@@ -316,7 +316,7 @@ export default function ChatWidget() {
           >
             <div className="relative">
               {/* Rotating hint message above icon */}
-              <div className="absolute bottom-full right-0 mb-1 text-right">
+              <div className="absolute bottom-full right-0 mb-0.5 text-right">
                 <span
                   className={`inline-block bg-white/95 text-[10px] sm:text-[11px] font-medium text-slate-700 shadow-md rounded-xl px-2.5 py-1.5 whitespace-nowrap border border-rose-100 transition-all duration-500 ${
                     hintVisible

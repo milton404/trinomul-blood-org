@@ -1080,7 +1080,8 @@
     "notifications": "নোটিফিকেশন",
     "enableNotifications": "নোটিফিকেশন চালু করুন",
     "notificationsOn": "নোটিফিকেশন চালু",
-    "notificationsBlocked": "ব্লক করা — ব্রাউজার সেটিংসে চালু করুন"
+    "notificationsBlocked": "ব্লক করা — ব্রাউজার সেটিংসে চালু করুন",
+    "seenBy": "{count} জন দেখেছে"
   },
   "donor_application": {
     "page_title": "রক্তদাতা হিসেবে নিবন্ধন করুন",

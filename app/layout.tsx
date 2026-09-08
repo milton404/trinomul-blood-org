@@ -1,5 +1,6 @@
 import "./globals.css";
 import { Hind_Siliguri } from "next/font/google";
+import type { Viewport } from "next";
 import AuthProvider from "@/components/providers/AuthProvider";
 import SkipToContent from "@/components/common/SkipToContent";
 import PWAInstallPrompt from "@/components/common/PWAInstallPrompt";
@@ -13,6 +14,15 @@ const hindSiliguri = Hind_Siliguri({
   display: "swap",
 });
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+  themeColor: "#dc2626",
+};
+
 export default function RootLayout({
   children,
 }: {
@@ -21,8 +31,6 @@ export default function RootLayout({
   return (
     <html suppressHydrationWarning className={hindSiliguri.variable}>
       <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-        <meta name="theme-color" content="#dc2626" />
         <meta name="mobile-web-app-capable" content="yes" />
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
