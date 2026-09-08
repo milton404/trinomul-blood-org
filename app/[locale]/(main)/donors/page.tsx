@@ -619,7 +619,7 @@ function DonorsContent() {
                   label: d.name_en,
                   labelBn: d.name_bn,
                 }))}
-                placeholder="All Districts"
+                placeholder={isBn ? "সব জেলা" : "All Districts"}
                 variant="location"
                 locale={locale as "en" | "bn"}
                 searchable
@@ -635,7 +635,7 @@ function DonorsContent() {
                   label: u.name_en,
                   labelBn: u.name_bn,
                 }))}
-                placeholder="All Upazilas"
+                placeholder={isBn ? "সব উপজেলা" : "All Upazilas"}
                 variant="location"
                 locale={locale as "en" | "bn"}
                 searchable
@@ -653,7 +653,7 @@ function DonorsContent() {
                     label: u.name_en,
                     labelBn: u.name_bn,
                   }))}
-                  placeholder="All Unions"
+                  placeholder={isBn ? "সব ইউনিয়ন" : "All Unions"}
                   variant="location"
                   locale={locale as "en" | "bn"}
                   searchable

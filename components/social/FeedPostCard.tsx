@@ -161,7 +161,7 @@ export default function FeedPostCard({
   const editFileRef = useRef<HTMLInputElement>(null);
   const cloudConfigured = isCloudinaryConfigured();
 
-  const canModify = currentUser && (currentUser.id === post.authorId || isAdmin);
+  const canModify = currentUser && (Number(currentUser.id) === Number(post.authorId) || isAdmin);
   const roleBadge = ROLE_BADGE[post.authorRole] || ROLE_BADGE.donor;
   const typeBadge = POST_TYPE_BADGE[post.postType] || POST_TYPE_BADGE.general;
 
@@ -719,10 +719,7 @@ export default function FeedPostCard({
             >
               <Share2 className="w-5.5 h-5.5 text-slate-700 -rotate-45" />
             </button>
-            <span className="inline-flex items-center gap-1 text-[11px] text-slate-400 ml-0.5 select-none tabular-nums">
-              <Eye className="w-3.5 h-3.5" />
-              {viewCount}
-            </span>
+
           </div>
           <button
             onClick={handleSave}

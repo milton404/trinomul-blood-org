@@ -1,6 +1,6 @@
 'use client';
 
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import dynamic from 'next/dynamic';
 import Navbar from '@/components/common/Navbar';
 import Footer from '@/components/common/Footer';
@@ -331,6 +331,13 @@ const SORT_OPTIONS = [
   { value: 'oldest', label: 'Oldest' },
 ] as const;
 
+const URGENCY_BN: Record<string, string> = { critical: 'জরুরি', urgent: 'তাৎক্ষণিক', normal: 'সাধারণ' };
+const STATUS_BN: Record<string, string> = { all: 'সব স্ট্যাটাস', active: 'সক্রিয়', fulfilled: 'পূর্ণ' };
+const TAG_BN: Record<string, string> = { now: 'এখনই', today: 'আজ', tomorrow: 'আগামীকাল', day_after: 'পরশু', specific_date: 'নির্ধারিত তারিখ' };
+const DATE_RANGE_BN: Record<string, string> = { today: 'আজ', '7days': 'গত ৭ দিন', '30days': 'গত ৩০ দিন', all: 'সব সময়' };
+const ASSIGN_BN: Record<string, string> = { all: 'সব', assigned: 'নির্ধারিত', unassigned: 'অনির্ধারিত' };
+const SORT_BN: Record<string, string> = { urgency: 'জরুরিতা', nearest: 'নিকটতম', newest: 'নতুনতম', oldest: 'পুরোনো' };
+
 /** Resolve a request's coordinates, falling back to its upazila/district centroid. */
 function requestCoords(req: any): { lat: number; lng: number } | null {
   if (typeof req.lat === 'number' && typeof req.lng === 'number') {
@@ -371,6 +378,8 @@ const ExploreMap = dynamic(
 export default function RequestsPage() {
   const t = useTranslations('common');
   const tMap = useTranslations('map');
+  const locale = useLocale();
+  const isBn = locale === 'bn';
   const [searchQuery, setSearchQuery] = useState('');
   const [requests, setRequests] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -1247,9 +1256,9 @@ export default function RequestsPage() {
               className={selectCls(!!urgencyFilter)}
               aria-label="Priority"
             >
-              <option value="">All priorities</option>
+              <option value="">{isBn ? "সব জরুরিতা" : "All priorities"}</option>
               {URGENCY_LEVELS.map(level => (
-                <option key={level} value={level} className="capitalize">{level}</option>
+                <option key={level} value={level} className="capitalize">{isBn ? URGENCY_BN[level] : level}</option>
               ))}
             </select>
 
@@ -1261,7 +1270,7 @@ export default function RequestsPage() {
               aria-label="Status"
             >
               {STATUS_OPTIONS.map(s => (
-                <option key={s.value} value={s.value}>{s.label}</option>
+                <option key={s.value} value={s.value}>{isBn ? STATUS_BN[s.value] : s.label}</option>
               ))}
             </select>
 
@@ -1272,9 +1281,9 @@ export default function RequestsPage() {
               className={selectCls(tagFilters.length > 0)}
               aria-label="When needed"
             >
-              <option value="">Any time</option>
+              <option value="">{isBn ? "যেকোনো সময়" : "Any time"}</option>
               {TAG_OPTIONS.map(tag => (
-                <option key={tag.value} value={tag.value}>{tag.label}</option>
+                <option key={tag.value} value={tag.value}>{isBn ? TAG_BN[tag.value] : tag.label}</option>
               ))}
             </select>
 
@@ -1285,9 +1294,9 @@ export default function RequestsPage() {
               className={selectCls(!!districtFilter)}
               aria-label="District"
             >
-              <option value="">All districts</option>
+              <option value="">{isBn ? "সব জেলা" : "All districts"}</option>
               {RANGPUR_DISTRICTS.map(d => (
-                <option key={d.id} value={d.name_en}>{d.name_en}</option>
+                <option key={d.id} value={d.name_en}>{isBn ? d.name_bn : d.name_en}</option>
               ))}
             </select>
 
@@ -1299,7 +1308,7 @@ export default function RequestsPage() {
               aria-label="Date range"
             >
               {DATE_RANGE_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                <option key={opt.value} value={opt.value}>{isBn ? DATE_RANGE_BN[opt.value] : opt.label}</option>
               ))}
             </select>
 
@@ -1311,7 +1320,7 @@ export default function RequestsPage() {
               aria-label="Assignee"
             >
               {ASSIGN_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>{opt.label}</option>
+                <option key={opt.value} value={opt.value}>{isBn ? ASSIGN_BN[opt.value] : opt.label}</option>
               ))}
             </select>
 
@@ -1334,7 +1343,7 @@ export default function RequestsPage() {
               aria-label="Sort by"
             >
               {SORT_OPTIONS.map(opt => (
-                <option key={opt.value} value={opt.value}>Sort: {opt.label}</option>
+                <option key={opt.value} value={opt.value}>{isBn ? `সাজানো: ${SORT_BN[opt.value]}` : `Sort: ${opt.label}`}</option>
               ))}
             </select>
 
@@ -1365,7 +1374,7 @@ export default function RequestsPage() {
                 className="inline-flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] font-semibold text-red-600 hover:bg-red-50 transition-colors"
               >
                 <X className="w-3 h-3" />
-                Clear ({activeFilterCount})
+                {isBn ? `মুছুন (${activeFilterCount})` : `Clear (${activeFilterCount})`}
               </button>
             )}
           </div>

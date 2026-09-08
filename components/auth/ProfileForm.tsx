@@ -3653,7 +3653,10 @@ export default function ProfileForm() {
       )}
 
       {showQrScanner && role === "donor" && (
-        <DonorQrScanner onClose={() => setShowQrScanner(false)} />
+        <DonorQrScanner
+          onClose={() => setShowQrScanner(false)}
+          onRecorded={fetchProfile}
+        />
       )}
     </div>
   );

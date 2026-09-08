@@ -30,7 +30,7 @@ import {
 type Phase = "scan" | "looking-up" | "confirm" | "recording" | "success" | "error";
 type ScanMode = "camera" | "upload";
 
-export default function DonorQrScanner({ onClose }: { onClose: () => void }) {
+export default function DonorQrScanner({ onClose, onRecorded }: { onClose: () => void; onRecorded?: () => void }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const controlsRef = useRef<{ stop: () => void } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -231,6 +231,7 @@ export default function DonorQrScanner({ onClose }: { onClose: () => void }) {
       });
       if (result.success) {
         setPhase("success");
+        onRecorded?.();
       } else {
         setRecordingError(result.error || "Failed to record donation");
         setPhase("error");
