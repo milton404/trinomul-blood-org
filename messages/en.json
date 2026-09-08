@@ -1065,7 +1065,9 @@
     "requestBlood": "Request blood",
     "options": "Options",
     "likeCount": "{count} likes",
-    "likeCountOne": "1 like"
+    "likeCountOne": "1 like",
+    "unlike": "Unlike",
+    "community": "Community"
   },
   "donor_application": {
     "page_title": "Become a Blood Donor",

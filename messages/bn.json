@@ -1065,7 +1065,9 @@
     "requestBlood": "রক্তের অনুরোধ করুন",
     "options": "অপশন",
     "likeCount": "{count} জনের পছন্দ",
-    "likeCountOne": "1 জনের পছন্দ"
+    "likeCountOne": "1 জনের পছন্দ",
+    "unlike": "আনলাইক",
+    "community": "কমিউনিটি"
   },
   "donor_application": {
     "page_title": "রক্তদাতা হিসেবে নিবন্ধন করুন",
