@@ -1253,6 +1253,79 @@ export async function getActivityLogPg(filters?: {
   return { rows, total };
 }
 
+// ── Contact messages ─────────────────────────────────────────────────
+
+export async function insertContactMessagePg(entry: {
+  name: string;
+  email: string;
+  phone?: string | null;
+  subject?: string | null;
+  message: string;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+}): Promise<number> {
+  const { rows } = await query<{ id: number }>(
+    `INSERT INTO contact_messages (name, email, phone, subject, message, ip_address, user_agent)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+    [
+      entry.name,
+      entry.email,
+      entry.phone ?? null,
+      entry.subject ?? null,
+      entry.message,
+      entry.ipAddress ?? null,
+      entry.userAgent ?? null,
+    ],
+  );
+  return rows[0].id;
+}
+
+export async function getContactMessagesPg(filters?: {
+  limit?: number;
+  offset?: number;
+  search?: string;
+  unreadOnly?: boolean;
+}) {
+  let sql = "SELECT * FROM contact_messages WHERE 1=1";
+  const params: any[] = [];
+  let p = 1;
+  if (filters?.search) {
+    sql += ` AND (name LIKE $${p} OR email LIKE $${p} OR subject LIKE $${p} OR message LIKE $${p})`;
+    params.push(`%${filters.search}%`);
+    p++;
+  }
+  if (filters?.unreadOnly) {
+    sql += ` AND is_read = FALSE`;
+  }
+
+  const countSqlStr = sql.replace("SELECT *", "SELECT COUNT(*) as count");
+  const total = await countSql(countSqlStr, [...params]);
+
+  sql += " ORDER BY created_at DESC";
+  if (filters?.limit) {
+    sql += ` LIMIT $${p++} OFFSET $${p++}`;
+    params.push(filters.limit, filters.offset || 0);
+  }
+
+  const { rows } = await query(sql, params);
+  return { rows, total };
+}
+
+export async function markContactMessageReadPg(id: number): Promise<boolean> {
+  const { rowCount } = await query(
+    "UPDATE contact_messages SET is_read = TRUE WHERE id = $1",
+    [id],
+  );
+  return (rowCount || 0) > 0;
+}
+
+export async function getUnreadContactMessageCountPg(): Promise<number> {
+  const { rows } = await query<{ count: number }>(
+    "SELECT COUNT(*) as count FROM contact_messages WHERE is_read = FALSE",
+  );
+  return rows[0]?.count || 0;
+}
+
 // ── Bulk operations ──────────────────────────────────────────────────
 
 export async function bulkDeleteProfilesPg(ids: number[]): Promise<number> {

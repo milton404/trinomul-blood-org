@@ -442,6 +442,23 @@ CREATE TABLE IF NOT EXISTS email_settings (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ── contact_messages (public contact-form submissions) ─────────────────────
+CREATE TABLE IF NOT EXISTS contact_messages (
+  id BIGSERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  phone TEXT,
+  subject TEXT,
+  message TEXT NOT NULL,
+  ip_address TEXT,
+  user_agent TEXT,
+  is_read BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_contact_messages_created ON contact_messages(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_contact_messages_is_read ON contact_messages(is_read);
+
 -- ── schema_migrations (tracking) ──────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS schema_migrations (
   id BIGSERIAL PRIMARY KEY,

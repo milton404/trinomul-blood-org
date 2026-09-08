@@ -68,6 +68,7 @@ const navGroups: { titleKey: string; items: NavItem[] }[] = [
       { href: "/admin/organizations", labelKey: "nav_organizations", icon: Building2 },
       { href: "/admin/saved-patients", labelKey: "saved_patients", icon: Heart },
       { href: "/admin/social", labelKey: "social_management", icon: Users },
+      { href: "/admin/contact-messages", labelKey: "nav_contact_messages", icon: Mail },
     ],
   },
   {

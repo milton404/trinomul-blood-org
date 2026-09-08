@@ -112,6 +112,10 @@ import {
   getMyNotifications,
   markNotificationRead,
   markAllNotificationsRead,
+  insertContactMessage as dbInsertContactMessage,
+  getContactMessages as dbGetContactMessages,
+  markContactMessageRead as dbMarkContactMessageRead,
+  getUnreadContactMessageCount as dbGetUnreadContactMessageCount,
 
   runRequestLifecycleSweep,
   purgeOldArchivedRequests,
@@ -154,6 +158,7 @@ import {
   sendApplicationApprovedEmail,
   dispatchBloodRequestEmails,
 } from "./email";
+import { sendContactMessageEmail } from "./email/templates/contact-message";
 import {
   getEmailSettingBool,
   getEmailSettingInt,
@@ -276,6 +281,10 @@ import {
   recordContactClickPg,
   getDonorContactClickStatsPg,
   searchReferrerCandidatesPg,
+  insertContactMessagePg,
+  getContactMessagesPg,
+  markContactMessageReadPg,
+  getUnreadContactMessageCountPg,
 } from "@/lib/pg/queries";
 
 // Profile actions
@@ -4212,8 +4221,10 @@ export async function serverSubmitNidForVerification(
       /* activity log is best-effort */
     }
 
-    return { success: true };
-  }
+  return { success: true };
+}
+
+
   dbUpdateProfile(userId, {
     nid_number: nidNumber,
     nid_front_url: input.nidFrontUrl,
@@ -4899,5 +4910,96 @@ export async function serverRejectDonorApplication(
   } catch {}
 
   return { success: true };
+}
+
+// ── Contact messages (public form → admin review) ─────────────────────
+
+const ORG_INBOX =
+  process.env.ORG_INBOX || "trinomulpaglapir2017@gmail.com";
+
+/** Public: submit the contact form. Persists the message and emails the
+ *  org inbox (best-effort). No auth required. */
+export async function serverSubmitContactMessage(input: {
+  name: string;
+  email: string;
+  phone?: string;
+  subject?: string;
+  message: string;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+}): Promise<{ success: boolean; error?: string }> {
+  const name = (input.name || "").trim();
+  const email = (input.email || "").trim();
+  const message = (input.message || "").trim();
+  if (!name || !email || !message) {
+    return { success: false, error: "Name, email, and message are required." };
+  }
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return { success: false, error: "Invalid email address." };
+  }
+  if (name.length > 200 || email.length > 200 || message.length > 5000) {
+    return { success: false, error: "Input too long." };
+  }
+
+  const entry = {
+    name,
+    email,
+    phone: (input.phone || "").trim() || null,
+    subject: (input.subject || "").trim() || null,
+    message,
+    ipAddress: input.ipAddress ?? null,
+    userAgent: input.userAgent ?? null,
+  };
+
+  try {
+    if (isSupabaseAvailable()) {
+      await insertContactMessagePg(entry);
+    } else {
+      dbInsertContactMessage(entry);
+    }
+  } catch (e) {
+    console.error("Failed to save contact message:", e);
+    return { success: false, error: "Failed to submit. Please try again." };
+  }
+
+  // Best-effort email to the org inbox — never throws.
+  try {
+    await sendContactMessageEmail(
+      { name, email, phone: entry.phone, subject: entry.subject, message },
+      ORG_INBOX,
+    );
+  } catch (e) {
+    console.error("Failed to send contact email:", e);
+  }
+
+  return { success: true };
+}
+
+/** Admin: list contact messages (paginated, optional search). */
+export async function serverGetContactMessages(filters?: {
+  limit?: number;
+  offset?: number;
+  search?: string;
+  unreadOnly?: boolean;
+}) {
+  await requireAdmin();
+  if (isSupabaseAvailable()) return getContactMessagesPg(filters);
+  return dbGetContactMessages(filters);
+}
+
+/** Admin: mark a contact message as read. */
+export async function serverMarkContactMessageRead(
+  id: number,
+): Promise<boolean> {
+  await requireAdmin();
+  if (isSupabaseAvailable()) return markContactMessageReadPg(id);
+  return dbMarkContactMessageRead(id);
+}
+
+/** Admin: unread count for the sidebar badge / dashboard. */
+export async function serverGetUnreadContactMessageCount(): Promise<number> {
+  await requireAdmin();
+  if (isSupabaseAvailable()) return getUnreadContactMessageCountPg();
+  return dbGetUnreadContactMessageCount();
 }
 

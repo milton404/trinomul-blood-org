@@ -732,6 +732,28 @@ function initTables(db: Database.Database) {
     "CREATE INDEX IF NOT EXISTS idx_activity_log_action ON activity_log(action)",
   );
 
+  // ── Contact-form submissions (public → admin review) ─────────────────────
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS contact_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      email TEXT NOT NULL,
+      phone TEXT,
+      subject TEXT,
+      message TEXT NOT NULL,
+      ip_address TEXT,
+      user_agent TEXT,
+      is_read INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_contact_messages_created ON contact_messages(created_at DESC)",
+  );
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_contact_messages_is_read ON contact_messages(is_read)",
+  );
+
   // ── Donor Identity Verification (NID + admin approval) ─────────────────
   // A donor uploads both sides of their NID (Cloudinary URLs) and enters
   // their NID number. An admin/super_admin then calls the donor to confirm
@@ -4656,6 +4678,84 @@ export function getActivityLog(filters?: {
   const total = db.prepare(countSql).get(...countParams) as { total: number };
   const rows = db.prepare(sql).all(...params);
   return { rows, total: total?.total || 0 };
+}
+
+// ── Contact messages (public contact-form submissions) ────────────────
+
+export function insertContactMessage(entry: {
+  name: string;
+  email: string;
+  phone?: string | null;
+  subject?: string | null;
+  message: string;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+}): number {
+  const db = getDb();
+  return db
+    .prepare(
+      `INSERT INTO contact_messages (name, email, phone, subject, message, ip_address, user_agent)
+       VALUES (@name, @email, @phone, @subject, @message, @ipAddress, @userAgent)`,
+    )
+    .run({
+      name: entry.name,
+      email: entry.email,
+      phone: entry.phone ?? null,
+      subject: entry.subject ?? null,
+      message: entry.message,
+      ipAddress: entry.ipAddress ?? null,
+      userAgent: entry.userAgent ?? null,
+    }).lastInsertRowid as number;
+}
+
+export function getContactMessages(filters?: {
+  limit?: number;
+  offset?: number;
+  search?: string;
+  unreadOnly?: boolean;
+}) {
+  const db = getDb();
+  let sql = "SELECT * FROM contact_messages WHERE 1=1";
+  const params: any[] = [];
+  if (filters?.search) {
+    sql += " AND (name LIKE ? OR email LIKE ? OR subject LIKE ? OR message LIKE ?)";
+    const q = `%${filters.search}%`;
+    params.push(q, q, q, q);
+  }
+  if (filters?.unreadOnly) {
+    sql += " AND is_read = 0";
+  }
+  sql += " ORDER BY created_at DESC";
+
+  const countSql = sql
+    .replace("SELECT *", "SELECT COUNT(*) as total")
+    .replace(/ ORDER BY .*/, "");
+  const countParams = [...params];
+
+  if (filters?.limit) {
+    sql += " LIMIT ? OFFSET ?";
+    params.push(filters.limit, filters.offset || 0);
+  }
+
+  const total = db.prepare(countSql).get(...countParams) as { total: number };
+  const rows = db.prepare(sql).all(...params);
+  return { rows, total: total?.total || 0 };
+}
+
+export function markContactMessageRead(id: number): boolean {
+  const db = getDb();
+  const result = db
+    .prepare("UPDATE contact_messages SET is_read = 1 WHERE id = ?")
+    .run(id);
+  return result.changes > 0;
+}
+
+export function getUnreadContactMessageCount(): number {
+  const db = getDb();
+  const row = db
+    .prepare("SELECT COUNT(*) as count FROM contact_messages WHERE is_read = 0")
+    .get() as { count: number };
+  return row?.count || 0;
 }
 
 
