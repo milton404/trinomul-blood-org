@@ -1315,7 +1315,10 @@ function mapSocialPostRow(r: any, viewerId: number | null) {
 const URGENCY_WEIGHT: Record<string, number> = { critical: 3, urgent: 2.5, high: 2, normal: 1.5, low: 1 };
 
 function scoreFeedItem(item: any): number {
-  const createdMs = item.createdAt ? new Date(String(item.createdAt).replace(" ", "T") + "Z").getTime() : Date.now();
+  const raw = item.createdAt ? String(item.createdAt) : "";
+  const normalized = raw.includes("T") ? raw : raw.replace(" ", "T");
+  const hasTz = /[+-]\d{2}:?\d{2}$/.test(normalized) || normalized.endsWith("Z");
+  const createdMs = normalized ? new Date(hasTz ? normalized : normalized + "Z").getTime() : Date.now();
   const ageHours = Math.max(0, (Date.now() - createdMs) / 3_600_000);
   const recency = 1 / (1 + ageHours / 24);
   let typeBoost = 1;

@@ -1,9 +1,13 @@
 import { format } from "date-fns";
 
 /** Human-friendly "posted at" label, matching the request card style. */
-export function formatPostedAt(iso: string): string {
+export function formatPostedAt(iso: string | Date | null | undefined): string {
   if (!iso) return "";
-  const d = new Date(iso.replace(" ", "T") + "Z");
+  const str = typeof iso === "string" ? iso : iso instanceof Date ? iso.toISOString() : String(iso);
+  // Handle SQLite ("2026-01-01 12:00:00"), pg ("2026-01-01 12:00:00+00"), and ISO ("2026-01-01T12:00:00Z")
+  const normalized = str.includes("T") ? str : str.replace(" ", "T");
+  const hasTz = /[+-]\d{2}:?\d{2}$/.test(normalized) || normalized.endsWith("Z");
+  const d = new Date(hasTz ? normalized : normalized + "Z");
   if (Number.isNaN(d.getTime())) return "";
   const now = new Date();
   const sameDay =

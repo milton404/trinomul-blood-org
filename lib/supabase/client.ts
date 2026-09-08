@@ -2,10 +2,19 @@
 // Supabase is used as managed PostgreSQL. We connect directly with the `pg`
 // driver (raw SQL) because the app uses custom JWT auth — NOT Supabase Auth —
 // so RLS/`auth.uid()` do not apply. Keep this module out of client bundles.
-import { Pool, type PoolConfig } from "pg";
+import { Pool, type PoolConfig, types } from "pg";
 import { createLogger } from "@/lib/logging/logger";
 
 const logger = createLogger("supabase");
+
+// Force pg to return strings for all date/time types instead of JS Date objects.
+// RSC server-action serialization can transmit Date objects, but client-side
+// formatters (e.g. formatPostedAt) expect ISO strings and crash on .replace().
+const pgStringParser = (val: string) => val;
+types.setTypeParser(types.builtins.TIMESTAMPTZ, pgStringParser);
+types.setTypeParser(types.builtins.TIMESTAMP, pgStringParser);
+types.setTypeParser(types.builtins.DATE, pgStringParser);
+types.setTypeParser(types.builtins.TIME, pgStringParser);
 
 // Connection string for Supabase Postgres. For serverless/multi-instance use
 // the "Session pooler" (PgBouncer, port 6543) string from:
