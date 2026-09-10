@@ -5390,9 +5390,11 @@ export async function serverPurgeProfiles(ids: number[]): Promise<PurgeResult> {
 
 export async function serverPurgePosts(ids: number[]): Promise<PurgeResult> {
   await requireFullAdmin();
+  if (ids.length === 0) return { purged: 0, skipped: 0, errors: [] };
   if (isSupabaseAvailable()) {
+    const placeholders = ids.map((_, i) => `$${i + 1}`).join(", ");
     const { rowCount } = await pgQuery(
-      `DELETE FROM social_posts WHERE id = ANY($1::bigint[]) AND status = 'deleted'`, [ids],
+      `DELETE FROM social_posts WHERE id IN (${placeholders}) AND status = 'deleted'`, ids,
     );
     return { purged: rowCount ?? 0, skipped: 0, errors: [] };
   }
@@ -5405,10 +5407,12 @@ export async function serverPurgePosts(ids: number[]): Promise<PurgeResult> {
 
 export async function serverPurgeRequests(ids: number[]): Promise<PurgeResult> {
   await requireFullAdmin();
+  if (ids.length === 0) return { purged: 0, skipped: 0, errors: [] };
   if (isSupabaseAvailable()) {
-    await pgQuery(`DELETE FROM request_translations WHERE request_id = ANY($1::bigint[])`, [ids]);
+    const placeholders = ids.map((_, i) => `$${i + 1}`).join(", ");
+    await pgQuery(`DELETE FROM request_translations WHERE request_id IN (${placeholders})`, ids);
     const { rowCount } = await pgQuery(
-      `DELETE FROM blood_requests WHERE id = ANY($1::bigint[]) AND archived_at IS NOT NULL`, [ids],
+      `DELETE FROM blood_requests WHERE id IN (${placeholders}) AND archived_at IS NOT NULL`, ids,
     );
     return { purged: rowCount ?? 0, skipped: 0, errors: [] };
   }
@@ -5422,9 +5426,11 @@ export async function serverPurgeRequests(ids: number[]): Promise<PurgeResult> {
 
 export async function serverPurgeOrganizations(ids: number[]): Promise<PurgeResult> {
   await requireFullAdmin();
+  if (ids.length === 0) return { purged: 0, skipped: 0, errors: [] };
   if (isSupabaseAvailable()) {
+    const placeholders = ids.map((_, i) => `$${i + 1}`).join(", ");
     const { rowCount } = await pgQuery(
-      `DELETE FROM organizations WHERE id = ANY($1::bigint[]) AND is_active = false`, [ids],
+      `DELETE FROM organizations WHERE id IN (${placeholders}) AND is_active = false`, ids,
     );
     return { purged: rowCount ?? 0, skipped: 0, errors: [] };
   }
@@ -5437,9 +5443,11 @@ export async function serverPurgeOrganizations(ids: number[]): Promise<PurgeResu
 
 export async function serverPurgeStories(ids: number[]): Promise<PurgeResult> {
   await requireFullAdmin();
+  if (ids.length === 0) return { purged: 0, skipped: 0, errors: [] };
   if (isSupabaseAvailable()) {
+    const placeholders = ids.map((_, i) => `$${i + 1}`).join(", ");
     const { rowCount } = await pgQuery(
-      `DELETE FROM stories WHERE id = ANY($1::bigint[]) AND expires_at < NOW()`, [ids],
+      `DELETE FROM stories WHERE id IN (${placeholders}) AND expires_at < NOW()`, ids,
     );
     return { purged: rowCount ?? 0, skipped: 0, errors: [] };
   }
