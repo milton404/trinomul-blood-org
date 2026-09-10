@@ -153,6 +153,7 @@ interface RequestCardProps {
     distance_km?: number | null;
     view_count?: number | null;
     patient_hb_level?: number | null;
+    donated_units?: number | null;
   };
 }
 
@@ -429,7 +430,15 @@ export default function RequestCard({ request }: RequestCardProps) {
   const trackingUrl = trackingId ? `/${locale}/track/${trackingId}` : null;
   const currentStatus = request.current_status || "submitted";
   const statusInfo = statusConfig[currentStatus] || statusConfig.submitted;
-  const statusLabel = locale === "bn" ? statusInfo.bn : statusInfo.en;
+  const donatedUnits = Number(request.donated_units ?? 0);
+  const unitsNeededNum = Number(request.units_needed ?? 1);
+  const remainingUnits = Math.max(0, unitsNeededNum - donatedUnits);
+  const statusLabel =
+    currentStatus === "donating" && donatedUnits > 0
+      ? (locale === "bn"
+        ? `দান হয়েছে (${donatedUnits}) · দরকার (${remainingUnits})`
+        : `Donated (${donatedUnits}) · Need (${remainingUnits})`)
+      : (locale === "bn" ? statusInfo.bn : statusInfo.en);
   const urgency = urgencyConfig[request.urgency_level] || urgencyConfig.normal;
   const urgencyLabel = locale === "bn" ? urgency.bn : urgency.en;
   const unitsLabel =

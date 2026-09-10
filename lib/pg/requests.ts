@@ -157,7 +157,11 @@ export async function runRequestLifecycleSweepPg(
 export async function getVisibleBloodRequestsPg() {
   await runRequestLifecycleSweepPg();
   const { rows } = await query(
-    "SELECT * FROM blood_requests WHERE archived_at IS NULL ORDER BY created_at DESC",
+    `SELECT br.*, COALESCE(d.total, 0) AS donated_units
+     FROM blood_requests br
+     LEFT JOIN (SELECT request_id, SUM(COALESCE(units, 1)) AS total FROM donations GROUP BY request_id) d
+       ON d.request_id = br.id
+     WHERE br.archived_at IS NULL ORDER BY br.created_at DESC`,
   );
   const now = Date.now();
   return rows.map((r: any) => ({
@@ -190,13 +194,24 @@ export async function getAllBloodRequestsPg() {
 }
 
 export async function getBloodRequestByIdPg(id: number) {
-  const { rows } = await query("SELECT * FROM blood_requests WHERE id = $1", [id]);
+  const { rows } = await query(
+    `SELECT br.*, COALESCE(d.total, 0) AS donated_units
+     FROM blood_requests br
+     LEFT JOIN (SELECT request_id, SUM(COALESCE(units, 1)) AS total FROM donations GROUP BY request_id) d
+       ON d.request_id = br.id
+     WHERE br.id = $1`,
+    [id],
+  );
   return rows[0] || null;
 }
 
 export async function getBloodRequestByTrackingCodePg(code: string) {
   const { rows } = await query(
-    "SELECT * FROM blood_requests WHERE tracking_code = $1",
+    `SELECT br.*, COALESCE(d.total, 0) AS donated_units
+     FROM blood_requests br
+     LEFT JOIN (SELECT request_id, SUM(COALESCE(units, 1)) AS total FROM donations GROUP BY request_id) d
+       ON d.request_id = br.id
+     WHERE br.tracking_code = $1`,
     [code],
   );
   return rows[0] || null;

@@ -316,6 +316,15 @@ export default function TrackingPage() {
               <p className="font-semibold text-slate-900">{request?.units_needed}</p>
             </div>
 
+            <div>
+              <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">
+                {params.locale === "bn" ? "ইউনিট দান হয়েছে" : "Units Donated"}
+              </p>
+              <p className="font-semibold text-slate-900">
+                {Number(request?.donated_units ?? 0)} / {request?.units_needed}
+              </p>
+            </div>
+
             <div className="col-span-2">
               <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">
                 Hospital

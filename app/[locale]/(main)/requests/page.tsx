@@ -419,6 +419,7 @@ export default function RequestsPage() {
     patient_hb_level: r.patient_hb_level ?? null,
     distance_km: r._distanceKm ?? null,
     view_count: r.view_count ?? 0,
+    donated_units: r.donated_units ?? 0,
   });
 
   const closeFocusedRequest = () => {

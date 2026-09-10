@@ -1592,7 +1592,11 @@ export function getVisibleBloodRequests() {
   const db = getDb();
   const rows = db
     .prepare(
-      "SELECT * FROM blood_requests WHERE archived_at IS NULL ORDER BY created_at DESC",
+      `SELECT br.*, COALESCE(d.total, 0) AS donated_units
+       FROM blood_requests br
+       LEFT JOIN (SELECT request_id, SUM(COALESCE(units, 1)) AS total FROM donations GROUP BY request_id) d
+         ON d.request_id = br.id
+       WHERE br.archived_at IS NULL ORDER BY br.created_at DESC`,
     )
     .all() as any[];
   const now = Date.now();
