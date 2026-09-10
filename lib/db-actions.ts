@@ -1323,7 +1323,7 @@ export async function serverRecordDonationByScan(
   });
 
   // Lifecycle mirror of the PG path: fulfill when units met, else "donating".
-  const db = getDb();
+
   const totalRow = db
     .prepare("SELECT COALESCE(SUM(units), 0) AS total FROM donations WHERE request_id = ?")
     .get(input.requestId) as { total: number };
