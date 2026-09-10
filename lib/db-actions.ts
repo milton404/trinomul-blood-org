@@ -5159,3 +5159,294 @@ export async function serverGetUnreadContactMessageCount(): Promise<number> {
   return dbGetUnreadContactMessageCount();
 }
 
+// ── Admin Cleanup / Deletion Manager ──────────────────────────────────────
+
+export interface DeactivatedProfile {
+  id: number;
+  full_name_en: string | null;
+  full_name_bn: string | null;
+  email: string;
+  role: string;
+  blood_group: string | null;
+  district: string | null;
+  upazila: string | null;
+  created_at: string;
+  updated_at: string | null;
+  donation_count: number;
+}
+
+export interface DeletedPost {
+  id: number;
+  author_name: string | null;
+  content_preview: string;
+  created_at: string;
+  images_count: number;
+}
+
+export interface ArchivedRequest {
+  id: number;
+  tracking_code: string;
+  patient_name: string | null;
+  blood_group: string;
+  status: string;
+  archive_reason: string | null;
+  archived_at: string;
+  created_at: string;
+  units_needed: number;
+}
+
+export interface DeactivatedOrg {
+  id: number;
+  name_en: string | null;
+  name_bn: string | null;
+  email: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface ExpiredStory {
+  id: number;
+  author_name: string | null;
+  created_at: string;
+  expires_at: string;
+  views_count: number;
+}
+
+export async function serverGetDeactivatedProfiles(): Promise<DeactivatedProfile[]> {
+  await requireFullAdmin();
+  if (isSupabaseAvailable()) {
+    const { rows } = await pgQuery<DeactivatedProfile>(
+      `SELECT p.id, p.full_name_en, p.full_name_bn, p.email, p.role, p.blood_group,
+              p.district, p.upazila, p.created_at::text, p.updated_at::text,
+              COALESCE((SELECT COUNT(*) FROM donations d WHERE d.donor_id = p.id), 0) AS donation_count
+       FROM profiles p
+       WHERE p.is_active = false
+       ORDER BY p.updated_at DESC NULLS LAST`,
+    );
+    return rows;
+  }
+  const { getDb } = await import("@/lib/db");
+  const db = getDb();
+  return db.prepare(
+    `SELECT p.id, p.full_name_en, p.full_name_bn, p.email, p.role, p.blood_group,
+            p.district, p.upazila, p.created_at, p.updated_at,
+            (SELECT COUNT(*) FROM donations d WHERE d.donor_id = p.id) AS donation_count
+     FROM profiles p
+     WHERE p.is_active = 0
+     ORDER BY p.updated_at DESC`,
+  ).all() as DeactivatedProfile[];
+}
+
+export async function serverGetDeletedPosts(): Promise<DeletedPost[]> {
+  await requireFullAdmin();
+  if (isSupabaseAvailable()) {
+    const { rows } = await pgQuery<DeletedPost>(
+      `SELECT s.id,
+              COALESCE(p.full_name_en, p.email) AS author_name,
+              LEFT(s.content, 80) AS content_preview,
+              s.created_at::text,
+              COALESCE(array_length(s.images, 1), 0) AS images_count
+       FROM social_posts s
+       LEFT JOIN profiles p ON s.author_id = p.id
+       WHERE s.status = 'deleted'
+       ORDER BY s.created_at DESC`,
+    );
+    return rows;
+  }
+  const { getDb } = await import("@/lib/db");
+  const db = getDb();
+  return db.prepare(
+    `SELECT s.id,
+            COALESCE(p.full_name_en, p.email) AS author_name,
+            SUBSTR(s.content, 1, 80) AS content_preview,
+            s.created_at,
+            CASE WHEN s.images IS NULL OR s.images = '' THEN 0
+                 ELSE LENGTH(s.images) - LENGTH(REPLACE(s.images, ',', '')) + 1 END AS images_count
+     FROM social_posts s
+     LEFT JOIN profiles p ON s.author_id = p.id
+     WHERE s.status = 'deleted'
+     ORDER BY s.created_at DESC`,
+  ).all() as DeletedPost[];
+}
+
+export async function serverGetArchivedRequests(): Promise<ArchivedRequest[]> {
+  await requireFullAdmin();
+  if (isSupabaseAvailable()) {
+    const { rows } = await pgQuery<ArchivedRequest>(
+      `SELECT id, tracking_code, patient_name, blood_group, status,
+              archive_reason, archived_at::text, created_at::text, units_needed
+       FROM blood_requests
+       WHERE archived_at IS NOT NULL
+       ORDER BY archived_at DESC`,
+    );
+    return rows;
+  }
+  const { getDb } = await import("@/lib/db");
+  const db = getDb();
+  return db.prepare(
+    `SELECT id, tracking_code, patient_name, blood_group, status,
+            archive_reason, archived_at, created_at, units_needed
+     FROM blood_requests
+     WHERE archived_at IS NOT NULL
+     ORDER BY archived_at DESC`,
+  ).all() as ArchivedRequest[];
+}
+
+export async function serverGetDeactivatedOrganizations(): Promise<DeactivatedOrg[]> {
+  await requireFullAdmin();
+  if (isSupabaseAvailable()) {
+    const { rows } = await pgQuery<DeactivatedOrg>(
+      `SELECT id, name_en, name_bn, email, created_at::text, updated_at::text
+       FROM organizations
+       WHERE is_active = false
+       ORDER BY updated_at DESC NULLS LAST`,
+    );
+    return rows;
+  }
+  const { getDb } = await import("@/lib/db");
+  const db = getDb();
+  return db.prepare(
+    `SELECT id, name_en, name_bn, email, created_at, updated_at
+     FROM organizations
+     WHERE is_active = 0
+     ORDER BY updated_at DESC`,
+  ).all() as DeactivatedOrg[];
+}
+
+export async function serverGetExpiredStories(): Promise<ExpiredStory[]> {
+  await requireFullAdmin();
+  if (isSupabaseAvailable()) {
+    const { rows } = await pgQuery<ExpiredStory>(
+      `SELECT s.id,
+              COALESCE(p.full_name_en, p.email) AS author_name,
+              s.created_at::text,
+              s.expires_at::text,
+              COALESCE((SELECT COUNT(*) FROM story_views sv WHERE sv.story_id = s.id), 0) AS views_count
+       FROM stories s
+       LEFT JOIN profiles p ON s.author_id = p.id
+       WHERE s.expires_at < NOW()
+       ORDER BY s.expires_at DESC`,
+    );
+    return rows;
+  }
+  const { getDb } = await import("@/lib/db");
+  const db = getDb();
+  return db.prepare(
+    `SELECT s.id,
+            COALESCE(p.full_name_en, p.email) AS author_name,
+            s.created_at,
+            s.expires_at,
+            (SELECT COUNT(*) FROM story_views sv WHERE sv.story_id = s.id) AS views_count
+     FROM stories s
+     LEFT JOIN profiles p ON s.author_id = p.id
+     WHERE s.expires_at < datetime('now')
+     ORDER BY s.expires_at DESC`,
+  ).all() as ExpiredStory[];
+}
+
+export interface PurgeResult {
+  purged: number;
+  skipped: number;
+  errors: string[];
+}
+
+export async function serverPurgeProfiles(ids: number[]): Promise<PurgeResult> {
+  await requireFullAdmin();
+  const errors: string[] = [];
+  let purged = 0;
+  let skipped = 0;
+
+  if (isSupabaseAvailable()) {
+    for (const id of ids) {
+      const { rows } = await pgQuery<{ count: string }>(
+        `SELECT COUNT(*)::text AS count FROM donations WHERE donor_id = $1`, [id],
+      );
+      const donationCount = Number(rows[0]?.count ?? 0);
+      if (donationCount > 0) {
+        skipped++;
+        errors.push(`Profile ${id}: has ${donationCount} donations — skipped to preserve donation data`);
+        continue;
+      }
+      await pgQuery(`DELETE FROM profiles WHERE id = $1 AND is_active = false AND role NOT IN ('admin', 'super_admin')`, [id]);
+      purged++;
+    }
+    return { purged, skipped, errors };
+  }
+
+  const { getDb } = await import("@/lib/db");
+  const db = getDb();
+  for (const id of ids) {
+    const donationCount = db.prepare(`SELECT COUNT(*) AS count FROM donations WHERE donor_id = ?`).get(id) as { count: number };
+    if (donationCount.count > 0) {
+      skipped++;
+      errors.push(`Profile ${id}: has ${donationCount.count} donations — skipped to preserve donation data`);
+      continue;
+    }
+    db.prepare(`DELETE FROM profiles WHERE id = ? AND is_active = 0 AND role NOT IN ('admin', 'super_admin')`).run(id);
+    purged++;
+  }
+  return { purged, skipped, errors };
+}
+
+export async function serverPurgePosts(ids: number[]): Promise<PurgeResult> {
+  await requireFullAdmin();
+  if (isSupabaseAvailable()) {
+    const { rowCount } = await pgQuery(
+      `DELETE FROM social_posts WHERE id = ANY($1::bigint[]) AND status = 'deleted'`, [ids],
+    );
+    return { purged: rowCount ?? 0, skipped: 0, errors: [] };
+  }
+  const { getDb } = await import("@/lib/db");
+  const db = getDb();
+  const placeholders = ids.map(() => "?").join(",");
+  const info = db.prepare(`DELETE FROM social_posts WHERE id IN (${placeholders}) AND status = 'deleted'`).run(...ids);
+  return { purged: info.changes, skipped: 0, errors: [] };
+}
+
+export async function serverPurgeRequests(ids: number[]): Promise<PurgeResult> {
+  await requireFullAdmin();
+  if (isSupabaseAvailable()) {
+    await pgQuery(`DELETE FROM request_translations WHERE request_id = ANY($1::bigint[])`, [ids]);
+    const { rowCount } = await pgQuery(
+      `DELETE FROM blood_requests WHERE id = ANY($1::bigint[]) AND archived_at IS NOT NULL`, [ids],
+    );
+    return { purged: rowCount ?? 0, skipped: 0, errors: [] };
+  }
+  const { getDb } = await import("@/lib/db");
+  const db = getDb();
+  const placeholders = ids.map(() => "?").join(",");
+  db.prepare(`DELETE FROM request_translations WHERE request_id IN (${placeholders})`).run(...ids);
+  const info = db.prepare(`DELETE FROM blood_requests WHERE id IN (${placeholders}) AND archived_at IS NOT NULL`).run(...ids);
+  return { purged: info.changes, skipped: 0, errors: [] };
+}
+
+export async function serverPurgeOrganizations(ids: number[]): Promise<PurgeResult> {
+  await requireFullAdmin();
+  if (isSupabaseAvailable()) {
+    const { rowCount } = await pgQuery(
+      `DELETE FROM organizations WHERE id = ANY($1::bigint[]) AND is_active = false`, [ids],
+    );
+    return { purged: rowCount ?? 0, skipped: 0, errors: [] };
+  }
+  const { getDb } = await import("@/lib/db");
+  const db = getDb();
+  const placeholders = ids.map(() => "?").join(",");
+  const info = db.prepare(`DELETE FROM organizations WHERE id IN (${placeholders}) AND is_active = 0`).run(...ids);
+  return { purged: info.changes, skipped: 0, errors: [] };
+}
+
+export async function serverPurgeStories(ids: number[]): Promise<PurgeResult> {
+  await requireFullAdmin();
+  if (isSupabaseAvailable()) {
+    const { rowCount } = await pgQuery(
+      `DELETE FROM stories WHERE id = ANY($1::bigint[]) AND expires_at < NOW()`, [ids],
+    );
+    return { purged: rowCount ?? 0, skipped: 0, errors: [] };
+  }
+  const { getDb } = await import("@/lib/db");
+  const db = getDb();
+  const placeholders = ids.map(() => "?").join(",");
+  const info = db.prepare(`DELETE FROM stories WHERE id IN (${placeholders}) AND expires_at < datetime('now')`).run(...ids);
+  return { purged: info.changes, skipped: 0, errors: [] };
+}
+

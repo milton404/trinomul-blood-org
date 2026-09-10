@@ -27,6 +27,7 @@ import {
   UserPlus,
   Trophy,
   DatabaseBackup,
+  Trash2,
 } from "lucide-react";
 import { serverLogout } from "@/lib/auth/actions";
 import { toast } from "sonner";
@@ -87,6 +88,7 @@ const navGroups: { titleKey: string; items: NavItem[] }[] = [
       { href: "/admin/manage-admins", labelKey: "manage_admins", icon: ShieldCheck, fullAdminOnly: true },
       { href: "/admin/settings", labelKey: "settings", icon: Settings, fullAdminOnly: true },
       { href: "/admin/backup", labelKey: "backup", icon: DatabaseBackup, fullAdminOnly: true },
+      { href: "/admin/cleanup", labelKey: "cleanup", icon: Trash2, fullAdminOnly: true },
     ],
   },
 ];
