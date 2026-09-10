@@ -799,6 +799,8 @@
     "cleanup_donation_protection": "Donation records, referrer data, and donor contribution counts are NEVER deleted by this tool. Profiles with existing donations are automatically skipped.",
     "cleanup_donation_warning_title": "Some profiles have donations",
     "cleanup_donation_warning_body": "Profiles with donation history are automatically skipped during purge to preserve donation counts and referrer data. Only profiles with 0 donations can be purged.",
+    "cleanup_profiles_manual_only_title": "Deactivated profiles are NOT auto-purged",
+    "cleanup_profiles_manual_only_body": "Deactivated accounts can be reactivated by an admin, so the weekly auto-purge does NOT touch them. This tab is for manual cleanup only — purge only if you're sure the account will never be reactivated.",
     "cleanup_nothing_to_clean": "Nothing to clean — no soft-deleted or archived records found",
     "cleanup_tab_profiles": "Deactivated Profiles",
     "cleanup_tab_posts": "Deleted Posts",

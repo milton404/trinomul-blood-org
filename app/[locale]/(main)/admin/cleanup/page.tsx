@@ -410,6 +410,16 @@ export default function AdminCleanupPage() {
             )}
           </div>
 
+          {activeTab === "profiles" && (
+            <div className="flex items-start gap-3 p-4 bg-blue-50 rounded-2xl border border-blue-200">
+              <Info className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-blue-800 space-y-1">
+                <p className="font-semibold">{t("cleanup_profiles_manual_only_title")}</p>
+                <p>{t("cleanup_profiles_manual_only_body")}</p>
+              </div>
+            </div>
+          )}
+
           {activeTab === "profiles" && profiles.some((p) => p.donation_count > 0) && (
             <div className="flex items-start gap-3 p-4 bg-amber-50 rounded-2xl border border-amber-200">
               <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />

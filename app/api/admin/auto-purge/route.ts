@@ -10,8 +10,6 @@ export async function GET() {
   }
 
   const results = {
-    profiles_purged: 0,
-    profiles_skipped: 0,
     posts_purged: 0,
     requests_purged: 0,
     orgs_purged: 0,
@@ -20,25 +18,9 @@ export async function GET() {
   };
 
   try {
-    const { rows: profileRows } = await pgQuery<{ id: number; donation_count: string }>(
-      `SELECT p.id,
-              COALESCE((SELECT COUNT(*) FROM donations d WHERE d.donor_id = p.id), 0)::text AS donation_count
-       FROM profiles p
-       WHERE p.is_active = false AND p.role NOT IN ('admin', 'super_admin')`,
-    );
-    const profileIdsToPurge = profileRows
-      .filter((r) => Number(r.donation_count) === 0)
-      .map((r) => r.id);
-    results.profiles_skipped = profileRows.length - profileIdsToPurge.length;
-
-    if (profileIdsToPurge.length > 0) {
-      const ph = profileIdsToPurge.map((_, i) => `$${i + 1}`).join(", ");
-      const { rowCount } = await pgQuery(
-        `DELETE FROM profiles WHERE id IN (${ph}) AND is_active = false AND role NOT IN ('admin', 'super_admin')`,
-        profileIdsToPurge,
-      );
-      results.profiles_purged = rowCount ?? 0;
-    }
+    // NOTE: Profiles are NOT auto-purged. Deactivated accounts (is_active=false)
+    // can be reactivated by admin, so they must stay. Admin-deleted profiles are
+    // already hard-deleted (DELETE FROM), so there's nothing to purge.
 
     const { rows: postRows } = await pgQuery<{ id: number }>(
       `SELECT id FROM social_posts WHERE status = 'deleted'`,
@@ -107,7 +89,7 @@ export async function GET() {
       ok: true,
       ...results,
       total_purged:
-        results.profiles_purged +
+
         results.posts_purged +
         results.requests_purged +
         results.orgs_purged +
