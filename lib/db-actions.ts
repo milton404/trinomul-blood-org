@@ -1464,6 +1464,36 @@ export async function serverAddStatusLog(
   return addStatusLog(requestId, status, changedBy, note);
 }
 
+/**
+ * Public fulfill from the tracking page (requester self-service).
+ * Sets status + current_status + fulfilled_at + show_fulfilled_badge so
+ * the card shows the Completed seal. No admin required — the tracking
+ * page gates this behind canEdit (guest edit eligibility).
+ */
+export async function serverFulfillRequestPublic(requestId: number) {
+  const usePg = isSupabaseAvailable();
+  if (usePg) {
+    await pgQuery(
+      `UPDATE blood_requests
+       SET status = 'fulfilled', current_status = 'fulfilled',
+           fulfilled_at = NOW(), show_fulfilled_badge = 1, updated_at = NOW()
+       WHERE id = $1 AND status = 'active'`,
+      [requestId],
+    );
+    await addStatusLogPg(requestId, "fulfilled", "requester", "Marked fulfilled by requester");
+    return;
+  }
+  const { getDb } = await import("@/lib/db");
+  const db = getDb();
+  db.prepare(
+    `UPDATE blood_requests
+     SET status = 'fulfilled', current_status = 'fulfilled',
+         fulfilled_at = datetime('now'), show_fulfilled_badge = 1, updated_at = datetime('now')
+     WHERE id = ? AND status = 'active'`,
+  ).run(requestId);
+  addStatusLog(requestId, "fulfilled", "requester", "Marked fulfilled by requester");
+}
+
 export async function serverGetStatusLogs(requestId: number) {
   if (isSupabaseAvailable()) return getStatusLogsPg(requestId);
   return getStatusLogs(requestId);

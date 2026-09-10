@@ -28,6 +28,7 @@ import {
   serverCheckGuestEditEligibility,
   serverRunLifecycleSweep,
   serverAddStatusLog,
+  serverFulfillRequestPublic,
 } from "@/lib/db-actions";
 import RequestStatusTimeline from "@/components/requests/RequestStatusTimeline";
 import GuestEditRequestModal from "@/components/requests/GuestEditRequestModal";
@@ -120,7 +121,11 @@ export default function TrackingPage() {
   const handleUpdateStatus = async (newStatus: string) => {
     if (!request || newStatus === currentStatus) return;
     try {
-      await serverAddStatusLog(request.id, newStatus, "requester");
+      if (newStatus === "fulfilled") {
+        await serverFulfillRequestPublic(request.id);
+      } else {
+        await serverAddStatusLog(request.id, newStatus, "requester");
+      }
       await loadData();
     } catch (err: any) {
       console.error("Status update failed:", err);
@@ -268,6 +273,16 @@ export default function TrackingPage() {
               <span className="text-3xl font-black leading-none">{request?.blood_group}</span>
             </div>
           </div>
+
+          {currentStatus === "donating" && Number(request?.donated_units ?? 0) > 0 && (
+            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 backdrop-blur-sm">
+              <span className="text-sm font-bold text-white">
+                {params.locale === "bn"
+                  ? `দান হয়েছে (${request.donated_units}) · দরকার (${Math.max(0, Number(request.units_needed ?? 1) - Number(request.donated_units))})`
+                  : `Donated (${request.donated_units}) · Need (${Math.max(0, Number(request.units_needed ?? 1) - Number(request.donated_units))})`}
+              </span>
+            </div>
+          )}
         </div>
       </div>
 
