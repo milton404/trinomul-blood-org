@@ -71,7 +71,7 @@ export default function QrScannerModal({ onClose }: { onClose: () => void }) {
         return;
       }
 
-      if (/^REQ-[A-Z0-9]{4,}$/i.test(trimmed)) {
+      if (/^[A-Z]{2,4}-[A-Z0-9]{4,}$/i.test(trimmed)) {
         router.push(`/track/${trimmed}`);
         onClose();
         return;

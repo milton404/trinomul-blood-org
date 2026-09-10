@@ -3042,7 +3042,7 @@ export default function ProfileForm() {
                   className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-all active:scale-[0.98] text-xs"
                 >
                   <ScanLine className="w-3.5 h-3.5" />
-                  {isBn ? "QR স্ক্যান" : "Scan QR"}
+                  {isBn ? "QR স্ক্যান করে রক্তদান যোগ করুন" : "Scan QR to Add Blood Record"}
                 </button>
               </div>
               {renderDonorImpact()}
@@ -3074,7 +3074,7 @@ export default function ProfileForm() {
                   >
                     <ScanLine className="w-4 h-4" />
                     <span className="text-sm">
-                      {isBn ? "QR স্ক্যান করে ডোনেশন" : "Scan Request QR"}
+                      {isBn ? "QR স্ক্যান করে রক্তদান যোগ করুন" : "Scan QR to Add Blood Record"}
                     </span>
                   </button>
                 </div>

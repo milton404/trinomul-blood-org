@@ -12,7 +12,7 @@ export interface ParsedRequestQr {
   requestId: number | null;
 }
 
-const TRACKING_CODE_RE = /^REQ-[A-Z0-9]{4,}$/i;
+const TRACKING_CODE_RE = /^[A-Z]{2,4}-[A-Z0-9]{4,}$/i;
 
 /**
  * Extract tracking code or numeric request ID from a scanned QR string.
