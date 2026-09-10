@@ -83,6 +83,40 @@ const pgMigrations: PgMigration[] = [
       `);
     },
   },
+  {
+    id: "004_backfill_fulfilled_from_donations",
+    name: "Backfill requests to fulfilled when donated units meet units_needed",
+    up: async (client) => {
+      await client.query(`
+        UPDATE blood_requests br
+        SET status = 'fulfilled',
+            current_status = 'fulfilled',
+            donor_id = d.donor_id,
+            donated_at = COALESCE(br.donated_at, NOW()),
+            fulfilled_at = COALESCE(br.fulfilled_at, NOW()),
+            show_fulfilled_badge = 1,
+            updated_at = NOW()
+        FROM (
+          SELECT request_id, MAX(donor_id) AS donor_id, SUM(COALESCE(units, 1)) AS total
+          FROM donations
+          GROUP BY request_id
+        ) d
+        WHERE br.id = d.request_id
+          AND br.status = 'active'
+          AND d.total >= COALESCE(br.units_needed, 1);
+      `);
+      await client.query(`
+        INSERT INTO request_status_log (request_id, status, changed_by, note)
+        SELECT br.id, 'fulfilled', 'backfill', 'Fulfilled from existing donations'
+        FROM blood_requests br
+        WHERE br.status = 'fulfilled'
+          AND NOT EXISTS (
+            SELECT 1 FROM request_status_log l
+            WHERE l.request_id = br.id AND l.status = 'fulfilled'
+          );
+      `);
+    },
+  },
 ];
 
 async function ensureTrackingTable(client: NonNullable<SupabaseAdminClient>): Promise<void> {
