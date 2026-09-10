@@ -40,6 +40,9 @@ yarn-error.log*
 # Keep the example file (safe to share)
 !.env.example
 
+# Backups — CRITICAL: contains full DB dumps with PII + password hashes
+backups/
+
 # Database files — CRITICAL: contains user data
 *.db
 *.db-shm
