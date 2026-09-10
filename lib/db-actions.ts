@@ -1049,7 +1049,8 @@ export async function serverCreateDonation(donation: Record<string, any>) {
       await pgQuery(
         `UPDATE profiles
          SET last_donation_date = $1,
-             last_donation_type = COALESCE($2, 'whole_blood')
+             last_donation_type = COALESCE($2, 'whole_blood'),
+             show_on_leaderboard = TRUE
          WHERE id = $3
            AND ($1 >= COALESCE(NULLIF(last_donation_date, ''), '0000-01-01'))`,
         [
@@ -1057,6 +1058,10 @@ export async function serverCreateDonation(donation: Record<string, any>) {
           donation.donationType || "whole_blood",
           donation.donorId,
         ],
+      );
+      await pgQuery(
+        `UPDATE profiles SET show_on_leaderboard = TRUE WHERE id = $1 AND show_on_leaderboard = FALSE`,
+        [donation.donorId],
       );
     }
 
@@ -1243,10 +1248,15 @@ export async function serverRecordDonationByScan(
     await pgQuery(
       `UPDATE profiles
        SET last_donation_date = $1,
-           last_donation_type = COALESCE($2, 'whole_blood')
+           last_donation_type = COALESCE($2, 'whole_blood'),
+           show_on_leaderboard = TRUE
        WHERE id = $3
          AND ($1 >= COALESCE(NULLIF(last_donation_date, ''), '0000-01-01'))`,
       [donationDate, input.donationType || "whole_blood", me.id],
+    );
+    await pgQuery(
+      `UPDATE profiles SET show_on_leaderboard = TRUE WHERE id = $1 AND show_on_leaderboard = FALSE`,
+      [me.id],
     );
 
     if (input.referrerProfileId != null || (input.referrerName && String(input.referrerName).trim() !== "")) {
@@ -3163,10 +3173,15 @@ async function serverMarkRequestFulfilledInner(
       await pgQuery(
         `UPDATE profiles
          SET last_donation_date = $1,
-             last_donation_type = COALESCE($2, 'whole_blood')
+             last_donation_type = COALESCE($2, 'whole_blood'),
+             show_on_leaderboard = TRUE
          WHERE id = $3
            AND ($1 >= COALESCE(NULLIF(last_donation_date, ''), '0000-01-01'))`,
         [donationDate, input.donationType || "whole_blood", input.donorId],
+      );
+      await pgQuery(
+        `UPDATE profiles SET show_on_leaderboard = TRUE WHERE id = $1 AND show_on_leaderboard = FALSE`,
+        [input.donorId],
       );
     }
 

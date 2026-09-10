@@ -231,8 +231,8 @@ export default function DonorQrScanner({ onClose, onRecorded }: { onClose: () =>
       const result = await serverRecordDonationByScan({
         requestId: request.requestId,
         units,
-        referrerProfileId: selectedReferrer?.profile_id ?? null,
-        referrerName: referrerMode === "manual" ? manualReferrerName.trim() || null : selectedReferrer?.name ?? null,
+        referrerProfileId: selectedReferrer?.id ?? null,
+        referrerName: referrerMode === "manual" ? manualReferrerName.trim() || null : selectedReferrer?.full_name_en ?? selectedReferrer?.full_name_bn ?? null,
         referrerPhone: referrerMode === "manual" ? manualReferrerPhone.trim() || null : selectedReferrer?.phone ?? null,
       });
       if (result.success) {
@@ -529,7 +529,7 @@ export default function DonorQrScanner({ onClose, onRecorded }: { onClose: () =>
                 <div className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2">
                   <div className="flex items-center gap-2">
                     <User className="w-4 h-4 text-slate-400" />
-                    <span className="text-sm font-medium text-slate-700">{selectedReferrer.name}</span>
+                    <span className="text-sm font-medium text-slate-700">{selectedReferrer.full_name_en || selectedReferrer.full_name_bn}</span>
                     {selectedReferrer.phone && (
                       <span className="text-xs text-slate-400">{selectedReferrer.phone}</span>
                     )}
