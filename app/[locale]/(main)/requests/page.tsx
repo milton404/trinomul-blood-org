@@ -1382,7 +1382,7 @@ export default function RequestsPage() {
 
         {/* Results count */}
         {!isLoading && (
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-3" suppressHydrationWarning>
             <p className="text-xs text-slate-500">
               <span className="font-semibold text-slate-700">{filteredRequests.length}</span>{' '}
               {filteredRequests.length === 1 ? 'request' : 'requests'} found
@@ -1440,7 +1440,7 @@ export default function RequestsPage() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" suppressHydrationWarning>
               {filteredRequests.map((request) => (
                 <div key={request.id} className="@container/card">
                   <RequestCard request={toCardProps(request)} />

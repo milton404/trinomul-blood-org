@@ -48,7 +48,7 @@ export default function AddDonationModal({ donation, onClose, onSave }: AddDonat
     hospital_name: donation?.hospital_name || '',
     donation_date: donation?.donation_date
       ? new Date(donation.donation_date).toISOString().slice(0, 10)
-      : new Date().toISOString().slice(0, 10),
+      : '',
     donation_type: donation?.donation_type || 'whole_blood',
     recipient_type: donation?.recipient_type || 'Patient',
     notes: donation?.notes || '',
@@ -71,6 +71,12 @@ export default function AddDonationModal({ donation, onClose, onSave }: AddDonat
   );
   const [refName, setRefName] = useState(donation?.referrer_profile_id ? '' : donation?.referrer_name || '');
   const [refPhone, setRefPhone] = useState(donation?.referrer_phone || '');
+
+  useEffect(() => {
+    if (!donation) {
+      setFormData((prev) => ({ ...prev, donation_date: new Date().toISOString().slice(0, 10) }));
+    }
+  }, [donation]);
 
   // Debounced referrer (registered user) search
   useEffect(() => {

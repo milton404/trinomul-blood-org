@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocale } from "next-intl";
 import { toast } from "sonner";
 import { X, Loader2, Droplet } from "lucide-react";
@@ -26,9 +26,10 @@ export default function QuickAddDonationModal({
   const [loading, setLoading] = useState(false);
   const [units, setUnits] = useState(1);
   const [hospitalName, setHospitalName] = useState("");
-  const [donationDate, setDonationDate] = useState(
-    new Date().toISOString().split("T")[0],
-  );
+  const [donationDate, setDonationDate] = useState("");
+  useEffect(() => {
+    setDonationDate(new Date().toISOString().split("T")[0]);
+  }, []);
   const [donationType, setDonationType] = useState("whole_blood");
 
   const handleSubmit = async (e: React.FormEvent) => {

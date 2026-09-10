@@ -132,7 +132,7 @@ export default function Footer() {
             </ul>
           </div>
         </div>
-        <div className="pt-4 border-t border-slate-800/60 text-center text-xs text-slate-500">
+        <div className="pt-4 border-t border-slate-800/60 text-center text-xs text-slate-500" suppressHydrationWarning>
           © {new Date().getFullYear()}{" "}
           {locale === "bn"
             ? "তৃণমূল ব্লাড ব্যাংক রংপুর। সর্বস্বত্ব সংরক্ষিত।"

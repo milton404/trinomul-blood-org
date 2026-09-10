@@ -31,10 +31,12 @@ import {
 } from "@/lib/db-actions";
 import RequestStatusTimeline from "@/components/requests/RequestStatusTimeline";
 import GuestEditRequestModal from "@/components/requests/GuestEditRequestModal";
+import { useClientSide } from "@/lib/hooks/useClientSide";
 
 export default function TrackingPage() {
   const params = useParams();
   const rawId = params.id as string;
+  const isClient = useClientSide();
 
   const [request, setRequest] = useState<any>(null);
   const [logs, setLogs] = useState<any[]>([]);
@@ -127,7 +129,7 @@ export default function TrackingPage() {
 
   // QR code using a public QR code API
   const trackingUrl =
-    typeof window !== "undefined"
+    isClient
       ? `${window.location.origin}/${params.locale}/track/${rawId}`
       : "";
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(trackingUrl)}`;

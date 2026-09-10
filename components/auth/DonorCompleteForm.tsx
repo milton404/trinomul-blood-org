@@ -392,7 +392,7 @@ export default function DonorCompleteForm({ user, onComplete }: DonorCompleteFor
                 ageInfo.status === 'eligible' ? 'bg-green-50 text-green-700' :
                 ageInfo.status === 'under' ? 'bg-amber-50 text-amber-700' :
                 'bg-orange-50 text-orange-700'
-              }`}>
+              }`} suppressHydrationWarning>
                 {ageInfo.status === 'eligible' ? (
                   <CheckCircle className="w-4 h-4 flex-shrink-0" />
                 ) : (
@@ -647,7 +647,7 @@ export default function DonorCompleteForm({ user, onComplete }: DonorCompleteFor
                 <div><span className="text-slate-400">Weight:</span> <strong>{watch('weightKg')} kg</strong></div>
                 <div><span className="text-slate-400">District:</span> <strong>{watch('district')}</strong></div>
                 <div><span className="text-slate-400">Available:</span> <strong>{watch('isActive') ? 'Yes' : 'No'}</strong></div>
-                {ageInfo && <div className="col-span-2"><span className="text-slate-400">Age:</span> <strong>{ageInfo.age} years</strong></div>}
+                {ageInfo && <div className="col-span-2" suppressHydrationWarning><span className="text-slate-400">Age:</span> <strong>{ageInfo.age} years</strong></div>}
               </div>
             </div>
 

@@ -453,6 +453,7 @@ export default function MyRequests() {
                                     ? "বুস্ট করুন — আরও ডোনারদের কাছে পৌঁছান"
                                     : "Boost — notify more donors"
                               }
+                              suppressHydrationWarning
                             >
                               {boostingId === r.id ? (
                                 <Loader2 className="w-3.5 h-3.5 animate-spin" />

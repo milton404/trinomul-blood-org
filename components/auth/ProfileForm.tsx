@@ -177,11 +177,14 @@ export default function ProfileForm() {
   const [recordingDonation, setRecordingDonation] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [recordForm, setRecordForm] = useState({
-    donationDate: new Date().toISOString().split("T")[0],
+    donationDate: "",
     donationType: "whole_blood",
     hospitalName: "",
     units: "1",
   });
+  useEffect(() => {
+    setRecordForm((prev) => ({ ...prev, donationDate: new Date().toISOString().split("T")[0] }));
+  }, []);
   const [advice, setAdvice] = useState<
     Awaited<ReturnType<typeof serverGetDonorAdvice>> | null
   >(null);
@@ -942,7 +945,7 @@ export default function ProfileForm() {
             },
           ];
           return (
-            <div className="md:col-span-2 space-y-2">
+            <div className="md:col-span-2 space-y-2" suppressHydrationWarning>
               <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                 <Heart className="w-4 h-4 text-red-500" />
                 {t("eligibility_status") || "Donation Eligibility Status"}
@@ -1214,7 +1217,7 @@ export default function ProfileForm() {
         if (diffDays >= minCooldown) return null;
         const daysLeft = minCooldown - diffDays;
         return (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2">
+          <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2" suppressHydrationWarning>
             <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
             <div>
               <p className="text-xs font-semibold text-red-800">
@@ -2074,7 +2077,7 @@ export default function ProfileForm() {
     }
 
     return (
-      <div className="mb-6 rounded-2xl border border-red-100 shadow-lg backdrop-blur bg-white/80 overflow-hidden">
+      <div className="mb-6 rounded-2xl border border-red-100 shadow-lg backdrop-blur bg-white/80 overflow-hidden" suppressHydrationWarning>
         <div className="flex items-center justify-between gap-3 p-4 sm:p-5 bg-gradient-to-r from-red-50/80 to-pink-50/80 border-b border-red-100">
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center text-white flex-shrink-0">
@@ -2109,6 +2112,7 @@ export default function ProfileForm() {
                         ? "bg-green-50 border-green-200"
                         : "bg-slate-50 border-slate-200"
                     }`}
+                    suppressHydrationWarning
                   >
                     <span className="text-base flex-shrink-0">
                       {type.icon}
@@ -2163,7 +2167,7 @@ export default function ProfileForm() {
 
           {nextEligibleDate &&
             new Date(nextEligibleDate).getTime() > new Date().getTime() && (
-              <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-xl border border-blue-100">
+              <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-xl border border-blue-100" suppressHydrationWarning>
                 <Calendar className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
                 <div>
                   <p className="text-xs font-semibold text-blue-800">
@@ -3325,7 +3329,7 @@ export default function ProfileForm() {
                         { key: "plasma", cooldown: 30, icon: "💉", label_en: "Plasma", label_bn: "প্লাজমা" },
                       ];
                       return (
-                        <div className="mt-4 space-y-2">
+                        <div className="mt-4 space-y-2" suppressHydrationWarning>
                           <p className="text-sm font-semibold text-slate-700">{t("eligibility_status") || "Eligibility Status"}</p>
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             {types.map((type) => {
@@ -3461,7 +3465,7 @@ export default function ProfileForm() {
                     if (diffDays >= minCooldown) return null;
                     const daysLeft = minCooldown - diffDays;
                     return (
-                      <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2">
+                      <div className="p-3 bg-red-50 border border-red-200 rounded-xl flex items-start gap-2" suppressHydrationWarning>
                         <AlertTriangle className="w-4 h-4 text-red-600 mt-0.5 flex-shrink-0" />
                         <div>
                           <p className="text-xs font-semibold text-red-800">{t("available_warning") || "⚠️ Cooling down!"}</p>

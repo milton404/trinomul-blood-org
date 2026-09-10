@@ -883,7 +883,7 @@ function UserDetailModal({ user, onClose, t, locale }: {
             <div className="p-3 bg-slate-50 rounded-xl">
               <p className="text-[11px] text-slate-400 flex items-center gap-1"><Calendar className="w-3 h-3" />{t('date_of_birth')}</p>
               <p className="font-semibold text-sm text-slate-900 mt-1">{user.date_of_birth ? new Date(user.date_of_birth).toLocaleDateString() : '-'}</p>
-              {age !== null && <p className="text-xs text-slate-400">{age} {t('years_old')}</p>}
+              {age !== null && <p className="text-xs text-slate-400" suppressHydrationWarning>{age} {t('years_old')}</p>}
             </div>
             <div className="p-3 bg-slate-50 rounded-xl">
               <p className="text-[11px] text-slate-400 flex items-center gap-1"><Activity className="w-3 h-3" />{t('sex')}</p>
