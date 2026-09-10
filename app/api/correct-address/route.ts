@@ -89,6 +89,16 @@ async function zhipuCorrect(query: string): Promise<string | null> {
 // ── Route handler ──
 export async function POST(request: Request) {
   try {
+    const { enforceRateLimit, incrementRateLimit } = await import(
+      "@/lib/auth/rateLimit"
+    );
+    const rateKey = await enforceRateLimit(
+      "ai-correct-address",
+      20,
+      5 * 60 * 1000,
+      15 * 60 * 1000,
+    );
+
     const { query } = await request.json();
 
     if (!query || typeof query !== "string" || query.trim().length < 2) {
@@ -96,6 +106,8 @@ export async function POST(request: Request) {
     }
 
     const trimmed = query.trim();
+
+    if (rateKey) await incrementRateLimit(rateKey, 5 * 60 * 1000);
 
     // Tier 1: DeepSeek
     try {
@@ -114,7 +126,10 @@ export async function POST(request: Request) {
     }
 
     return Response.json({ corrected: null });
-  } catch {
+  } catch (err: any) {
+    if (err?.message?.startsWith("Too many requests")) {
+      return Response.json({ error: err.message }, { status: 429 });
+    }
     return Response.json({ corrected: null });
   }
 }

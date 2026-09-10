@@ -11,6 +11,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
   try {
+    const { enforceRateLimit } = await import("@/lib/auth/rateLimit");
+    await enforceRateLimit("feed-list", 60, 60 * 1000, 5 * 60 * 1000);
+
     const url = new URL(req.url);
     const limit = parseInt(url.searchParams.get("limit") || "20");
     const offset = parseInt(url.searchParams.get("offset") || "0");
@@ -18,7 +21,10 @@ export async function GET(req: Request) {
 
     const feed = await serverGetFeed({ limit, offset, filter });
     return NextResponse.json(feed);
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.message?.startsWith("Too many requests")) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     console.error("[api/feed]", err);
     return NextResponse.json({ error: "Failed to load feed" }, { status: 500 });
   }
@@ -30,6 +36,16 @@ export async function POST(req: Request) {
     if (!session) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
+
+    const { enforceRateLimit, incrementRateLimit } = await import(
+      "@/lib/auth/rateLimit"
+    );
+    const rateKey = await enforceRateLimit(
+      "feed-post",
+      10,
+      10 * 60 * 1000,
+      30 * 60 * 1000,
+    );
 
     const body = await req.json();
     const content = body.content || "";
@@ -50,8 +66,13 @@ export async function POST(req: Request) {
       isPublic,
     });
 
+    if (rateKey) await incrementRateLimit(rateKey, 10 * 60 * 1000);
+
     return NextResponse.json({ id });
   } catch (err: any) {
+    if (err?.message?.startsWith("Too many requests")) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     console.error("[api/feed POST]", err);
     return NextResponse.json({ error: err.message || "Failed to create post" }, { status: 500 });
   }

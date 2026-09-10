@@ -7,6 +7,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    const { enforceRateLimit } = await import("@/lib/auth/rateLimit");
+    await enforceRateLimit("auth-me", 60, 60 * 1000, 5 * 60 * 1000);
+
     const session = await getSession();
     if (!session) {
       return NextResponse.json({ user: null });
@@ -56,7 +59,10 @@ export async function GET() {
         last_active_at: profile.last_active_at,
       },
     });
-  } catch {
+  } catch (err: any) {
+    if (err?.message?.startsWith("Too many requests")) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     return NextResponse.json({ user: null });
   }
 }

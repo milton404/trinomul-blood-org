@@ -13,11 +13,17 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    const { enforceRateLimit } = await import("@/lib/auth/rateLimit");
+    await enforceRateLimit("donors-list", 30, 60 * 1000, 5 * 60 * 1000);
+
     const donors = isSupabaseAvailable()
       ? await getDonorsWithStatsPg()
       : getDonorsWithStats();
     return NextResponse.json(donors);
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.message?.startsWith("Too many requests")) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     console.error("[api/donors]", err);
     return NextResponse.json(
       { error: "Failed to load donors" },
@@ -28,6 +34,16 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const { enforceRateLimit, incrementRateLimit } = await import(
+      "@/lib/auth/rateLimit"
+    );
+    const rateKey = await enforceRateLimit(
+      "create-donor",
+      3,
+      60 * 60 * 1000,
+      60 * 60 * 1000,
+    );
+
     const body = await req.json();
 
     const email = body.email;
@@ -87,8 +103,13 @@ export async function POST(req: Request) {
       verification_status: "pending",
     });
 
+    if (rateKey) await incrementRateLimit(rateKey, 60 * 60 * 1000);
+
     return NextResponse.json({ id });
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.message?.startsWith("Too many requests")) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     console.error("[api/donors POST]", err);
     return NextResponse.json(
       { error: "Failed to register donor" },

@@ -28,6 +28,16 @@ export async function synthesizeEdgeSpeech(
   const clean = (text || "").replace(/\s+/g, " ").trim();
   if (!clean) return null;
 
+  const { enforceRateLimit, incrementRateLimit } = await import(
+    "@/lib/auth/rateLimit"
+  );
+  const rateKey = await enforceRateLimit(
+    "ai-edge-tts",
+    20,
+    5 * 60 * 1000,
+    15 * 60 * 1000,
+  );
+
   const voice = isBn ? VOICE_BN_FEMALE : VOICE_EN_FEMALE;
 
   try {
@@ -61,6 +71,7 @@ export async function synthesizeEdgeSpeech(
 
     const buf = Buffer.concat(chunks);
     if (buf.length < 100) return null;
+    if (rateKey) await incrementRateLimit(rateKey, 5 * 60 * 1000);
     return buf.toString("base64");
   } catch (err) {
     console.warn("[EdgeTTS] Synthesis failed:", err);

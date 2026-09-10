@@ -25,6 +25,16 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
+    const { enforceRateLimit, incrementRateLimit } = await import(
+      "@/lib/auth/rateLimit"
+    );
+    const rateKey = await enforceRateLimit(
+      "feed-delete",
+      10,
+      10 * 60 * 1000,
+      30 * 60 * 1000,
+    );
+
     const { id } = await params;
     const postId = parseInt(id);
     if (!postId) {
@@ -32,8 +42,12 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
     }
 
     const changes = await serverDeletePost(postId);
+    if (rateKey) await incrementRateLimit(rateKey, 10 * 60 * 1000);
     return NextResponse.json({ changes });
   } catch (err: any) {
+    if (err?.message?.startsWith("Too many requests")) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     console.error("[api/feed/[id] DELETE]", err);
     return NextResponse.json({ error: err.message || "Failed to delete" }, { status: 500 });
   }
@@ -46,6 +60,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
+    const { enforceRateLimit, incrementRateLimit } = await import(
+      "@/lib/auth/rateLimit"
+    );
+    const rateKey = await enforceRateLimit(
+      "feed-update",
+      10,
+      10 * 60 * 1000,
+      30 * 60 * 1000,
+    );
+
     const { id } = await params;
     const postId = parseInt(id);
     const body = await req.json();
@@ -56,8 +80,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
       isPublic: body.isPublic,
     });
 
+    if (rateKey) await incrementRateLimit(rateKey, 10 * 60 * 1000);
     return NextResponse.json({ changes });
   } catch (err: any) {
+    if (err?.message?.startsWith("Too many requests")) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     console.error("[api/feed/[id] PATCH]", err);
     return NextResponse.json({ error: err.message || "Failed to update" }, { status: 500 });
   }

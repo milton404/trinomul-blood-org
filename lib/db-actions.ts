@@ -148,6 +148,7 @@ import {
   recordFailedAttempt,
   clearRateLimit,
   incrementRateLimit,
+  enforceRateLimit,
 } from "./auth/rateLimit";
 import { RANGPUR_DISTRICTS, RANGPUR_UPAZILAS, RANGPUR_UNIONS } from "./constants/rangpur";
 import { toValidBangladeshCoordinates } from "./location-coordinates";
@@ -1772,18 +1773,42 @@ export async function serverGetOrganizations() {
 // ── Phase 4.1: AI-Powered Donor Insights ─────────────────────────────
 
 export async function serverGetDashboardAISnapshot() {
+  const rateKey = await enforceRateLimit(
+    "ai-dashboard-snapshot",
+    5,
+    10 * 60 * 1000,
+    30 * 60 * 1000,
+  );
   const { getDashboardAISnapshot } = await import("./ai/insights");
-  return getDashboardAISnapshot();
+  const result = await getDashboardAISnapshot();
+  if (rateKey) await incrementRateLimit(rateKey, 10 * 60 * 1000);
+  return result;
 }
 
 export async function serverGenerateAIInsights() {
+  const rateKey = await enforceRateLimit(
+    "ai-generate-insights",
+    10,
+    10 * 60 * 1000,
+    30 * 60 * 1000,
+  );
   const { generateAIInsights } = await import("./ai/insights");
-  return generateAIInsights();
+  const result = await generateAIInsights();
+  if (rateKey) await incrementRateLimit(rateKey, 10 * 60 * 1000);
+  return result;
 }
 
 export async function serverAskNaturalLanguageQuery(question: string) {
+  const rateKey = await enforceRateLimit(
+    "ai-nl-query",
+    10,
+    10 * 60 * 1000,
+    30 * 60 * 1000,
+  );
   const { askNaturalLanguageQuery } = await import("./ai/insights");
-  return askNaturalLanguageQuery(question);
+  const result = await askNaturalLanguageQuery(question);
+  if (rateKey) await incrementRateLimit(rateKey, 10 * 60 * 1000);
+  return result;
 }
 
 // ── Phase 4 Extension: User-Facing AI Assistant ──────────────────────
@@ -1885,8 +1910,16 @@ export async function serverAnalyzeRequestContext(data: {
   urgencyLevel?: string;
   unitsNeeded?: number;
 }) {
+  const rateKey = await enforceRateLimit(
+    "ai-analyze-request",
+    20,
+    5 * 60 * 1000,
+    15 * 60 * 1000,
+  );
   const { analyzeRequestContext } = await import("./ai/user-assistant");
-  return analyzeRequestContext(data);
+  const result = await analyzeRequestContext(data);
+  if (rateKey) await incrementRateLimit(rateKey, 5 * 60 * 1000);
+  return result;
 }
 
 export async function serverGetDonorAdvice(
@@ -1900,6 +1933,12 @@ export async function serverGetDonorAdvice(
   },
   donorId?: number,
 ) {
+  const rateKey = await enforceRateLimit(
+    "ai-donor-advice",
+    20,
+    10 * 60 * 1000,
+    30 * 60 * 1000,
+  );
   const { getDonorAdvice } = await import("./ai/user-assistant");
   // Fetch actual donation history from DB so eligibility is based on real
   // per-type last donation dates, not just the single last_donation_date
@@ -1915,7 +1954,9 @@ export async function serverGetDonorAdvice(
       console.error("Failed to fetch donation history for advice:", e);
     }
   }
-  return getDonorAdvice(profile, donationHistory);
+  const result = await getDonorAdvice(profile, donationHistory);
+  if (rateKey) await incrementRateLimit(rateKey, 10 * 60 * 1000);
+  return result;
 }
 
 export async function serverGetAssistantQuickReplies() {

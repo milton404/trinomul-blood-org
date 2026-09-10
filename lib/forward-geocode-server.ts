@@ -725,15 +725,29 @@ export async function serverSearchPlace(
   const trimmed = (query || "").trim();
   if (!trimmed) return [];
 
+  const { enforceRateLimit, incrementRateLimit } = await import(
+    "@/lib/auth/rateLimit"
+  );
+  const rateKey = await enforceRateLimit(
+    "geocode-search",
+    30,
+    60 * 1000,
+    5 * 60 * 1000,
+  );
+
   // ── 1. Check local data FIRST (instant, no network) ─────────────
   const { district, upazila, keywords } = matchLocalDistrictUpazila(trimmed);
   if (district) {
+    if (rateKey) await incrementRateLimit(rateKey, 60 * 1000);
     return [buildLocalResult(district, upazila, keywords)];
   }
 
   // ── 2. Try Nominatim for non-Rangpur locations (3s timeout) ─────
   const remoteResults = await nominatimSearch(trimmed, 5);
-  if (remoteResults.length > 0) return remoteResults;
+  if (remoteResults.length > 0) {
+    if (rateKey) await incrementRateLimit(rateKey, 60 * 1000);
+    return remoteResults;
+  }
 
   // ── 3. AI search parser as last resort ──────────────────────────
   // The AI can normalize Bangla/Banglish text that our local matcher
@@ -755,11 +769,13 @@ export async function serverSearchPlace(
     const aiDistrict = getDistrictById(aiDistrictId);
     const aiUpazila = aiUpazilaId ? getUpazilaById(aiUpazilaId) : null;
     if (aiDistrict) {
+      if (rateKey) await incrementRateLimit(rateKey, 60 * 1000);
       return [buildLocalResult(aiDistrict, aiUpazila, aiKeywords)];
     }
   }
 
   // ── 4. Nothing matched — return empty array ─────────────────────
+  if (rateKey) await incrementRateLimit(rateKey, 60 * 1000);
   return [];
 }
 
@@ -1017,6 +1033,17 @@ export async function serverSearchMedicalPlace(
   const trimmed = (query || "").trim();
   if (!trimmed) return [];
 
+  const { enforceRateLimit, incrementRateLimit } = await import(
+    "@/lib/auth/rateLimit"
+  );
+  const rateKey = await enforceRateLimit(
+    "geocode-medical",
+    30,
+    60 * 1000,
+    5 * 60 * 1000,
+  );
+
+  try {
   const isMedical = isMedicalQuery(trimmed);
   let searchQuery = trimmed;
   let aiExtract: MedicalInstitutionExtract | null = null;
@@ -1161,4 +1188,7 @@ export async function serverSearchMedicalPlace(
   }
 
   return [];
+  } finally {
+    if (rateKey) await incrementRateLimit(rateKey, 60 * 1000);
+  }
 }

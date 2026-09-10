@@ -222,3 +222,46 @@ export async function incrementRateLimit(
 ): Promise<RateLimitResult> {
   return recordFailedAttempt(identifier, windowMs);
 }
+
+/**
+ * Reusable rate-limit guard for server actions and API route handlers.
+ *
+ * Builds a per-IP identifier prefixed with `prefix`, checks the sliding
+ * window, and throws an Error with a human-readable wait message when
+ * blocked. On success the caller MUST call `incrementRateLimit` with the
+ * returned key after the protected operation completes.
+ *
+ * In development (NODE_ENV !== "production") the guard is skipped so
+ * local testing is not throttled.
+ *
+ * @returns the rate-limit key to pass to `incrementRateLimit` later, or
+ *          null when the guard was skipped (dev mode).
+ */
+export async function enforceRateLimit(
+  prefix: string,
+  maxAttempts: number,
+  windowMs: number,
+  lockoutMs: number,
+): Promise<string | null> {
+  if (process.env.NODE_ENV !== "production") return null;
+
+  let rateKey = `${prefix}:unknown`;
+  try {
+    const { getVisitorFingerprint } = await import("./visitor");
+    const { ip } = await getVisitorFingerprint();
+    rateKey = `${prefix}:${ip}`;
+  } catch {
+    // fall back to a shared bucket if fingerprinting is unavailable
+  }
+
+  const limit = await checkRateLimit(rateKey, maxAttempts, windowMs, lockoutMs);
+  if (!limit.allowed) {
+    const waitMin = Math.ceil(
+      ((limit.lockedUntil ?? limit.resetTime) - Date.now()) / 60000,
+    );
+    throw new Error(
+      `Too many requests. Please wait about ${waitMin} minute(s) and try again.`,
+    );
+  }
+  return rateKey;
+}

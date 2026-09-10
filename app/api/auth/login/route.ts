@@ -37,6 +37,16 @@ export async function POST(req: Request) {
       );
     }
 
+    const { enforceRateLimit, incrementRateLimit } = await import(
+      "@/lib/auth/rateLimit"
+    );
+    const signupRateKey = await enforceRateLimit(
+      `signup:${email.toLowerCase()}`,
+      5,
+      60 * 60 * 1000,
+      60 * 60 * 1000,
+    );
+
     const existing = getProfileByEmail(email);
     if (existing) {
       return NextResponse.json(
@@ -74,10 +84,10 @@ export async function POST(req: Request) {
     });
 
     // Auto-login after signup
-    const { randomBytes: rb2 } = await import("crypto");
-    const tempPassword = rb2(16).toString("hex");
     // Set a session for the new user
     await createSession({ sub: String(id), email, role: "donor" }, false);
+
+    if (signupRateKey) await incrementRateLimit(signupRateKey, 60 * 60 * 1000);
 
     return NextResponse.json({
       user: {
@@ -88,7 +98,10 @@ export async function POST(req: Request) {
         full_name_bn: fullNameBn || null,
       },
     });
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.message?.startsWith("Too many requests")) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     console.error("[api/auth/login]", err);
     return NextResponse.json(
       { error: "Authentication failed" },

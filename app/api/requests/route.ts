@@ -15,11 +15,17 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   try {
+    const { enforceRateLimit } = await import("@/lib/auth/rateLimit");
+    await enforceRateLimit("requests-list", 60, 60 * 1000, 5 * 60 * 1000);
+
     const requests = isSupabaseAvailable()
       ? await getVisibleBloodRequestsPg()
       : getVisibleBloodRequests();
     return NextResponse.json(requests);
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.message?.startsWith("Too many requests")) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     console.error("[api/requests]", err);
     return NextResponse.json(
       { error: "Failed to load requests" },
@@ -30,6 +36,16 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
+    const { enforceRateLimit, incrementRateLimit } = await import(
+      "@/lib/auth/rateLimit"
+    );
+    const rateKey = await enforceRateLimit(
+      "create-request",
+      5,
+      15 * 60 * 1000,
+      30 * 60 * 1000,
+    );
+
     const body = await req.json();
 
     const input = {
@@ -70,11 +86,16 @@ export async function POST(req: Request) {
       created = getBloodRequestById(requestId) as any;
     }
 
+    if (rateKey) await incrementRateLimit(rateKey, 15 * 60 * 1000);
+
     return NextResponse.json({
       id: requestId,
       trackingCode: created?.tracking_code ?? null,
     });
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.message?.startsWith("Too many requests")) {
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
     console.error("[api/requests POST]", err);
     return NextResponse.json(
       { error: "Failed to create request" },
