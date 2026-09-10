@@ -26,6 +26,7 @@ import QRCode from "qrcode";
 import { toPng } from "html-to-image";
 import { serverRecordContactClick, serverTranslateDonorText } from "@/lib/db-actions";
 import { getUnionById, getUpazilaById, getDistrictById } from "@/lib/constants/rangpur";
+import { useClientSide } from "@/lib/hooks/useClientSide";
 
 import BookmarkDonorButton from "./BookmarkDonorButton";
 import SaveContactButton from "./SaveContactButton";
@@ -101,8 +102,10 @@ export default function DonorCard({ donor }: DonorCardProps) {
   const [copyingText, setCopyingText] = useState(false);
   const [textCopied, setTextCopied] = useState(false);
 
-  const [now, setNow] = useState(() => Date.now());
+  const isClient = useClientSide();
+  const [now, setNow] = useState(0);
   useEffect(() => {
+    setNow(Date.now());
     const interval = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(interval);
   }, []);
@@ -110,7 +113,7 @@ export default function DonorCard({ donor }: DonorCardProps) {
   const qrFrameRef = useRef<HTMLDivElement>(null);
 
 
-  const donorShareUrl = typeof window !== "undefined" && donor.id
+  const donorShareUrl = isClient && donor.id
     ? `${window.location.origin}/${locale}/donors?donor=${donor.id}`
     : "https://trinomul-blood-bank.vercel.app/donors";
 
@@ -672,7 +675,7 @@ export default function DonorCard({ donor }: DonorCardProps) {
             isVerified={isVerified}
             avgResponseMin={avgResponseMin}
             phone={donor.phone || null}
-            siteOrigin={typeof window !== "undefined" ? window.location.origin : "trinomul-blood-bank.vercel.app"}
+            siteOrigin={isClient ? window.location.origin : "trinomul-blood-bank.vercel.app"}
             qrDataUrl={null}
             labels={{
               verifiedBadge: isBn ? "যাচাইকৃত" : "Verified",

@@ -45,6 +45,7 @@ import {
 import RequestShareImage from "./RequestShareImage";
 import BengaliShareImage from "./BengaliShareImage";
 import QuickAddDonor from "@/components/admin/QuickAddDonor";
+import { useClientSide } from "@/lib/hooks/useClientSide";
 
 const QR_GRADIENTS: { stops: [number, number, number][] }[] = [
   { stops: [[16, 185, 129], [20, 184, 166], [220, 38, 38]] },     // emerald → teal → red
@@ -78,7 +79,10 @@ function pickQrGradient(seed: string | number | undefined) {
  */
 function parseSqliteUtc(iso: string): Date {
   if (!iso) return new Date(NaN);
-  return new Date(String(iso).replace(" ", "T") + "Z");
+  let s = String(iso).trim();
+  if (s.includes(" ") && !s.includes("T")) s = s.replace(" ", "T");
+  if (!/[Zz]|[+-]\d{2}:?\d{2}$/.test(s)) s = s + "Z";
+  return new Date(s);
 }
 
 function formatPostedAt(iso: string): string {
@@ -187,6 +191,7 @@ export default function RequestCard({ request }: RequestCardProps) {
   const tMap = useTranslations("map");
   const locale = useLocale();
   const isBn = locale === "bn";
+  const isClient = useClientSide();
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [donorSearch, setDonorSearch] = useState("");
   const [donors, setDonors] = useState<any[]>([]);
@@ -457,7 +462,7 @@ export default function RequestCard({ request }: RequestCardProps) {
   const showExpiredSeal = isExpired && !isFulfilled;
   const isLastChance = !!request.is_last_chance && !isFulfilled && !isExpired;
 
-  const siteOrigin = typeof window !== "undefined" ? window.location.origin : "";
+  const siteOrigin = isClient ? window.location.origin : "";
   const absoluteTrackingUrl = trackingUrl ? `${siteOrigin}${trackingUrl}` : "";
   // Dedicated per-card link — opens the requests page with this exact card in a popup
   const cardShareUrl = trackingId
@@ -884,7 +889,7 @@ whatsapp_number: request.whatsapp_number || null,
             </div>
             <div className="flex min-w-0 items-start gap-2 text-[13px] text-slate-800">
               <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-slate-500 shrink-0 mt-0.5 md:w-3 md:h-3 lg:w-4 lg:h-4" />
-              <span className="font-medium break-words text-slate-500 line-clamp-2 min-h-[32px]" title={format(parseSqliteUtc(request.created_at || ""), "PPPP p")}>
+              <span className="font-medium break-words text-slate-500 line-clamp-2 min-h-[32px]" title={(() => { try { const _d = parseSqliteUtc(request.created_at || ""); return Number.isNaN(_d.getTime()) ? "" : format(_d, "PPPP p"); } catch { return ""; } })()} suppressHydrationWarning>
                 {formatPostedAt(request.created_at)}
               </span>
             </div>
@@ -1138,7 +1143,7 @@ whatsapp_number: request.whatsapp_number || null,
           altPhone={altPhone}
           whatsappNumber={whatsappNumber}
           trackingCode={trackingId}
-          siteOrigin={typeof window !== "undefined" ? window.location.origin : ""}
+          siteOrigin={isClient ? window.location.origin : ""}
           qrDataUrl={qrDataUrl}
           patientHbLevel={request.patient_hb_level ?? null}
           labels={{

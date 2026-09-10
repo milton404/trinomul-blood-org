@@ -15,6 +15,7 @@ export default function Error({
     console.error('Error digest:', error.digest);
     console.error('Stack:', error.stack);
     console.error('Message:', error.message);
+
   }, [error]);
 
   const isNetworkError = error.message?.toLowerCase().includes('network') || 

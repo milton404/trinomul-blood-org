@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { Download, Loader2 } from "lucide-react";
 import QRCode from "qrcode";
 import { toPng } from "html-to-image";
+import { useClientSide } from "@/lib/hooks/useClientSide";
 
 interface DonorQrCardProps {
   donorId: number;
@@ -36,13 +37,14 @@ export default function DonorQrCard({
 }: DonorQrCardProps) {
   const locale = useLocale();
   const isBn = locale === "bn";
+  const isClient = useClientSide();
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
   const frameRef = useRef<HTMLDivElement>(null);
 
   // QR payload — direct link to the donor's profile so every scanner works.
   const donorUrl =
-    typeof window !== "undefined"
+    isClient
       ? `${window.location.origin}/${locale}/donors?donor=${donorId}`
       : "https://trinomul-blood-bank.vercel.app/donors";
 
