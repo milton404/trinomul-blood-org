@@ -51,12 +51,19 @@
     },
     "app/api/feed/[id]/route.ts": {
       "maxDuration": 15
+    },
+    "app/api/admin/auto-purge/route.ts": {
+      "maxDuration": 60
     }
   },
   "crons": [
     {
       "path": "/api/health",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/admin/auto-purge",
+      "schedule": "0 3 * * 1"
     }
   ],
   "headers": [
