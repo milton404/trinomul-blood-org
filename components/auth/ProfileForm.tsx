@@ -398,7 +398,7 @@ export default function ProfileForm() {
       try {
         const top = await serverGetTopDonors(5);
         setTopDonors((top as any[]) || []);
-      } catch (e) {}
+      } catch (e) { console.error('Profile leaderboard fetch failed:', e); }
     }
 
     if (role === "patient" && user) {

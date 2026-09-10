@@ -118,13 +118,17 @@ export default function LeaderboardPage() {
     const fetchLeaderboard = async () => {
       setIsLoading(true);
       try {
-        const [topDonors, topReferrers, monthDonor, impact] = await Promise.all([
+        const results = await Promise.allSettled([
           serverGetTopDonors(20), serverGetTopReferrers(20), serverGetDonorOfTheMonth(), serverGetDonationImpactStats(),
         ]);
-        setDonors((topDonors as TopDonor[]) ?? []);
-        setReferrers((topReferrers as TopReferrer[]) ?? []);
-        setDonorOfMonth((monthDonor as DonorOfTheMonth | null) ?? null);
-        setStats((impact as ImpactStats) ?? null);
+        if (results[0].status === 'fulfilled') setDonors((results[0].value as TopDonor[]) ?? []);
+        else console.error('leaderboard topDonors failed:', results[0].reason);
+        if (results[1].status === 'fulfilled') setReferrers((results[1].value as TopReferrer[]) ?? []);
+        else console.error('leaderboard referrers failed:', results[1].reason);
+        if (results[2].status === 'fulfilled') setDonorOfMonth((results[2].value as DonorOfTheMonth | null) ?? null);
+        else console.error('leaderboard donorOfMonth failed:', results[2].reason);
+        if (results[3].status === 'fulfilled') setStats((results[3].value as ImpactStats) ?? null);
+        else console.error('leaderboard impactStats failed:', results[3].reason);
       } catch (error) {
         console.error('Error fetching leaderboard:', error);
       } finally {
