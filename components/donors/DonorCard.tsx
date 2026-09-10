@@ -81,6 +81,14 @@ interface DonorCardProps {
   };
 }
 
+function parseDateSafe(raw: string | null | undefined): Date {
+  if (!raw) return new Date(NaN);
+  let s = String(raw).trim();
+  if (s.includes(" ") && !s.includes("T")) s = s.replace(" ", "T");
+  if (!/[Zz]|[+-]\d{2}:?\d{2}$/.test(s)) s = s + "Z";
+  return new Date(s);
+}
+
 const typeBadgeClass = (eligible: boolean | undefined) =>
   `px-2 py-0.5 rounded-md text-[9px] sm:text-[10px] font-bold border inline-flex items-center gap-1 ${
     eligible
@@ -311,12 +319,13 @@ export default function DonorCard({ donor }: DonorCardProps) {
   const isAnonymous = Boolean(donor.is_anonymous);
   const displayName = isAnonymous ? "Anonymous Donor" : donor.full_name;
   const donorSinceYear = donor.created_at
-    ? new Date(donor.created_at.includes("T") ? donor.created_at : donor.created_at.replace(" ", "T") + "Z").getFullYear()
+    ? parseDateSafe(donor.created_at).getFullYear()
     : null;
   const presence = (() => {
     if (!donor.last_active_at) return null;
     try {
-      const last = new Date(donor.last_active_at.includes("T") ? donor.last_active_at : donor.last_active_at.replace(" ", "T") + "Z").getTime();
+      const last = parseDateSafe(donor.last_active_at).getTime();
+      if (Number.isNaN(last)) return null;
       const diffMs = now - last;
       if (diffMs < 0) return null;
 
@@ -484,6 +493,22 @@ export default function DonorCard({ donor }: DonorCardProps) {
         <span className={typeBadgeClass(donor.eligible_plasma)}>💉 {isBn ? "প্লাজমা" : "Plasma"}</span>
       </div>
 
+      {!donor.eligible_whole_blood && typeCount > 0 && (() => {
+        const canDonate: string[] = [];
+        if (donor.eligible_platelets) canDonate.push(isBn ? "প্লাটিলেট" : "Platelets");
+        if (donor.eligible_plasma) canDonate.push(isBn ? "প্লাজমা" : "Plasma");
+        return (
+          <div className="flex items-center gap-1.5 p-2 bg-blue-50 rounded-lg border border-blue-200 mb-3 sm:mb-4">
+            <Droplet className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+            <p className="text-[10px] sm:text-xs font-medium text-blue-700">
+              {isBn
+                ? `সম্পূর্ণ রক্ত নয় — শুধু ${canDonate.join(", ")} দিতে পারবেন`
+                : `Not whole blood — can only donate ${canDonate.join(", ")}`}
+            </p>
+          </div>
+        );
+      })()}
+
       <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-4 sm:mb-6">
         {donor.badges.map((badge, i) => (
           <span
@@ -539,7 +564,7 @@ export default function DonorCard({ donor }: DonorCardProps) {
             )}
           </div>
           <div className="flex items-center gap-2 text-[9px] sm:text-[10px] text-slate-500 font-medium">
-            {donorSinceYear && <span>Since {donorSinceYear}</span>}
+            {donorSinceYear && !Number.isNaN(donorSinceYear) && <span>Since {donorSinceYear}</span>}
             {avgResponseMin !== null && (
               <span className="inline-flex items-center gap-0.5">
                 <Clock className="w-2.5 h-2.5" />
