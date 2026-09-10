@@ -546,7 +546,7 @@ export default function RequestCard({ request }: RequestCardProps) {
   }, [showQrModal, qrMode, qrModalDataUrl, absoluteTrackingUrl, cardShareUrl, trackingId, request.id]);
 
   useEffect(() => {
-    if (!cardShareUrl || inlineQrUrl) return;
+    if (!isClient || !cardShareUrl || inlineQrUrl) return;
     const size = 200;
     const canvas = document.createElement("canvas");
     canvas.width = size;
@@ -609,7 +609,7 @@ export default function RequestCard({ request }: RequestCardProps) {
         img.src = dataUrl;
       })
       .catch(() => {});
-  }, [cardShareUrl, inlineQrUrl, trackingId, request.id]);
+  }, [isClient, cardShareUrl, inlineQrUrl, trackingId, request.id]);
 
   const buildShareText = () => {
     const parts = [
