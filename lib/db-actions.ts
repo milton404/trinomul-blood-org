@@ -1169,6 +1169,8 @@ export interface RecordDonationByScanInput {
 export interface RecordDonationByScanResult {
   success: boolean;
   donationId?: number;
+  /** True when this donation completed the request's required units. */
+  fulfilled?: boolean;
   error?: string;
 }
 
@@ -1258,7 +1260,33 @@ export async function serverRecordDonationByScan(
         [input.referrerProfileId ?? null, input.referrerName ?? null, input.referrerPhone ?? null, input.requestId],
       );
     }
-    return { success: true, donationId };
+
+    // Lifecycle: fulfill the request once its required units are all donated,
+    // otherwise advance the tracking status to "donating".
+    const { rows: sumRows } = await pgQuery<{ total: string | number }>(
+      "SELECT COALESCE(SUM(units), 0) AS total FROM donations WHERE request_id = $1",
+      [input.requestId],
+    );
+    const totalUnits = Number(sumRows[0]?.total ?? 0);
+    const unitsNeeded = Number(req.units_needed) || 1;
+    if (totalUnits >= unitsNeeded) {
+      await pgQuery(
+        `UPDATE blood_requests
+         SET status = 'fulfilled', current_status = 'fulfilled', donor_id = $1,
+             donated_at = NOW(), fulfilled_at = NOW(), show_fulfilled_badge = 1, updated_at = NOW()
+         WHERE id = $2 AND status = 'active'`,
+        [me.id, input.requestId],
+      );
+      await addStatusLogPg(input.requestId, "fulfilled", `donor:${profile.id}`, "Fulfilled via donor QR scan");
+      return { success: true, donationId, fulfilled: true };
+    }
+    await addStatusLogPg(
+      input.requestId,
+      "donating",
+      `donor:${profile.id}`,
+      `Donation recorded via scan (${totalUnits}/${unitsNeeded} units)`,
+    );
+    return { success: true, donationId, fulfilled: false };
   }
   const { getDb } = await import("@/lib/db");
   const db = getDb();
@@ -1284,7 +1312,25 @@ export async function serverRecordDonationByScan(
     referrerPhone: input.referrerPhone ?? null,
   });
 
-  return { success: true, donationId };
+  // Lifecycle mirror of the PG path: fulfill when units met, else "donating".
+  const db = getDb();
+  const totalRow = db
+    .prepare("SELECT COALESCE(SUM(units), 0) AS total FROM donations WHERE request_id = ?")
+    .get(input.requestId) as { total: number };
+  const totalUnits = Number(totalRow?.total ?? 0);
+  const unitsNeeded = Number(req.units_needed) || 1;
+  if (totalUnits >= unitsNeeded) {
+    dbUpdateRequestStatus(input.requestId, "fulfilled");
+    addStatusLog(input.requestId, "fulfilled", `donor:${profile.id}`, "Fulfilled via donor QR scan");
+    return { success: true, donationId, fulfilled: true };
+  }
+  addStatusLog(
+    input.requestId,
+    "donating",
+    `donor:${profile.id}`,
+    `Donation recorded via scan (${totalUnits}/${unitsNeeded} units)`,
+  );
+  return { success: true, donationId, fulfilled: false };
 }
 
 // Stats actions

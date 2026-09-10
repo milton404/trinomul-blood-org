@@ -42,12 +42,17 @@ export default function DonorQrScanner({ onClose, onRecorded }: { onClose: () =>
   const [phase, setPhase] = useState<Phase>("scan");
   const [request, setRequest] = useState<ScannedRequestInfo | null>(null);
   const [recordingError, setRecordingError] = useState("");
+  const [units, setUnits] = useState(1);
+  const [fulfilledNow, setFulfilledNow] = useState(false);
 
   // Referrer state
   const [referrerQuery, setReferrerQuery] = useState("");
   const [referrerResults, setReferrerResults] = useState<any[]>([]);
   const [selectedReferrer, setSelectedReferrer] = useState<any | null>(null);
   const [searchingReferrers, setSearchingReferrers] = useState(false);
+  const [referrerMode, setReferrerMode] = useState<"search" | "manual">("search");
+  const [manualReferrerName, setManualReferrerName] = useState("");
+  const [manualReferrerPhone, setManualReferrerPhone] = useState("");
 
   const isBn = useLocaleIsBn();
 
@@ -225,11 +230,13 @@ export default function DonorQrScanner({ onClose, onRecorded }: { onClose: () =>
     try {
       const result = await serverRecordDonationByScan({
         requestId: request.requestId,
+        units,
         referrerProfileId: selectedReferrer?.profile_id ?? null,
-        referrerName: selectedReferrer?.name ?? null,
-        referrerPhone: selectedReferrer?.phone ?? null,
+        referrerName: referrerMode === "manual" ? manualReferrerName.trim() || null : selectedReferrer?.name ?? null,
+        referrerPhone: referrerMode === "manual" ? manualReferrerPhone.trim() || null : selectedReferrer?.phone ?? null,
       });
       if (result.success) {
+        setFulfilledNow(!!result.fulfilled);
         setPhase("success");
         onRecorded?.();
       } else {
@@ -246,9 +253,14 @@ export default function DonorQrScanner({ onClose, onRecorded }: { onClose: () =>
     setPhase("scan");
     setRequest(null);
     setRecordingError("");
+    setUnits(1);
+    setFulfilledNow(false);
     setReferrerQuery("");
     setReferrerResults([]);
     setSelectedReferrer(null);
+    setReferrerMode("search");
+    setManualReferrerName("");
+    setManualReferrerPhone("");
     if (scanMode === "camera") startCamera(activeDeviceId);
   };
 
@@ -436,12 +448,84 @@ export default function DonorQrScanner({ onClose, onRecorded }: { onClose: () =>
               </div>
             </div>
 
-            {/* Optional referrer */}
+            {/* Units donated */}
             <div className="mb-4">
               <label className="text-xs font-semibold text-slate-700 mb-1.5 block">
-                {isBn ? "রেফারার? (ঐচ্ছিক)" : "Referred by? (optional)"}
+                {isBn ? "কত ইউনিট দিয়েছেন?" : "How many units did you donate?"}
               </label>
-              {selectedReferrer ? (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setUnits((u) => Math.max(1, u - 1))}
+                  className="w-9 h-9 rounded-lg border border-slate-200 text-slate-600 text-lg font-bold hover:bg-slate-50 transition-colors"
+                  aria-label="Decrease units"
+                >
+                  −
+                </button>
+                <div className="flex-1 text-center py-2 rounded-lg bg-slate-50 border border-slate-200">
+                  <span className="text-lg font-black text-slate-900">{units}</span>
+                  <span className="text-xs text-slate-400 ml-1">
+                    {isBn ? "ইউনিট" : units === 1 ? "unit" : "units"}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setUnits((u) => Math.min(request.unitsNeeded || 10, u + 1))}
+                  className="w-9 h-9 rounded-lg border border-slate-200 text-slate-600 text-lg font-bold hover:bg-slate-50 transition-colors"
+                  aria-label="Increase units"
+                >
+                  +
+                </button>
+              </div>
+              {units >= (request.unitsNeeded || 1) && (
+                <p className="text-[10px] text-emerald-600 mt-1.5 flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" />
+                  {isBn ? "সব ইউনিট পূরণ — অনুরোধটি স্বয়ংক্রিয়ভাবে পূর্ণ হবে" : "All units met — request will be marked fulfilled"}
+                </p>
+              )}
+            </div>
+
+            {/* Optional referrer */}
+            <div className="mb-4">
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-xs font-semibold text-slate-700">
+                  {isBn ? "রেফারার? (ঐচ্ছিক)" : "Referred by? (optional)"}
+                </label>
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setReferrerMode("search")}
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-colors ${
+                      referrerMode === "search" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {isBn ? "খুঁজুন" : "Search"}
+                  </button>
+                  <button
+                    onClick={() => { setReferrerMode("manual"); setSelectedReferrer(null); setReferrerQuery(""); }}
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-semibold transition-colors ${
+                      referrerMode === "manual" ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
+                    }`}
+                  >
+                    {isBn ? "ম্যানুয়াল" : "Manual"}
+                  </button>
+                </div>
+              </div>
+              {referrerMode === "manual" ? (
+                <div className="space-y-2">
+                  <input
+                    type="text"
+                    value={manualReferrerName}
+                    onChange={(e) => setManualReferrerName(e.target.value)}
+                    placeholder={isBn ? "রেফারারের নাম" : "Referrer name"}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-300 outline-none"
+                  />
+                  <input
+                    type="tel"
+                    value={manualReferrerPhone}
+                    onChange={(e) => setManualReferrerPhone(e.target.value)}
+                    placeholder={isBn ? "রেফারারের ফোন (ঐচ্ছিক)" : "Referrer phone (optional)"}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:border-emerald-400 focus:ring-1 focus:ring-emerald-300 outline-none"
+                  />
+                </div>
+              ) : selectedReferrer ? (
                 <div className="flex items-center justify-between bg-slate-50 rounded-lg px-3 py-2">
                   <div className="flex items-center gap-2">
                     <User className="w-4 h-4 text-slate-400" />
@@ -525,7 +609,13 @@ export default function DonorQrScanner({ onClose, onRecorded }: { onClose: () =>
               {isBn ? "ডোনেশন রেকর্ড হয়েছে!" : "Donation Recorded!"}
             </p>
             <p className="text-sm text-slate-500 mb-4">
-              {isBn ? "অ্যাডমিন যাচাই করার পর অনুরোধের অবস্থা আপডেট হবে।" : "Admin will verify and update the request status."}
+              {fulfilledNow
+                ? (isBn
+                  ? "সব ইউনিট পূরণ হয়েছে — অনুরোধটি পূর্ণ হিসেবে চিহ্নিত হয়েছে।"
+                  : "All units met — the request has been marked fulfilled.")
+                : (isBn
+                  ? "অনুরোধের ট্র্যাকিং স্ট্যাটাস আপডেট হয়েছে।"
+                  : "The request's tracking status has been updated.")}
             </p>
             <button
               onClick={onClose}

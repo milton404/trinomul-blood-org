@@ -1000,7 +1000,7 @@ whatsapp_number: request.whatsapp_number || null,
             {trackingUrl && (
               <a
                 href={trackingUrl}
-                className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-green-200 bg-green-50 text-[11px] font-semibold text-green-700 hover:text-green-800 hover:bg-green-100 hover:border-green-300 transition-colors"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md border border-green-200 bg-green-50 text-xs font-semibold text-green-700 hover:text-green-800 hover:bg-green-100 hover:border-green-300 transition-colors"
                 title="Track this request's live status"
               >
                 <QrCode className="w-3 h-3" />
@@ -1020,13 +1020,13 @@ whatsapp_number: request.whatsapp_number || null,
             {/* Copy link only */}
             <button
               onClick={handleShare}
-              className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full border border-slate-200 text-[10px] font-semibold text-slate-600 hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50 transition-colors"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-slate-200 text-[11px] font-semibold text-slate-600 hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50 transition-colors"
               title={t("share")}
             >
               {shareCopied ? (
-                <Check className="w-2.5 h-2.5 shrink-0" />
+                <Check className="w-3 h-3 shrink-0" />
               ) : (
-                <Link2 className="w-2.5 h-2.5 shrink-0" />
+                <Link2 className="w-3 h-3 shrink-0" />
               )}
               <span className="leading-none">{shareCopied ? t("link_copied") : (isBn ? "লিংক" : "Link")}</span>
             </button>
@@ -1035,15 +1035,15 @@ whatsapp_number: request.whatsapp_number || null,
             <button
               onClick={handleCopyText}
               disabled={translating}
-              className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full border border-slate-200 text-[10px] font-semibold text-slate-600 hover:text-emerald-600 hover:border-emerald-300 hover:bg-emerald-50 transition-colors disabled:opacity-60 disabled:cursor-wait whitespace-nowrap"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-slate-200 text-[11px] font-semibold text-slate-600 hover:text-emerald-600 hover:border-emerald-300 hover:bg-emerald-50 transition-colors disabled:opacity-60 disabled:cursor-wait whitespace-nowrap"
               title={isBn ? "টেক্সট কপি করুন" : "Copy text"}
             >
               {translating ? (
-                <Loader2 className="w-2.5 h-2.5 shrink-0 animate-spin" />
+                <Loader2 className="w-3 h-3 shrink-0 animate-spin" />
               ) : textCopied ? (
-                <Check className="w-2.5 h-2.5 shrink-0" />
+                <Check className="w-3 h-3 shrink-0" />
               ) : (
-                <Copy className="w-2.5 h-2.5 shrink-0" />
+                <Copy className="w-3 h-3 shrink-0" />
               )}
               <span className="leading-none">
                 {translating
@@ -1063,10 +1063,10 @@ whatsapp_number: request.whatsapp_number || null,
                   e.stopPropagation();
                   setShowShareMenu(!showShareMenu);
                 }}
-                className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full border border-slate-200 text-[10px] font-semibold text-slate-600 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-slate-200 text-[11px] font-semibold text-slate-600 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition-colors"
                 title={isBn ? "শেয়ার করুন" : "Share"}
               >
-                <Share2 className="w-2.5 h-2.5 shrink-0" />
+                <Share2 className="w-3 h-3 shrink-0" />
                 <span className="leading-none">{isBn ? "শেয়ার" : "Share"}</span>
               </button>
               {showShareMenu && (
@@ -1108,13 +1108,13 @@ whatsapp_number: request.whatsapp_number || null,
             <button
               onClick={handleDownloadImage}
               disabled={downloading}
-              className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full bg-slate-900 text-white text-[10px] font-semibold hover:bg-slate-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-slate-900 text-white text-[11px] font-semibold hover:bg-slate-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               title={t("download")}
             >
               {downloading ? (
-                <Loader2 className="w-2.5 h-2.5 shrink-0 animate-spin" />
+                <Loader2 className="w-3 h-3 shrink-0 animate-spin" />
               ) : (
-                <Download className="w-2.5 h-2.5 shrink-0" />
+                <Download className="w-3 h-3 shrink-0" />
               )}
               <span className="leading-none">{t("download")}</span>
             </button>
