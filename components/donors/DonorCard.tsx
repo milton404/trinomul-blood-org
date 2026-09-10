@@ -81,11 +81,12 @@ interface DonorCardProps {
   };
 }
 
-function parseDateSafe(raw: string | null | undefined): Date {
+function parseDateSafe(raw: string | Date | null | undefined): Date {
   if (!raw) return new Date(NaN);
+  if (raw instanceof Date) return new Date(raw.getTime());
   let s = String(raw).trim();
   if (s.includes(" ") && !s.includes("T")) s = s.replace(" ", "T");
-  if (!/[Zz]|[+-]\d{2}:?\d{2}$/.test(s)) s = s + "Z";
+  if (!/[Zz]|[+-]\d{2}:?\d{2}$|[+-]\d{2}$/.test(s)) s = s + "Z";
   return new Date(s);
 }
 
@@ -318,9 +319,11 @@ export default function DonorCard({ donor }: DonorCardProps) {
   const isVerified = Boolean(donor.is_verified);
   const isAnonymous = Boolean(donor.is_anonymous);
   const displayName = isAnonymous ? "Anonymous Donor" : donor.full_name;
-  const donorSinceYear = donor.created_at
-    ? parseDateSafe(donor.created_at).getFullYear()
-    : null;
+  const donorSinceYear = (() => {
+    if (!donor.created_at) return null;
+    const d = parseDateSafe(donor.created_at);
+    return Number.isNaN(d.getTime()) ? null : d.getFullYear();
+  })();
   const presence = (() => {
     if (!donor.last_active_at) return null;
     try {
@@ -564,7 +567,7 @@ export default function DonorCard({ donor }: DonorCardProps) {
             )}
           </div>
           <div className="flex items-center gap-2 text-[9px] sm:text-[10px] text-slate-500 font-medium">
-            {donorSinceYear && !Number.isNaN(donorSinceYear) && <span>Since {donorSinceYear}</span>}
+            {donorSinceYear != null && <span>Since {donorSinceYear}</span>}
             {avgResponseMin !== null && (
               <span className="inline-flex items-center gap-0.5">
                 <Clock className="w-2.5 h-2.5" />
