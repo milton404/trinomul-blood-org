@@ -152,24 +152,7 @@ function formatDateTime(iso: string | Date | null | undefined): string {
     minute: '2-digit',
   });
 }
-}
 
-function formatDateTime(iso: string | Date | null | undefined): string {
-  if (!iso) return '—';
-  try {
-    const d = iso instanceof Date ? iso : new Date(String(iso).replace(' ', 'T') + (String(iso).includes('T') ? '' : 'Z'));
-    return d.toLocaleString('en-US', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  } catch {
-
-    return String(iso);
-  }
-}
 
 export default function AdminDonorDetailPage() {
   const params = useParams();
