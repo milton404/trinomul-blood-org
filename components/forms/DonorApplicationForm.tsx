@@ -7,7 +7,7 @@ import * as z from "zod";
 import { useTranslations, useLocale } from "next-intl";
 import Link from "next/link";
 import { toast } from "sonner";
-import { Loader2, Send } from "lucide-react";
+import { Loader2, Send, Droplet } from "lucide-react";
 import { serverSubmitDonorApplication } from "@/lib/db-actions";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
 import { RANGPUR_DISTRICTS, getUpazilasByDistrict, getUnionsByUpazila } from "@/lib/constants/rangpur";
@@ -171,10 +171,27 @@ export default function DonorApplicationForm() {
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">{t("blood_group")} *</label>
-            <select {...register("bloodGroup")} className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition bg-white">
-              <option value="">{t("select_blood_group")}</option>
-              {bloodGroups.map((bg) => <option key={bg} value={bg}>{bg}</option>)}
-            </select>
+            <div className="grid grid-cols-4 gap-2">
+              {bloodGroups.map((bg) => {
+                const selected = watch("bloodGroup") === bg;
+                return (
+                  <button
+                    key={bg}
+                    type="button"
+                    onClick={() => setValue("bloodGroup", bg, { shouldValidate: true })}
+                    className={[
+                      "flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl border-2 transition-all active:scale-95",
+                      selected
+                        ? "bg-red-600 text-white border-red-600 shadow-md"
+                        : "bg-white text-red-600 border-red-200 hover:border-red-400 hover:bg-red-50",
+                    ].join(" ")}
+                  >
+                    <Droplet className={`w-4 h-4 ${selected ? "fill-white" : "fill-red-100"}`} />
+                    <span className="text-sm font-bold">{bg}</span>
+                  </button>
+                );
+              })}
+            </div>
             {errors.bloodGroup && <p className="text-red-500 text-xs mt-1">{errors.bloodGroup.message}</p>}
           </div>
 
