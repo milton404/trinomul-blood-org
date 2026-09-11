@@ -459,7 +459,7 @@ export default function AdminEmailPage() {
                         {log.request_id ? `#${log.request_id}` : '—'}
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
-                        {new Date(log.created_at.replace(' ', 'T') + 'Z').toLocaleString()}
+                        {(() => { try { const s = log.created_at.replace(' ', 'T').replace(/[+-]\d{2}(:\d{2})?$/, ''); const d = new Date(s + 'Z'); return isNaN(d.getTime()) ? '—' : d.toLocaleString(); } catch { return '—'; } })()}
                       </td>
                     </tr>
                   ))

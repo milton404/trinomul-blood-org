@@ -130,20 +130,21 @@ function toDateSafe(iso: string | Date | null | undefined): Date | null {
   if (!iso) return null;
   if (iso instanceof Date) return isNaN(iso.getTime()) ? null : iso;
   let s = String(iso).replace(' ', 'T');
-  if (!/[zZ]$/.test(s) && !/[+-]\d{2}(:\d{2})?$/.test(s)) s += 'Z';
+  s = s.replace(/([+-])(\d{2})$/, '$1$2:00');
+  if (!/[zZ]$/.test(s) && !/[+-]\d{2}:\d{2}$/.test(s)) s += 'Z';
   const d = new Date(s);
   return isNaN(d.getTime()) ? null : d;
 }
 
 function formatDate(iso: string | Date | null | undefined): string {
   const d = toDateSafe(iso);
-  if (!d) return iso ? String(iso) : '—';
+  if (!d) return iso instanceof Date || !iso ? '—' : String(iso);
   return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 function formatDateTime(iso: string | Date | null | undefined): string {
   const d = toDateSafe(iso);
-  if (!d) return iso ? String(iso) : '—';
+  if (!d) return iso instanceof Date || !iso ? '—' : String(iso);
   return d.toLocaleString('en-US', {
     day: 'numeric',
     month: 'short',
