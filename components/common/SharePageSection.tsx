@@ -36,7 +36,7 @@ export default function SharePageSection({
     const tempCanvas = document.createElement("canvas");
     await QRCode.toCanvas(tempCanvas, targetUrl, {
       width: size,
-      margin: 2,
+      margin: 4,
       errorCorrectionLevel: "H",
       color: { dark: "#000000", light: "#00000000" },
     });
@@ -50,8 +50,8 @@ export default function SharePageSection({
 
     ctx.globalCompositeOperation = "source-in";
     const gradient = ctx.createLinearGradient(0, 0, size, size);
-    gradient.addColorStop(0, "#059669");
-    gradient.addColorStop(0.5, "#10b981");
+    gradient.addColorStop(0, "#064e3b");
+    gradient.addColorStop(0.5, "#065f46");
     gradient.addColorStop(1, "#047857");
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, size, size);
@@ -66,13 +66,13 @@ export default function SharePageSection({
     finalCtx.fillRect(0, 0, size, size);
     finalCtx.drawImage(canvas, 0, 0);
 
-    const logoSize = size * 0.22;
+    const logoSize = size * 0.16;
     const logoX = (size - logoSize) / 2;
     const logoY = (size - logoSize) / 2;
 
     finalCtx.fillStyle = "#ffffff";
     finalCtx.beginPath();
-    finalCtx.arc(size / 2, size / 2, logoSize / 2 + 18, 0, Math.PI * 2);
+    finalCtx.arc(size / 2, size / 2, logoSize / 2 + 12, 0, Math.PI * 2);
     finalCtx.fill();
 
     try {
