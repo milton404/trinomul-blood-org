@@ -5098,6 +5098,13 @@ export async function serverSubmitDonorApplication(data: {
   diseaseDetails?: string;
   avatarUrl?: string;
 }) {
+  const rateKey = await enforceRateLimit(
+    "donor-application",
+    1,
+    5 * 60 * 1000,
+    5 * 60 * 1000,
+  );
+
   const existing = (await (isSupabaseAvailable() ? serverGetProfileByEmail(data.email) : getProfileByEmail(data.email))) as any;
   if (existing) {
     throw new Error("An account with this email already exists.");
@@ -5179,6 +5186,7 @@ export async function serverSubmitDonorApplication(data: {
     });
   }
 
+  if (rateKey) await incrementRateLimit(rateKey, 5 * 60 * 1000);
   return { id };
 }
 
