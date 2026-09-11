@@ -59,34 +59,23 @@ import {
   getUpazilasByDistrict,
   getUnionsByUpazila,
 } from "@/lib/constants/rangpur";
+import {
+  toValidBangladeshCoordinates,
+  resolveAreaCentroid,
+} from "@/lib/location-coordinates";
 
 /**
  * Resolve a request's coordinates the same way the Requests page does:
  * explicit lat/lng first, then upazila centroid, then district centroid.
  */
 function requestCoords(req: any): { lat: number; lng: number } | null {
-  if (typeof req.lat === "number" && typeof req.lng === "number") {
-    return { lat: req.lat, lng: req.lng };
-  }
-  const upaName = (req.upazila || "").toLowerCase();
-  if (upaName) {
-    const upa = RANGPUR_UPAZILAS.find(
-      (u) =>
-        u.name_en.toLowerCase() === upaName ||
-        u.name_bn === req.upazila ||
-        u.name_en.toLowerCase().endsWith(upaName) ||
-        u.name_en.toLowerCase().split(" ")[0] === upaName,
-    );
-    if (upa) return { lat: upa.lat, lng: upa.lng };
-  }
-  const distName = (req.district || "").toLowerCase();
-  if (distName) {
-    const d = RANGPUR_DISTRICTS.find(
-      (x) => x.name_en.toLowerCase() === distName || x.name_bn === req.district,
-    );
-    if (d) return { lat: d.lat, lng: d.lng };
-  }
-  return null;
+  // Trust stored coords only when valid Bangladesh coordinates (guards
+  // against sentinel/corrupt values like 0,0).
+  const exact = toValidBangladeshCoordinates(req.lat, req.lng);
+  if (exact) return exact;
+  // District-scoped lookup so same-named upazilas in different districts
+  // (Pirganj, Phulbari) resolve to the correct centroid.
+  return resolveAreaCentroid(req.district, req.upazila, req.union_name);
 }
 
 export default function HomePage() {

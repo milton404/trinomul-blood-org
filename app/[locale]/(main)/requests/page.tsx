@@ -21,6 +21,10 @@ import {
 import { fetchRequestsData, fetchDonorsData } from '@/lib/public-reads';
 import { serverParseSearchQuery } from '@/lib/ai/search-parser';
 import { RANGPUR_DISTRICTS, RANGPUR_UPAZILAS } from '@/lib/constants/rangpur';
+import {
+  toValidBangladeshCoordinates,
+  resolveAreaCentroid,
+} from '@/lib/location-coordinates';
 import { useUserLocation, haversineKm } from '@/hooks/use-user-location';
 import AiThinkingBadge from '@/components/common/AiThinkingBadge';
 import { forwardGeocode } from '@/lib/forward-geocode';
@@ -340,28 +344,14 @@ const SORT_BN: Record<string, string> = { urgency: 'জরুরিতা', near
 
 /** Resolve a request's coordinates, falling back to its upazila/district centroid. */
 function requestCoords(req: any): { lat: number; lng: number } | null {
-  if (typeof req.lat === 'number' && typeof req.lng === 'number') {
-    return { lat: req.lat, lng: req.lng };
-  }
-  const upaName = (req.upazila || '').toLowerCase();
-  if (upaName) {
-    const upa = RANGPUR_UPAZILAS.find(
-      (u) =>
-        u.name_en.toLowerCase() === upaName ||
-        u.name_bn === req.upazila ||
-        u.name_en.toLowerCase().endsWith(upaName) ||
-        u.name_en.toLowerCase().split(' ')[0] === upaName,
-    );
-    if (upa) return { lat: upa.lat, lng: upa.lng };
-  }
-  const distName = (req.district || '').toLowerCase();
-  if (distName) {
-    const d = RANGPUR_DISTRICTS.find(
-      (x) => x.name_en.toLowerCase() === distName || x.name_bn === req.district,
-    );
-    if (d) return { lat: d.lat, lng: d.lng };
-  }
-  return null;
+  // Trust stored coords only when they're valid Bangladesh coordinates —
+  // guards against corrupt/sentinel values (e.g. 0,0) that would otherwise
+  // place the pin in the ocean.
+  const exact = toValidBangladeshCoordinates(req.lat, req.lng);
+  if (exact) return exact;
+  // District-scoped hierarchy lookup so same-named upazilas in different
+  // districts (Pirganj, Phulbari) resolve to the correct centroid.
+  return resolveAreaCentroid(req.district, req.upazila, req.union_name);
 }
 
 // SSR-safe map load — Leaflet touches `window` at import.

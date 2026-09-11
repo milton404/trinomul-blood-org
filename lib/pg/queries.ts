@@ -6,12 +6,7 @@ import {
   isLastChanceRequest,
   generateTrackingCode,
 } from "@/lib/db";
-import {
-  RANGPUR_DISTRICTS,
-  RANGPUR_UPAZILAS,
-  RANGPUR_UNIONS,
-} from "@/lib/constants/rangpur";
-import { toValidBangladeshCoordinates } from "@/lib/location-coordinates";
+import { resolveLocationCoordinates } from "@/lib/location-coordinates";
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -22,33 +17,16 @@ function resolveCoords(
   upazilaName?: string | null,
   unionName?: string | null,
 ): { lat: number; lng: number } {
-  const exactCoords = toValidBangladeshCoordinates(lat, lng);
-  if (exactCoords) return exactCoords;
-  if (unionName) {
-    const lower = unionName.toLowerCase();
-    const union = RANGPUR_UNIONS.find(
-      (u) => u.id === lower || u.name_en.toLowerCase() === lower || u.name_bn === unionName,
-    );
-    if (union) return { lat: union.lat, lng: union.lng };
-  }
-  if (upazilaName) {
-    const lower = upazilaName.toLowerCase();
-    const upazila = RANGPUR_UPAZILAS.find(
-      (u) => u.id === lower || u.name_en.toLowerCase() === lower || u.name_bn === upazilaName,
-    );
-    if (upazila) return { lat: upazila.lat, lng: upazila.lng };
-  }
-  if (districtName) {
-    const lower = districtName.toLowerCase();
-    const district = RANGPUR_DISTRICTS.find(
-      (d) =>
-        d.id === lower ||
-        d.name_en.toLowerCase() === lower ||
-        d.name_bn === districtName,
-    );
-    if (district) return { lat: district.lat, lng: district.lng };
-  }
-  return { lat: 25.7439, lng: 89.2752 };
+  // District-scoped hierarchy matching lives in lib/location-coordinates —
+  // it prevents same-named upazilas in different districts (Pirganj,
+  // Phulbari) from resolving to the wrong district's centroid.
+  return resolveLocationCoordinates(
+    lat,
+    lng,
+    districtName,
+    upazilaName,
+    unionName,
+  );
 }
 
 
@@ -1251,6 +1229,33 @@ export async function getActivityLogPg(filters?: {
 
   const { rows } = await query(sql, params);
   return { rows, total };
+}
+
+/** Recent activity by admin/super_admin actors, excluding the current user.
+ *  Used by the super-admin notification panel to surface what other admins
+ *  are doing (username + entity/place). */
+export async function getRecentAdminActivityPg(opts: {
+  excludeActorId: number;
+  sinceHours?: number;
+  limit?: number;
+}) {
+  const sinceHours = opts.sinceHours ?? 24;
+  const limit = opts.limit ?? 10;
+  const { rows } = await query<any>(
+    `SELECT al.id, al.actor_id, al.actor_email, al.action, al.entity_type,
+            al.entity_id, al.details, al.created_at,
+            p.full_name_en, p.full_name_bn, p.role, p.assigned_district
+     FROM activity_log al
+     LEFT JOIN profiles p ON p.id = al.actor_id
+     WHERE al.actor_id IS NOT NULL
+       AND al.actor_id <> $1
+       AND p.role IN ('admin', 'super_admin')
+       AND al.created_at >= NOW() - ($2 || ' hours')::interval
+     ORDER BY al.created_at DESC
+     LIMIT $3`,
+    [opts.excludeActorId, String(sinceHours), limit],
+  );
+  return rows;
 }
 
 // ── Contact messages ─────────────────────────────────────────────────

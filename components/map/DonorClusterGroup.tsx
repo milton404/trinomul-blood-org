@@ -5,6 +5,7 @@ import { Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import { useTranslations, useLocale } from "next-intl";
 import Link from "next/link";
+import { resolveAreaCentroid, RANGPUR_CENTER } from "@/lib/location-coordinates";
 
 export interface DonorClusterData {
   /** Donor display name (English or Bengali). */
@@ -81,15 +82,22 @@ export default function DonorClusterGroup({
   const clusters = useMemo<Cluster[]>(() => {
     const map = new Map<string, Cluster>();
     for (const d of donors) {
-      const key = (d.upazila || "unknown").toLowerCase();
+      // Group by district + upazila so same-named upazilas in different
+      // districts (Pirganj, Phulbari) form separate, correctly-placed
+      // clusters instead of merging into one wrong pin.
+      const key = `${(d.district || "unknown").toLowerCase()}::${(d.upazila || "unknown").toLowerCase()}`;
       let cluster = map.get(key);
       if (!cluster) {
+        // Pin the cluster at the district-scoped upazila centroid. Using an
+        // individual donor's coords here could leak an exact GPS position,
+        // so we always anchor to the area centroid for privacy + accuracy.
+        const centroid = resolveAreaCentroid(d.district, d.upazila);
         cluster = {
           key,
           upazilaLabel: d.upazila || (locale === "bn" ? "অজানা" : "Unknown"),
           districtLabel: d.district || "",
-          lat: d.lat ?? 25.7439,
-          lng: d.lng ?? 89.2752,
+          lat: centroid?.lat ?? RANGPUR_CENTER.lat,
+          lng: centroid?.lng ?? RANGPUR_CENTER.lng,
           count: 0,
           eligibleCount: 0,
           bloodGroups: {},
@@ -203,7 +211,7 @@ export default function DonorClusterGroup({
                 ) : (
                   <Link
                     href={`/${locale}/donors?upazila=${encodeURIComponent(
-                      cluster.key,
+                      cluster.upazilaLabel,
                     )}`}
                     className="block text-center text-[10px] sm:text-[11px] font-bold py-1.5 rounded-md bg-green-100 text-green-800 hover:bg-green-200 border border-green-200 transition-all"
                   >

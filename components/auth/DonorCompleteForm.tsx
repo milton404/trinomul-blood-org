@@ -122,6 +122,13 @@ export default function DonorCompleteForm({ user, onComplete }: DonorCompleteFor
         if (!getValues('fullNameEn'))
           setValue('fullNameEn', profile.full_name_en || profile.full_name_bn || '');
         if (!getValues('phone') && profile.phone) setValue('phone', profile.phone);
+        // Pre-fill previously saved map coordinates so the picker shows the
+        // existing pin instead of starting blank (which would otherwise wipe
+        // the stored location on save).
+        if (typeof profile.lat === 'number' && typeof profile.lng === 'number') {
+          setPickedLat(profile.lat);
+          setPickedLng(profile.lng);
+        }
       } catch {
         // best-effort pre-fill only
       }
@@ -474,7 +481,16 @@ export default function DonorCompleteForm({ user, onComplete }: DonorCompleteFor
                 label={t('pick_location') || 'Pick Your Location on Map'}
                 hint={t('pick_location_hint') || 'Click on the map to mark your approximate location. This helps responders find you faster.'}
                 height={260}
+                initialLat={pickedLat}
+                initialLng={pickedLng}
                 onLocationChange={(lat, lng) => {
+                  // The picker emits (0,0) when the pin is removed — treat
+                  // that as "clear" rather than a real coordinate.
+                  if (lat === 0 && lng === 0) {
+                    setPickedLat(null);
+                    setPickedLng(null);
+                    return;
+                  }
                   setPickedLat(lat);
                   setPickedLng(lng);
                 }}

@@ -1,13 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Bell, X, HeartPulse, Users, Droplets, AlertTriangle, Clock, ExternalLink } from 'lucide-react';
-import { serverGetActiveBloodRequests, serverGetAllBloodRequests, serverGetRecentActivityLog } from '@/lib/db-actions';
+import { Bell, X, HeartPulse, Users, Droplets, AlertTriangle, Clock, ExternalLink, Shield } from 'lucide-react';
+import { serverGetActiveBloodRequests, serverGetAllBloodRequests, serverGetRecentActivityLog, serverGetRecentAdminActivity } from '@/lib/db-actions';
 import { useTranslations } from 'next-intl';
 
 interface NotificationItem {
   id: string;
-  type: 'urgent' | 'new_request' | 'low_hb' | 'new_donor';
+  type: 'urgent' | 'new_request' | 'low_hb' | 'new_donor' | 'admin_activity';
   title: string;
   description: string;
   timeAgo: string;
@@ -67,8 +67,24 @@ export default function NotificationPanel() {
         console.error('Error fetching low-Hb alerts:', error);
       }
 
-      setNotifications([...lowHbAlerts, ...urgentReqs, ...recentReqs].slice(0, 8));
-      setUnreadCount(urgentReqs.length + lowHbAlerts.length);
+      // Other admins' recent actions (last 24h) — super-admin oversight feed.
+      let adminActivity: NotificationItem[] = [];
+      try {
+        const acts = (await serverGetRecentAdminActivity(24, 8)) as any[];
+        adminActivity = (acts || []).map((a: any) => ({
+          id: `act-${a.id}`,
+          type: 'admin_activity' as const,
+          title: formatAdminAction(a.action, a.actor_email, a.full_name_en, a.full_name_bn),
+          description: formatAdminPlace(a.entity_type, a.details, a.assigned_district),
+          timeAgo: getTimeAgo(a.created_at),
+          href: '/admin/activity-log',
+        }));
+      } catch (error) {
+        console.error('Error fetching admin activity:', error);
+      }
+
+      setNotifications([...adminActivity, ...lowHbAlerts, ...urgentReqs, ...recentReqs].slice(0, 12));
+      setUnreadCount(adminActivity.length + urgentReqs.length + lowHbAlerts.length);
     } catch (error) {
       console.error('Error fetching notifications:', error);
     }
@@ -87,11 +103,61 @@ export default function NotificationPanel() {
     }
   };
 
+  const formatAdminAction = (
+    action: string,
+    email: string | null,
+    nameEn: string | null,
+    nameBn: string | null,
+  ): string => {
+    const who = (nameEn || nameBn || email || 'Admin').split('@')[0];
+    const verbMap: Record<string, string> = {
+      user_created: 'created a user',
+      user_updated: 'updated a user',
+      user_deleted: 'deleted a user',
+      hospital_created: 'added a hospital',
+      hospital_updated: 'updated a hospital',
+      hospital_deleted: 'deleted a hospital',
+      admin_created: 'created an admin',
+      admin_updated: 'updated an admin',
+      admin_deleted: 'deleted an admin',
+      request_created: 'created a request',
+      request_updated: 'updated a request',
+      request_status_changed: 'changed request status',
+      request_deleted: 'deleted a request',
+      donation_created: 'logged a donation',
+      donation_updated: 'updated a donation',
+      donation_deleted: 'deleted a donation',
+      organization_created: 'added an org',
+      organization_updated: 'updated an org',
+      organization_deactivated: 'deactivated an org',
+      settings_updated: 'changed site settings',
+      donor_verified: 'verified a donor',
+      donor_rejected: 'rejected a donor',
+      bulk_delete: 'bulk-deleted records',
+      bulk_deactivate: 'bulk-deactivated users',
+    };
+    const verb = verbMap[action] || action.replace(/_/g, ' ');
+    return `${who} ${verb}`;
+  };
+
+  const formatAdminPlace = (
+    entityType: string | null,
+    details: string | null,
+    district: string | null,
+  ): string => {
+    const parts: string[] = [];
+    if (entityType && entityType !== 'system') parts.push(entityType);
+    if (district) parts.push(district);
+    if (details) parts.push(details);
+    return parts.join(' • ') || '—';
+  };
+
   const getIcon = (type: string) => {
     switch (type) {
       case 'urgent': return <AlertTriangle className="w-4 h-4 text-red-500" />;
       case 'low_hb': return <Droplets className="w-4 h-4 text-red-500" />;
       case 'new_request': return <HeartPulse className="w-4 h-4 text-amber-500" />;
+      case 'admin_activity': return <Shield className="w-4 h-4 text-purple-500" />;
       default: return <Bell className="w-4 h-4 text-slate-400" />;
     }
   };
@@ -101,6 +167,7 @@ export default function NotificationPanel() {
       case 'urgent': return 'hover:bg-red-50';
       case 'low_hb': return 'hover:bg-red-50';
       case 'new_request': return 'hover:bg-amber-50';
+      case 'admin_activity': return 'hover:bg-purple-50';
       default: return 'hover:bg-slate-50';
     }
   };
@@ -148,7 +215,9 @@ export default function NotificationPanel() {
                       className={`flex items-start gap-3 p-4 transition-colors cursor-pointer ${getBgColor(notif.type)}`}
                     >
                       <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${
-                        notif.type === 'urgent' || notif.type === 'low_hb' ? 'bg-red-100' : 'bg-amber-100'
+                        notif.type === 'urgent' || notif.type === 'low_hb' ? 'bg-red-100'
+                        : notif.type === 'admin_activity' ? 'bg-purple-100'
+                        : 'bg-amber-100'
                       }`}>
                         {getIcon(notif.type)}
                       </div>

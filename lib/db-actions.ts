@@ -151,7 +151,7 @@ import {
   enforceRateLimit,
 } from "./auth/rateLimit";
 import { RANGPUR_DISTRICTS, RANGPUR_UPAZILAS, RANGPUR_UNIONS } from "./constants/rangpur";
-import { toValidBangladeshCoordinates } from "./location-coordinates";
+import { toValidBangladeshCoordinates, resolveLocationCoordinates } from "./location-coordinates";
 import { callLLM } from "./ai/providers";
 import { hashPassword } from "./auth/password";
 import {
@@ -243,6 +243,7 @@ import {
   updateSiteSettingsPg,
   recordActivityLogPg,
   getActivityLogPg,
+  getRecentAdminActivityPg,
   bulkDeleteProfilesPg,
   bulkDeactivateProfilesPg,
   bulkActivateProfilesPg,
@@ -1580,33 +1581,16 @@ function resolveCoordsLocal(
   upazilaName?: string | null,
   unionName?: string | null,
 ): { lat: number; lng: number } {
-  const exactCoords = toValidBangladeshCoordinates(lat, lng);
-  if (exactCoords) return exactCoords;
-  if (unionName) {
-    const lower = unionName.toLowerCase();
-    const union = RANGPUR_UNIONS.find(
-      (u) => u.id === lower || u.name_en.toLowerCase() === lower || u.name_bn === unionName,
-    );
-    if (union) return { lat: union.lat, lng: union.lng };
-  }
-  if (upazilaName) {
-    const lower = upazilaName.toLowerCase();
-    const upazila = RANGPUR_UPAZILAS.find(
-      (u) => u.id === lower || u.name_en.toLowerCase() === lower || u.name_bn === upazilaName,
-    );
-    if (upazila) return { lat: upazila.lat, lng: upazila.lng };
-  }
-  if (districtName) {
-    const lower = districtName.toLowerCase();
-    const district = RANGPUR_DISTRICTS.find(
-      (d) =>
-        d.id === lower ||
-        d.name_en.toLowerCase() === lower ||
-        d.name_bn === districtName,
-    );
-    if (district) return { lat: district.lat, lng: district.lng };
-  }
-  return { lat: 25.7439, lng: 89.2752 };
+  // District-scoped hierarchy matching lives in lib/location-coordinates —
+  // it prevents same-named upazilas in different districts (Pirganj,
+  // Phulbari) from resolving to the wrong district's centroid.
+  return resolveLocationCoordinates(
+    lat,
+    lng,
+    districtName,
+    upazilaName,
+    unionName,
+  );
 }
 
 
@@ -2134,6 +2118,276 @@ export async function serverRecordActivityLog(entry: {
 }) {
   if (isSupabaseAvailable()) return recordActivityLogPg(entry);
   return dbRecordActivityLog(entry);
+}
+
+/** Recent activity by OTHER admins (excludes the current admin).
+ *  Powers the super-admin "what other admins are doing" notification feed.
+ *  Each row carries actor name + role + district so the UI can show
+ *  username and place. */
+export async function serverGetRecentAdminActivity(
+  sinceHours = 24,
+  limit = 10,
+): Promise<any[]> {
+  const ctx = await requireAdmin();
+  if (isSupabaseAvailable()) {
+    return getRecentAdminActivityPg({
+      excludeActorId: ctx.id,
+      sinceHours,
+      limit,
+    });
+  }
+  return [];
+}
+
+// ── System health / maintenance checks ───────────────────────────────
+
+export interface HealthCheckResult {
+  section: string;
+  status: "ok" | "warning" | "error";
+  message: string;
+  details?: string;
+  latencyMs?: number;
+}
+
+/** Run a full battery of system health checks across every app subsystem.
+ *  Super-admin only. Each result names the failing section so the developer
+ *  can jump straight to the fix. */
+export async function serverRunSystemHealthChecks(): Promise<HealthCheckResult[]> {
+  await requireFullAdmin();
+  const results: HealthCheckResult[] = [];
+  const usePg = isSupabaseAvailable();
+
+  // 1. Database connection
+  const dbStart = Date.now();
+  try {
+    if (usePg) {
+      const { testSupabaseConnection } = await import("@/lib/supabase/client");
+      const r = await testSupabaseConnection();
+      results.push({
+        section: "Database / Supabase",
+        status: r.connected ? "ok" : "error",
+        message: r.connected ? "PostgreSQL connected" : "Connection failed",
+        details: r.error || undefined,
+        latencyMs: Date.now() - dbStart,
+      });
+    } else {
+      results.push({
+        section: "Database / Supabase",
+        status: "warning",
+        message: "Running on SQLite (local dev) — PG not configured",
+        latencyMs: Date.now() - dbStart,
+      });
+    }
+  } catch (e: any) {
+    results.push({
+      section: "Database / Supabase",
+      status: "error",
+      message: "Connection check threw",
+      details: e?.message,
+      latencyMs: Date.now() - dbStart,
+    });
+  }
+
+  // 2. Critical tables exist
+  if (usePg) {
+    const expectedTables = [
+      "profiles", "blood_requests", "donations", "activity_log",
+      "site_settings", "contact_messages", "notifications", "organizations",
+      "hospitals", "donor_matches", "email_log", "email_templates",
+      "email_settings", "password_resets", "social_posts", "stories",
+    ];
+    try {
+      const { rows } = await pgQuery<{ tablename: string }>(
+        `SELECT tablename FROM pg_tables WHERE schemaname = 'public'`,
+      );
+      const existing = new Set(rows.map((r) => r.tablename));
+      const missing = expectedTables.filter((t) => !existing.has(t));
+      results.push({
+        section: "Database / Tables",
+        status: missing.length === 0 ? "ok" : "error",
+        message:
+          missing.length === 0
+            ? `All ${expectedTables.length} critical tables present`
+            : `${missing.length} table(s) missing`,
+        details: missing.length ? missing.join(", ") : undefined,
+      });
+    } catch (e: any) {
+      results.push({
+        section: "Database / Tables",
+        status: "error",
+        message: "Could not list tables",
+        details: e?.message,
+      });
+    }
+  }
+
+  // 3. Environment variables
+  const envChecks: { name: string; set: boolean; required: boolean }[] = [
+    { name: "AUTH_SECRET", set: !!process.env.AUTH_SECRET, required: true },
+    { name: "DATABASE_URL", set: !!process.env.DATABASE_URL, required: true },
+    { name: "RESEND_API_KEY", set: !!process.env.RESEND_API_KEY, required: false },
+    { name: "NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME", set: !!process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME, required: false },
+    { name: "NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET", set: !!process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET, required: false },
+    { name: "CLOUDINARY_API_KEY", set: !!process.env.CLOUDINARY_API_KEY, required: false },
+    { name: "CLOUDINARY_API_SECRET", set: !!process.env.CLOUDINARY_API_SECRET, required: false },
+    { name: "VAPID_PUBLIC_KEY", set: !!process.env.VAPID_PUBLIC_KEY, required: false },
+    { name: "VAPID_PRIVATE_KEY", set: !!process.env.VAPID_PRIVATE_KEY, required: false },
+    { name: "DEEPSEEK_API_KEY", set: !!process.env.DEEPSEEK_API_KEY, required: false },
+    { name: "ZHIPU_API_KEY", set: !!process.env.ZHIPU_API_KEY, required: false },
+  ];
+  const missingRequired = envChecks.filter((c) => c.required && !c.set);
+  const missingOptional = envChecks.filter((c) => !c.required && !c.set);
+  results.push({
+    section: "Config / Environment",
+    status: missingRequired.length ? "error" : "ok",
+    message: missingRequired.length
+      ? `${missingRequired.length} required env var(s) missing`
+      : "All required env vars set",
+    details: [
+      missingRequired.length && `Missing required: ${missingRequired.map((c) => c.name).join(", ")}`,
+      missingOptional.length && `Optional unset: ${missingOptional.map((c) => c.name).join(", ")}`,
+    ].filter(Boolean).join(" | ") || undefined,
+  });
+
+  // 4. Email service
+  results.push({
+    section: "Email / Resend",
+    status: process.env.RESEND_API_KEY ? "ok" : "warning",
+    message: process.env.RESEND_API_KEY ? "RESEND_API_KEY configured" : "Email sending disabled — RESEND_API_KEY not set",
+  });
+
+  // 5. Image uploads (Cloudinary)
+  const cloudinaryVars = [
+    "NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME",
+    "NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET",
+    "CLOUDINARY_API_KEY",
+    "CLOUDINARY_API_SECRET",
+  ];
+  const cloudinaryMissing = cloudinaryVars.filter((v) => !process.env[v]);
+  results.push({
+    section: "Images / Cloudinary",
+    status: cloudinaryMissing.length === 0 ? "ok" : cloudinaryMissing.length === 4 ? "warning" : "warning",
+    message: cloudinaryMissing.length === 0 ? "All Cloudinary vars set" : `Photo uploads degraded — ${cloudinaryMissing.length} var(s) unset`,
+    details: cloudinaryMissing.length ? cloudinaryMissing.join(", ") : undefined,
+  });
+
+  // 6. Web Push (VAPID)
+  const vapidMissing = ["VAPID_PUBLIC_KEY", "VAPID_PRIVATE_KEY"].filter((v) => !process.env[v]);
+  results.push({
+    section: "Push / VAPID",
+    status: vapidMissing.length === 0 ? "ok" : "warning",
+    message: vapidMissing.length === 0 ? "VAPID keys configured" : "Web push disabled — VAPID keys not set",
+    details: vapidMissing.length ? vapidMissing.join(", ") : undefined,
+  });
+
+  // 7. AI features
+  const aiKeys = ["DEEPSEEK_API_KEY", "ZHIPU_API_KEY"].filter((v) => process.env[v]);
+  results.push({
+    section: "AI / LLM",
+    status: aiKeys.length > 0 ? "ok" : "warning",
+    message: aiKeys.length > 0 ? `AI provider configured (${aiKeys.length})` : "AI features using rule-based fallback — no LLM key set",
+  });
+
+  // 8. Admin accounts exist
+  if (usePg) {
+    try {
+      const { rows } = await pgQuery<{ count: string }>(
+        `SELECT COUNT(*)::text as count FROM profiles WHERE role IN ('admin','super_admin') AND is_active = true`,
+      );
+      const count = Number(rows[0]?.count || 0);
+      results.push({
+        section: "Auth / Admins",
+        status: count > 0 ? "ok" : "error",
+        message: `${count} active admin account(s)`,
+        details: count === 0 ? "No active admins — login impossible" : undefined,
+      });
+    } catch (e: any) {
+      results.push({
+        section: "Auth / Admins",
+        status: "error",
+        message: "Could not count admins",
+        details: e?.message,
+      });
+    }
+  }
+
+  // 9. Cron / auto-purge last run
+  if (usePg) {
+    try {
+      const { rows } = await pgQuery<{ created_at: string; details: string }>(
+        `SELECT created_at, details FROM activity_log WHERE action = 'auto_purge' ORDER BY created_at DESC LIMIT 1`,
+      );
+      if (rows.length > 0) {
+        const lastRun = new Date(rows[0].created_at);
+        const daysAgo = (Date.now() - lastRun.getTime()) / 86400000;
+        results.push({
+          section: "Cron / Auto-purge",
+          status: daysAgo <= 8 ? "ok" : "warning",
+          message: `Last run ${daysAgo.toFixed(1)} days ago`,
+          details: rows[0].details || undefined,
+        });
+      } else {
+        results.push({
+          section: "Cron / Auto-purge",
+          status: "warning",
+          message: "No auto-purge run logged yet — cron may not be wired",
+        });
+      }
+    } catch (e: any) {
+      results.push({
+        section: "Cron / Auto-purge",
+        status: "warning",
+        message: "Could not check cron history",
+        details: e?.message,
+      });
+    }
+  }
+
+  // 10. Recent error activity (last 24h)
+  if (usePg) {
+    try {
+      const { rows } = await pgQuery<{ count: string }>(
+        `SELECT COUNT(*)::text as count FROM activity_log WHERE action LIKE '%error%' AND created_at >= NOW() - INTERVAL '24 hours'`,
+      );
+      const errCount = Number(rows[0]?.count || 0);
+      results.push({
+        section: "Logs / Recent errors",
+        status: errCount === 0 ? "ok" : errCount < 10 ? "warning" : "error",
+        message: `${errCount} error event(s) in last 24h`,
+      });
+    } catch (e: any) {
+      results.push({
+        section: "Logs / Recent errors",
+        status: "warning",
+        message: "Could not query recent errors",
+        details: e?.message,
+      });
+    }
+  }
+
+  // 11. Storage row counts (major tables)
+  if (usePg) {
+    const storageTables = ["profiles", "blood_requests", "donations", "social_posts", "activity_log", "email_log"];
+    const storageParts: string[] = [];
+    let storageStatus: "ok" | "warning" | "error" = "ok";
+    for (const t of storageTables) {
+      try {
+        const { rows } = await pgQuery<{ count: string }>(`SELECT COUNT(*)::text as count FROM ${t}`);
+        storageParts.push(`${t}: ${rows[0]?.count || "0"}`);
+      } catch {
+        storageParts.push(`${t}: ?`);
+        storageStatus = "warning";
+      }
+    }
+    results.push({
+      section: "Storage / Row counts",
+      status: storageStatus,
+      message: "Major table sizes",
+      details: storageParts.join(" | "),
+    });
+  }
+
+  return results;
 }
 
 // ── Phase 4.1: Donations CRUD ─────────────────────────────────────────

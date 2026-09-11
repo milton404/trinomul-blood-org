@@ -16,11 +16,8 @@
  */
 
 import { getDb } from "@/lib/db";
-import {
-  RANGPUR_UPAZILAS,
-  RANGPUR_DISTRICTS,
-} from "@/lib/constants/rangpur";
-import { toValidBangladeshCoordinates } from "@/lib/location-coordinates";
+import { RANGPUR_UPAZILAS } from "@/lib/constants/rangpur";
+import { resolveLocationCoordinates } from "@/lib/location-coordinates";
 import { getEmailSettingInt } from "@/lib/email/template-settings";
 
 export const MAX_EMAIL_RECIPIENTS = 15;
@@ -91,23 +88,9 @@ function resolvePoint(
   districtName?: string | null,
   upazilaName?: string | null,
 ): { lat: number; lng: number } {
-  const exact = toValidBangladeshCoordinates(lat, lng);
-  if (exact) return exact;
-  if (upazilaName) {
-    const lower = upazilaName.toLowerCase();
-    const u = RANGPUR_UPAZILAS.find(
-      (x) => x.name_en.toLowerCase() === lower || x.name_bn === upazilaName,
-    );
-    if (u) return { lat: u.lat, lng: u.lng };
-  }
-  if (districtName) {
-    const lower = districtName.toLowerCase();
-    const d = RANGPUR_DISTRICTS.find(
-      (x) => x.name_en.toLowerCase() === lower || x.name_bn === districtName,
-    );
-    if (d) return { lat: d.lat, lng: d.lng };
-  }
-  return { lat: 25.7439, lng: 89.2752 }; // Rangpur city center
+  // District-scoped matching prevents same-named upazilas in different
+  // districts (Pirganj, Phulbari) from resolving to the wrong place.
+  return resolveLocationCoordinates(lat, lng, districtName, upazilaName);
 }
 
 function haversineKm(

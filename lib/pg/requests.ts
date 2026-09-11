@@ -10,12 +10,7 @@ import {
   getFulfilledSealHideMs,
   generateTrackingCode,
 } from "@/lib/db";
-import {
-  RANGPUR_DISTRICTS,
-  RANGPUR_UPAZILAS,
-  RANGPUR_UNIONS,
-} from "@/lib/constants/rangpur";
-import { toValidBangladeshCoordinates } from "@/lib/location-coordinates";
+import { resolveLocationCoordinates } from "@/lib/location-coordinates";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const EXPIRED_SEAL_DISPLAY_MS = DAY_MS;
@@ -27,33 +22,16 @@ function resolveCoords(
   upazilaName?: string,
   unionName?: string,
 ): { lat: number; lng: number } {
-  const exactCoords = toValidBangladeshCoordinates(lat, lng);
-  if (exactCoords) return exactCoords;
-  if (unionName) {
-    const lower = unionName.toLowerCase();
-    const union = RANGPUR_UNIONS.find(
-      (u) => u.id === lower || u.name_en.toLowerCase() === lower || u.name_bn === unionName,
-    );
-    if (union) return { lat: union.lat, lng: union.lng };
-  }
-  if (upazilaName) {
-    const lower = upazilaName.toLowerCase();
-    const upazila = RANGPUR_UPAZILAS.find(
-      (u) => u.id === lower || u.name_en.toLowerCase() === lower || u.name_bn === upazilaName,
-    );
-    if (upazila) return { lat: upazila.lat, lng: upazila.lng };
-  }
-  if (districtName) {
-    const lower = districtName.toLowerCase();
-    const district = RANGPUR_DISTRICTS.find(
-      (d) =>
-        d.id === lower ||
-        d.name_en.toLowerCase() === lower ||
-        d.name_bn === districtName,
-    );
-    if (district) return { lat: district.lat, lng: district.lng };
-  }
-  return { lat: 25.7439, lng: 89.2752 };
+  // District-scoped hierarchy matching lives in lib/location-coordinates —
+  // it prevents same-named upazilas in different districts (Pirganj,
+  // Phulbari) from resolving to the wrong district's centroid.
+  return resolveLocationCoordinates(
+    lat,
+    lng,
+    districtName,
+    upazilaName,
+    unionName,
+  );
 }
 
 // ── Lifecycle sweep ───────────────────────────────────────────────────

@@ -2,18 +2,13 @@
 import Database from "better-sqlite3";
 import path from "path";
 import {
-  RANGPUR_DISTRICTS,
-  RANGPUR_UPAZILAS,
-  RANGPUR_UNIONS,
-} from "@/lib/constants/rangpur";
-import { toValidBangladeshCoordinates } from "@/lib/location-coordinates";
+  toValidBangladeshCoordinates,
+  resolveLocationCoordinates,
+} from "@/lib/location-coordinates";
 import { rankDonorCandidates } from "@/lib/donor-ranking";
 
 // Use relative path for server-only module
 const DB_PATH = path.resolve("data/bloodbank.db");
-
-// Default fallback coordinates (Rangpur city center)
-const RANGPUR_CENTER = { lat: 25.7439, lng: 89.2752 };
 
 /**
  * Resolve coordinates for a blood request using the selected district/upazila
@@ -27,44 +22,16 @@ function resolveCoords(
   upazilaName?: string,
   unionName?: string,
 ): { lat: number; lng: number } {
-  const exactCoords = toValidBangladeshCoordinates(lat, lng);
-  if (exactCoords) {
-    return exactCoords;
-  }
-  // Try union match by id, name (EN or BN), case-insensitive
-  if (unionName) {
-    const lower = unionName.toLowerCase();
-    const union = RANGPUR_UNIONS.find(
-      (u) =>
-        u.id === lower ||
-        u.name_en.toLowerCase() === lower ||
-        u.name_bn === unionName,
-    );
-    if (union) return { lat: union.lat, lng: union.lng };
-  }
-  // Try upazila match by id, name (EN or BN), case-insensitive
-  if (upazilaName) {
-    const lower = upazilaName.toLowerCase();
-    const upazila = RANGPUR_UPAZILAS.find(
-      (u) =>
-        u.id === lower ||
-        u.name_en.toLowerCase() === lower ||
-        u.name_bn === upazilaName,
-    );
-    if (upazila) return { lat: upazila.lat, lng: upazila.lng };
-  }
-  // Try district match by id, name (EN or BN), case-insensitive
-  if (districtName) {
-    const lower = districtName.toLowerCase();
-    const district = RANGPUR_DISTRICTS.find(
-      (d) =>
-        d.id === lower ||
-        d.name_en.toLowerCase() === lower ||
-        d.name_bn === districtName,
-    );
-    if (district) return { lat: district.lat, lng: district.lng };
-  }
-  return RANGPUR_CENTER;
+  // District-scoped hierarchy matching lives in lib/location-coordinates —
+  // it prevents same-named upazilas in different districts (Pirganj,
+  // Phulbari) from resolving to the wrong district's centroid.
+  return resolveLocationCoordinates(
+    lat,
+    lng,
+    districtName,
+    upazilaName,
+    unionName,
+  );
 }
 
 /**

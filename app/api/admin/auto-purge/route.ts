@@ -14,6 +14,7 @@ export async function GET() {
     requests_purged: 0,
     orgs_purged: 0,
     stories_purged: 0,
+    activity_log_purged: 0,
     errors: [] as string[],
   };
 
@@ -75,6 +76,14 @@ export async function GET() {
       results.stories_purged = rowCount ?? 0;
     }
 
+    // Activity log: hard-delete rows older than 7 days, regardless of whether
+    // any admin saw them. Keeps the super-admin oversight feed fresh and
+    // bounds storage growth. Runs weekly via cron `0 3 * * 1`.
+    const { rowCount: activityRowCount } = await pgQuery(
+      `DELETE FROM activity_log WHERE created_at < NOW() - INTERVAL '7 days'`,
+    );
+    results.activity_log_purged = activityRowCount ?? 0;
+
     try {
       await pgQuery(
         `INSERT INTO activity_log (actor_id, actor_email, action, entity_type, details)
@@ -89,11 +98,11 @@ export async function GET() {
       ok: true,
       ...results,
       total_purged:
-
         results.posts_purged +
         results.requests_purged +
         results.orgs_purged +
-        results.stories_purged,
+        results.stories_purged +
+        results.activity_log_purged,
     });
   } catch (err: any) {
     console.error("Auto-purge failed:", err);
