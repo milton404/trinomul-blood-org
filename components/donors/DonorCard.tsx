@@ -70,6 +70,7 @@ interface DonorCardProps {
     total_units?: number;
     hb_status?: "eligible" | "low_hb" | "not_tested";
     distance_km?: number | null;
+    preferred_contact?: string;
     // Verification + presence (Phase 5)
     is_verified?: boolean | number;
     verification_status?: string;
@@ -579,22 +580,28 @@ export default function DonorCard({ donor }: DonorCardProps) {
         </div>
         {!isAnonymous && (
           <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-            <button
-              onClick={handleCall}
-              className="border-2 border-red-600 text-red-600 font-bold text-xs hover:bg-red-600 hover:text-white transition-all flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl active:scale-95 whitespace-nowrap"
-            >
-              <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              {t("contact")}
-            </button>
-            {isWhatsAppAvailable && (
-              <button
-                onClick={handleWhatsApp}
-                className="border-2 border-[#25D366] text-[#25D366] font-bold text-xs hover:bg-[#25D366] hover:text-white transition-all flex items-center justify-center px-2 sm:px-2.5 py-1.5 rounded-xl active:scale-95"
-                title="WhatsApp"
-              >
-                <WhatsAppIcon className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
-              </button>
-            )}
+            {(() => {
+              const callBtn = (
+                <button
+                  onClick={handleCall}
+                  className="border-2 border-red-600 text-red-600 font-bold text-xs hover:bg-red-600 hover:text-white transition-all flex items-center gap-1 px-2 sm:px-2.5 py-1.5 rounded-xl active:scale-95 whitespace-nowrap"
+                >
+                  <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  {t("contact")}
+                </button>
+              );
+              const waBtn = isWhatsAppAvailable ? (
+                <button
+                  onClick={handleWhatsApp}
+                  className="border-2 border-[#25D366] text-[#25D366] font-bold text-xs hover:bg-[#25D366] hover:text-white transition-all flex items-center justify-center px-2 sm:px-2.5 py-1.5 rounded-xl active:scale-95"
+                  title="WhatsApp"
+                >
+                  <WhatsAppIcon className="w-4 h-4 sm:w-4.5 sm:h-4.5" />
+                </button>
+              ) : null;
+              const preferWhatsApp = donor.preferred_contact === "whatsapp";
+              return preferWhatsApp ? <>{waBtn}{callBtn}</> : <>{callBtn}{waBtn}</>;
+            })()}
           </div>
         )}
       </div>
