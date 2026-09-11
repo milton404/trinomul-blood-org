@@ -3,17 +3,13 @@
 import { useState, useCallback, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { toast } from "sonner";
-import { Link2, Check, QrCode, Loader2 } from "lucide-react";
+import { Link2, Check, Download, Loader2 } from "lucide-react";
 import QRCode from "qrcode";
 
 interface SharePageSectionProps {
-  /** URL to share. Defaults to window.location.href. */
   url?: string;
-  /** Filename base for the downloaded QR PNG (without extension). */
   fileNameBase?: string;
-  /** Optional title shown above the buttons. Overrides i18n default. */
   title?: string;
-  /** Optional subtitle shown under the title. Overrides i18n default. */
   subtitle?: string;
 }
 
@@ -27,10 +23,84 @@ export default function SharePageSection({
   const [pageUrl, setPageUrl] = useState<string>("");
   const [copied, setCopied] = useState(false);
   const [downloadingQr, setDownloadingQr] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState<string>("");
+
 
   useEffect(() => {
     setPageUrl(url || (typeof window !== "undefined" ? window.location.href : ""));
   }, [url]);
+
+  const generateQrWithLogo = useCallback(async (targetUrl: string): Promise<string> => {
+    const size = 1024;
+
+    const tempCanvas = document.createElement("canvas");
+    await QRCode.toCanvas(tempCanvas, targetUrl, {
+      width: size,
+      margin: 2,
+      errorCorrectionLevel: "H",
+      color: { dark: "#000000", light: "#00000000" },
+    });
+
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d")!;
+
+    ctx.drawImage(tempCanvas, 0, 0);
+
+    ctx.globalCompositeOperation = "source-in";
+    const gradient = ctx.createLinearGradient(0, 0, size, size);
+    gradient.addColorStop(0, "#059669");
+    gradient.addColorStop(0.5, "#10b981");
+    gradient.addColorStop(1, "#047857");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, size, size);
+    ctx.globalCompositeOperation = "source-over";
+
+    const finalCanvas = document.createElement("canvas");
+    finalCanvas.width = size;
+    finalCanvas.height = size;
+    const finalCtx = finalCanvas.getContext("2d")!;
+
+    finalCtx.fillStyle = "#ffffff";
+    finalCtx.fillRect(0, 0, size, size);
+    finalCtx.drawImage(canvas, 0, 0);
+
+    const logoSize = size * 0.22;
+    const logoX = (size - logoSize) / 2;
+    const logoY = (size - logoSize) / 2;
+
+    finalCtx.fillStyle = "#ffffff";
+    finalCtx.beginPath();
+    finalCtx.arc(size / 2, size / 2, logoSize / 2 + 18, 0, Math.PI * 2);
+    finalCtx.fill();
+
+    try {
+      const logoImg = new Image();
+      logoImg.crossOrigin = "anonymous";
+      logoImg.src = "/trinomul-logo.png";
+      await new Promise<void>((resolve, reject) => {
+        logoImg.onload = () => resolve();
+        logoImg.onerror = () => reject();
+      });
+      finalCtx.drawImage(logoImg, logoX, logoY, logoSize, logoSize);
+    } catch {}
+
+    return finalCanvas.toDataURL("image/png");
+  }, []);
+
+  useEffect(() => {
+    if (!pageUrl) return;
+    let cancelled = false;
+    generateQrWithLogo(pageUrl)
+      .then((dataUrl) => {
+        if (!cancelled) setQrDataUrl(dataUrl);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [pageUrl, generateQrWithLogo]);
 
   const handleCopyLink = useCallback(async () => {
     if (!pageUrl) return;
@@ -45,18 +115,12 @@ export default function SharePageSection({
   }, [pageUrl, t]);
 
   const handleDownloadQr = useCallback(async () => {
-    if (!pageUrl) return;
+    if (!qrDataUrl) return;
     setDownloadingQr(true);
     try {
-      const dataUrl = await QRCode.toDataURL(pageUrl, {
-        width: 1024,
-        margin: 2,
-        errorCorrectionLevel: "H",
-        color: { dark: "#0f172a", light: "#ffffff" },
-      });
       const link = document.createElement("a");
       link.download = `${fileNameBase}.png`;
-      link.href = dataUrl;
+      link.href = qrDataUrl;
       link.click();
       toast.success(t("qr_downloaded"));
     } catch {
@@ -64,42 +128,55 @@ export default function SharePageSection({
     } finally {
       setDownloadingQr(false);
     }
-  }, [pageUrl, fileNameBase, t]);
+  }, [qrDataUrl, fileNameBase, t]);
 
   return (
-    <section className="mt-10 rounded-2xl border border-slate-200 bg-white/80 backdrop-blur p-6 sm:p-8">
-      <div className="text-center mb-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-slate-800 mb-1">
+    <section className="mt-6 rounded-xl border border-slate-200 bg-white/80 backdrop-blur p-4 sm:p-5">
+      <div className="text-center mb-4">
+        <h2 className="text-base sm:text-lg font-bold text-slate-800 mb-0.5">
           {title || t("share_page_title")}
         </h2>
-        <p className="text-sm text-slate-500">{subtitle || t("share_page_subtitle")}</p>
+        <p className="text-xs text-slate-500">{subtitle || t("share_page_subtitle")}</p>
       </div>
-      <div className="flex flex-col sm:flex-row items-stretch justify-center gap-3 sm:gap-4 max-w-xl mx-auto">
-        <button
-          type="button"
-          onClick={handleCopyLink}
-          className="inline-flex items-center justify-center gap-2 px-5 py-3 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors min-h-[52px] flex-1"
-        >
-          {copied ? (
-            <Check className="w-5 h-5" />
-          ) : (
-            <Link2 className="w-5 h-5" />
-          )}
-          {t("copy_link")}
-        </button>
-        <button
-          type="button"
-          onClick={handleDownloadQr}
-          disabled={downloadingQr}
-          className="inline-flex items-center justify-center gap-2 px-5 py-3 text-sm font-semibold text-white bg-slate-800 hover:bg-slate-900 rounded-xl transition-colors min-h-[52px] flex-1 disabled:opacity-60"
-        >
-          {downloadingQr ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
-          ) : (
-            <QrCode className="w-5 h-5" />
-          )}
-          {t("download_qr")}
-        </button>
+
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+        {qrDataUrl && (
+          <div className="shrink-0">
+            <img
+              src={qrDataUrl}
+              alt="QR Code"
+              className="w-32 h-32 sm:w-36 sm:h-36 rounded-lg border border-slate-200 shadow-sm"
+            />
+          </div>
+        )}
+
+        <div className="flex flex-col gap-2 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={handleCopyLink}
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors min-h-[40px] sm:w-full"
+          >
+            {copied ? (
+              <Check className="w-4 h-4" />
+            ) : (
+              <Link2 className="w-4 h-4" />
+            )}
+            {t("copy_link")}
+          </button>
+          <button
+            type="button"
+            onClick={handleDownloadQr}
+            disabled={downloadingQr || !qrDataUrl}
+            className="inline-flex items-center justify-center gap-1.5 px-4 py-2 text-xs font-semibold text-white bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 rounded-lg transition-colors min-h-[40px] sm:w-full disabled:opacity-60"
+          >
+            {downloadingQr ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Download className="w-4 h-4" />
+            )}
+            {t("download_qr")}
+          </button>
+        </div>
       </div>
     </section>
   );
