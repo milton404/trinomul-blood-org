@@ -185,7 +185,7 @@ export default function AdminDonorDetailPage() {
   const refreshProfile = () => {
     serverGetProfileByUserId(donorId).then((p) => setProfile(p as DonorProfile | null));
     serverGetDonorsWithStats().then((allDonors) => {
-      const match = (allDonors as any[])?.find((d) => d.id === donorId);
+      const match = (allDonors as any[])?.find((d) => Number(d.id) === donorId);
       setStats(match || null);
     });
   };
@@ -256,7 +256,7 @@ export default function AdminDonorDetailPage() {
       .then(([p, dons, allDonors]) => {
         setProfile(p as DonorProfile | null);
         setDonations((dons as Donation[]) || []);
-        const match = (allDonors as any[])?.find((d) => d.id === donorId);
+        const match = (allDonors as any[])?.find((d) => Number(d.id) === donorId);
         setStats(match || null);
       })
       .finally(() => setIsLoading(false));
@@ -610,7 +610,7 @@ export default function AdminDonorDetailPage() {
             // Refresh profile + stats after a verification action.
             serverGetProfileByUserId(donorId).then((p) => setProfile(p as DonorProfile | null));
             serverGetDonorsWithStats().then((allDonors) => {
-              const match = (allDonors as any[])?.find((d) => d.id === donorId);
+              const match = (allDonors as any[])?.find((d) => Number(d.id) === donorId);
               setStats(match || null);
             });
           }}
@@ -753,7 +753,7 @@ export default function AdminDonorDetailPage() {
           onSuccess={() => {
             serverGetDonationsByDonorId(donorId, Date.now()).then((dons) => setDonations((dons as Donation[]) || []));
             serverGetDonorsWithStats().then((allDonors) => {
-              const match = (allDonors as any[])?.find((d) => d.id === donorId);
+              const match = (allDonors as any[])?.find((d) => Number(d.id) === donorId);
               setStats(match || null);
             });
           }}
