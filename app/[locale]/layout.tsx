@@ -7,7 +7,7 @@ import ChatWidget from '@/components/ai/ChatWidget';
 import PresenceHeartbeat from '@/components/PresenceHeartbeat';
 import JsonLd from '@/components/seo/JsonLd';
 import AlternateLinks from '@/components/seo/AlternateLinks';
-import { getSeoTexts, SITE_URL } from '@/lib/seo';
+import { getSeoTexts, SITE_URL, SITE_NAME, SITE_NAME_BN } from '@/lib/seo';
 
 
 export function generateStaticParams() {
@@ -49,6 +49,14 @@ export async function generateMetadata({
         'max-video-preview': -1,
       },
     },
+    alternates: {
+      canonical: `${SITE_URL}/${locale}`,
+      languages: {
+        en: `${SITE_URL}/en`,
+        bn: `${SITE_URL}/bn`,
+        'x-default': `${SITE_URL}/bn`,
+      },
+    },
     icons: {
       icon: [
         { url: '/favicon.ico', sizes: 'any' },
@@ -64,7 +72,7 @@ export async function generateMetadata({
       url: `${SITE_URL}/${locale}`,
       locale: t.ogLocale,
       alternateLocale: t.ogLocaleAlternate,
-      siteName: t.title,
+      siteName: isBn ? SITE_NAME_BN : SITE_NAME,
       title: t.ogTitle,
       description: t.ogDescription,
       images: [
@@ -72,7 +80,7 @@ export async function generateMetadata({
           url: '/og-image.png',
           width: 1200,
           height: 630,
-          alt: t.title,
+          alt: isBn ? SITE_NAME_BN : SITE_NAME,
         },
       ],
     },
@@ -80,7 +88,14 @@ export async function generateMetadata({
       card: 'summary_large_image',
       title: t.ogTitle,
       description: t.ogDescription,
-      images: ['/og-image.png'],
+      images: [
+        {
+          url: '/og-image.png',
+          width: 1200,
+          height: 630,
+          alt: isBn ? SITE_NAME_BN : SITE_NAME,
+        },
+      ],
     },
   };
 }

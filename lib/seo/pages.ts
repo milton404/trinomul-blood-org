@@ -222,11 +222,12 @@ export function buildPageMetadata({
 
 export function pageOgCardProps(page: PageKey): OgCardProps {
   const p = PAGES[page];
+  const displayDomain = SITE_URL.replace(/^https?:\/\//, "");
   return {
     title: p.titleEn,
     description: p.descriptionEn,
     badge: p.badgeEn,
     siteName: SITE_NAME,
-    siteUrl: "trinomul.org",
+    siteUrl: displayDomain,
   };
 }

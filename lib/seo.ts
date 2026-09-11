@@ -1,5 +1,7 @@
+const FALLBACK_SITE_URL = "https://trinomul.vercel.app";
+
 function resolveSiteUrl(): string {
-  const raw = (process.env.NEXT_PUBLIC_SITE_URL || "https://trinomul.org")
+  const raw = (process.env.NEXT_PUBLIC_SITE_URL || FALLBACK_SITE_URL)
     .trim()
     .replace(/^["']|["']$/g, "")
     .replace(/\/$/, "");
@@ -7,7 +9,7 @@ function resolveSiteUrl(): string {
     new URL(raw);
     return raw;
   } catch {
-    return "https://trinomul.org";
+    return FALLBACK_SITE_URL;
   }
 }
 

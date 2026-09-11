@@ -7,10 +7,11 @@ import {
   serverGetBloodRequestById,
   serverGetBloodRequestByTrackingCode,
 } from "@/lib/db-actions";
-import { SITE_NAME } from "@/lib/seo";
+import { SITE_NAME, SITE_URL } from "@/lib/seo";
 
 export const size = OG_SIZE;
 export const contentType = OG_CONTENT_TYPE;
+export const alt = "Trinomul Blood Bank — Blood Request Tracking";
 
 export default async function Image({
   params,
@@ -24,6 +25,7 @@ export default async function Image({
     if (!req) req = await serverGetBloodRequestByTrackingCode(id);
   } catch {}
 
+  const displayDomain = SITE_URL.replace(/^https?:\/\//, "");
   return renderOgImage({
     title: req
       ? `Blood Request \u2014 ${req.blood_group ?? "Needed"}`
@@ -33,6 +35,6 @@ export default async function Image({
       : "Track the status of a blood request by tracking code or ID.",
     badge: req ? req.urgency_level ?? "Request" : "Tracking",
     siteName: SITE_NAME,
-    siteUrl: "trinomul.org",
+    siteUrl: displayDomain,
   });
 }
