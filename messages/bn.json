@@ -80,7 +80,15 @@
     "resources": "রিসোর্স",
     "support": "সহায়তা",
     "blood_bank_areas": "ব্লাড ব্যাংক এলাকা",
-    "download_app": "অ্যাপ ডাউনলোড"
+    "download_app": "অ্যাপ ডাউনলোড",
+    "share_page_title": "এই পেজটি শেয়ার করুন",
+    "share_page_subtitle": "শেয়ার করুন বা স্ক্যান করে পেজটি খুলুন",
+    "copy_link": "লিংক কপি",
+    "link_copied": "লিংক কপি হয়েছে",
+    "copy_failed": "লিংক কপি ব্যর্থ",
+    "download_qr": "QR কোড ডাউনলোড",
+    "qr_downloaded": "QR কোড ডাউনলোড হয়েছে",
+    "qr_failed": "QR কোড তৈরি ব্যর্থ"
   },
   "transparency": {
     "title": "স্বচ্ছতা ড্যাশবোর্ড",

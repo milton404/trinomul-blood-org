@@ -5,6 +5,7 @@ import Image from "next/image";
 import DonorApplicationForm from "@/components/forms/DonorApplicationForm";
 import Navbar from "@/components/common/Navbar";
 import Footer from "@/components/common/Footer";
+import SharePageSection from "@/components/common/SharePageSection";
 
 export default function BecomeDonorPage() {
   const t = useTranslations("donor_application");
@@ -27,6 +28,7 @@ export default function BecomeDonorPage() {
             <p className="text-slate-500 max-w-lg mx-auto">{t("page_subtitle")}</p>
           </div>
           <DonorApplicationForm />
+          <SharePageSection fileNameBase="become-donor-qr" />
         </div>
       </main>
       <Footer />

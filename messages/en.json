@@ -80,7 +80,15 @@
     "resources": "Resources",
     "support": "Support",
     "blood_bank_areas": "Blood Bank Areas",
-    "download_app": "Download App"
+    "download_app": "Download App",
+    "share_page_title": "Share this page",
+    "share_page_subtitle": "Share or scan to open this page",
+    "copy_link": "Copy Link",
+    "link_copied": "Link copied to clipboard",
+    "copy_failed": "Failed to copy link",
+    "download_qr": "Download QR Code",
+    "qr_downloaded": "QR code downloaded",
+    "qr_failed": "Failed to generate QR code"
   },
   "transparency": {
     "title": "Transparency Dashboard",
