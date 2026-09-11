@@ -27,8 +27,9 @@ import {
   serverGetDonationsByHospital,
   serverGetHospitalStats,
 } from "@/lib/db-actions";
-import { Link } from "@/i18n/routing";
+import { Link, useRouter } from "@/i18n/routing";
 import { useAuthStore } from "@/store/authStore";
+import { clearSession } from "@/components/providers/AuthProvider";
 import { useTranslations, useLocale } from "next-intl";
 import { toast } from "sonner";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
@@ -59,6 +60,7 @@ import {
   HeartPulse,
   Plus,
   ScanLine,
+  LogOut,
 } from "lucide-react";
 import {
   RANGPUR_DISTRICTS,
@@ -146,12 +148,19 @@ type HospitalFormValues = z.infer<typeof hospitalSchema>;
 type AdminFormValues = z.infer<typeof adminSchema>;
 
 export default function ProfileForm() {
-  const { user, role } = useAuthStore();
+  const { user, role, clearAuth } = useAuthStore();
   const t = useTranslations("profile");
   const tCommon = useTranslations("common");
   const tAi = useTranslations("ai_assistant");
   const locale = useLocale();
   const isBn = locale === "bn";
+  const router = useRouter();
+
+  const handleLogout = () => {
+    clearSession();
+    clearAuth();
+    router.push("/login");
+  };
 
   const adviceAutoLoadedRef = useRef(false);
 
@@ -2937,16 +2946,27 @@ export default function ProfileForm() {
 
   return (
     <div className="bg-white p-4 sm:p-8 rounded-3xl shadow-xl border border-slate-100">
-      <div className="flex items-center gap-4 mb-6 sm:mb-8">
-        <div className="w-12 sm:w-16 h-12 sm:h-16 bg-gradient-to-br from-green-400 to-emerald-600 rounded-2xl flex items-center justify-center text-white">
-          {getRoleIcon()}
+      <div className="flex items-center justify-between gap-4 mb-6 sm:mb-8">
+        <div className="flex items-center gap-4">
+          <div className="w-12 sm:w-16 h-12 sm:h-16 bg-gradient-to-br from-green-400 to-emerald-600 rounded-2xl flex items-center justify-center text-white">
+            {getRoleIcon()}
+          </div>
+          <div>
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
+              {getRoleTitle()}
+            </h2>
+            <p className="text-slate-500 text-sm sm:text-base">{t("keep_updated")}</p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold text-slate-900">
-            {getRoleTitle()}
-          </h2>
-          <p className="text-slate-500 text-sm sm:text-base">{t("keep_updated")}</p>
-        </div>
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 text-sm font-semibold transition-all active:scale-[0.97] shrink-0"
+          aria-label={tCommon("logout")}
+        >
+          <LogOut className="w-4 h-4" />
+          <span className="hidden sm:inline">{tCommon("logout")}</span>
+        </button>
       </div>
 
       {isProfileIncomplete() && (() => {

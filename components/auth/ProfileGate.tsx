@@ -1,13 +1,12 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { Loader2, LogOut } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useRouter } from "@/i18n/routing";
 import { useAuthStore } from "@/store/authStore";
 import { clearSession } from "@/components/providers/AuthProvider";
 import LoginForm from "./LoginForm";
 import ProfileForm from "./ProfileForm";
-import ShareToCommunityButton from "@/components/social/ShareToCommunityButton";
 import ProfileSocialTabs from "@/components/social/ProfileSocialTabs";
 
 /**
@@ -57,22 +56,6 @@ export default function ProfileGate() {
 
   return (
     <>
-      {/* Phone/PWA: no always-visible top nav logout, so surface one here.
-          Desktop keeps using the logout in the top navbar (hidden below sm). */}
-      <div className="flex items-center justify-between gap-2 mb-4">
-        <div className="flex-1 min-w-0 flex justify-end">
-          <ShareToCommunityButton />
-        </div>
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="sm:hidden inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 text-sm font-semibold transition-all active:scale-[0.97] shrink-0"
-          aria-label={tCommon("logout")}
-        >
-          <LogOut className="w-4 h-4" />
-          <span>{tCommon("logout")}</span>
-        </button>
-      </div>
       <ProfileForm />
       <ProfileSocialTabs />
     </>
