@@ -54,6 +54,10 @@ interface Donation {
   recipient_type: string;
   notes: string | null;
   request_id: number | null;
+  referrer_profile_id?: number | null;
+  referrer_name?: string | null;
+  referrer_phone?: string | null;
+  created_at?: string;
 }
 
 interface DonorProfile {
@@ -122,18 +126,32 @@ const DONATION_TYPE_LABELS: Record<string, string> = {
   plasma: 'Plasma',
 };
 
+function toDateSafe(iso: string | Date | null | undefined): Date | null {
+  if (!iso) return null;
+  if (iso instanceof Date) return isNaN(iso.getTime()) ? null : iso;
+  let s = String(iso).replace(' ', 'T');
+  if (!/[zZ]$/.test(s) && !/[+-]\d{2}(:\d{2})?$/.test(s)) s += 'Z';
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 function formatDate(iso: string | Date | null | undefined): string {
-  if (!iso) return '—';
-  try {
-    const d = iso instanceof Date ? iso : new Date(String(iso).replace(' ', 'T') + (String(iso).includes('T') ? '' : 'Z'));
-    return d.toLocaleDateString('en-US', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
-    });
-  } catch {
-    return String(iso);
-  }
+  const d = toDateSafe(iso);
+  if (!d) return iso ? String(iso) : '—';
+  return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function formatDateTime(iso: string | Date | null | undefined): string {
+  const d = toDateSafe(iso);
+  if (!d) return iso ? String(iso) : '—';
+  return d.toLocaleString('en-US', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
 }
 
 function formatDateTime(iso: string | Date | null | undefined): string {
@@ -648,13 +666,14 @@ export default function AdminDonorDetailPage() {
           <div className="flex items-center gap-2">
             <button
               onClick={() => {
-                const headers = ['Date', 'Type', 'Units', 'Hospital', 'Recipient', 'Notes'];
+                const headers = ['Date', 'Type', 'Units', 'Hospital', 'Recipient', 'Referrer', 'Notes'];
                 const rows = donations.map(d => [
                   formatDateTime(d.donation_date),
                   DONATION_TYPE_LABELS[d.donation_type || 'whole_blood'] || d.donation_type || 'Whole Blood',
                   d.units,
                   d.hospital_name || '',
                   d.recipient_type || 'Patient',
+                  [d.referrer_name, d.referrer_phone].filter(Boolean).join(' • ') || '',
                   d.notes || '',
                 ]);
                 const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${v}"`).join(','))].join('\n');
@@ -698,6 +717,7 @@ export default function AdminDonorDetailPage() {
                   <th className="text-left px-6 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Units</th>
                   <th className="text-left px-6 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Hospital</th>
                   <th className="text-left px-6 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Recipient</th>
+                  <th className="text-left px-6 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Referrer</th>
                   <th className="text-left px-6 py-3 text-xs font-semibold text-slate-600 uppercase tracking-wider">Notes</th>
                 </tr>
               </thead>
@@ -720,6 +740,14 @@ export default function AdminDonorDetailPage() {
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-600">
                       {donation.recipient_type || 'Patient'}
+                    </td>
+                    <td className="px-6 py-4 text-sm text-slate-600 whitespace-nowrap">
+                      {donation.referrer_name || donation.referrer_phone ? (
+                        <div className="flex flex-col leading-tight">
+                          {donation.referrer_name && <span className="font-medium text-slate-700">{donation.referrer_name}</span>}
+                          {donation.referrer_phone && <span className="text-xs text-slate-500">{donation.referrer_phone}</span>}
+                        </div>
+                      ) : '—'}
                     </td>
                     <td className="px-6 py-4 text-sm text-slate-500 max-w-xs truncate">
                       {donation.notes || '—'}
