@@ -10,7 +10,7 @@ import { toast } from "sonner";
 import { Loader2, Send } from "lucide-react";
 import { serverSubmitDonorApplication } from "@/lib/db-actions";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
-import { RANGPUR_DISTRICTS, getUpazilasByDistrict } from "@/lib/constants/rangpur";
+import { RANGPUR_DISTRICTS, getUpazilasByDistrict, getUnionsByUpazila } from "@/lib/constants/rangpur";
 import ImageAdjustPreview from "@/components/ui/ImageAdjustPreview";
 
 const bloodGroups = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
@@ -24,6 +24,7 @@ const formSchema = z.object({
   bloodGroup: z.string().min(1),
   district: z.string().min(1),
   upazila: z.string().optional(),
+  union: z.string().optional(),
   address: z.string().optional(),
   sex: z.enum(["male", "female", "other"]),
   dateOfBirth: z.string().min(1),
@@ -46,15 +47,17 @@ export default function DonorApplicationForm() {
   const [uploading, setUploading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [selectedDistrict, setSelectedDistrict] = useState("");
+  const [selectedUpazila, setSelectedUpazila] = useState("");
   const [termsAgreed, setTermsAgreed] = useState(false);
 
-  const { register, handleSubmit, watch, formState: { errors, isSubmitting } } = useForm<FormValues>({
+  const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: { sex: "male", preferredContact: "call", hasChronicDisease: false },
   });
 
   const hasChronic = watch("hasChronicDisease");
   const upazilas = selectedDistrict ? getUpazilasByDistrict(selectedDistrict) : [];
+  const availableUnions = selectedUpazila ? getUnionsByUpazila(selectedUpazila) : [];
 
   const onSubmit = async (data: FormValues) => {
     try {
@@ -73,6 +76,7 @@ export default function DonorApplicationForm() {
         bloodGroup: data.bloodGroup,
         district: data.district,
         upazila: data.upazila || undefined,
+        union: data.union || undefined,
         address: data.address || undefined,
         sex: data.sex,
         dateOfBirth: data.dateOfBirth,
@@ -183,11 +187,20 @@ export default function DonorApplicationForm() {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">{t("upazila")}</label>
-              <select {...register("upazila")} className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition bg-white" disabled={!selectedDistrict}>
+              <select {...register("upazila")} onChange={(e) => { register("upazila").onChange(e); setSelectedUpazila(e.target.value); setValue("union", ""); }} className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition bg-white" disabled={!selectedDistrict}>
                 <option value="">{t("select_upazila")}</option>
                 {upazilas.map((u) => <option key={u.id} value={u.id}>{locale === "bn" ? u.name_bn : u.name_en}</option>)}
               </select>
             </div>
+            {availableUnions.length > 0 && (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">{t("union")}</label>
+                <select {...register("union")} className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition bg-white">
+                  <option value="">{t("select_union")}</option>
+                  {availableUnions.map((u) => <option key={u.id} value={u.id}>{locale === "bn" ? u.name_bn : u.name_en}</option>)}
+                </select>
+              </div>
+            )}
           </div>
 
           <div>

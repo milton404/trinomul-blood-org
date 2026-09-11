@@ -5084,6 +5084,7 @@ export async function serverSubmitDonorApplication(data: {
   bloodGroup: string;
   district: string;
   upazila?: string;
+  union?: string;
   address?: string;
   sex: string;
   dateOfBirth: string;
@@ -5121,6 +5122,7 @@ export async function serverSubmitDonorApplication(data: {
       role: "donor",
       district: data.district,
       upazila: data.upazila || null,
+      unionName: data.union || null,
       lat: null,
       lng: null,
     });
@@ -5153,6 +5155,7 @@ export async function serverSubmitDonorApplication(data: {
       role: "donor",
       district: data.district,
       upazila: data.upazila || null,
+      unionName: data.union || null,
       lat: null,
       lng: null,
     });
