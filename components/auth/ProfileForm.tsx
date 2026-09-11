@@ -3034,8 +3034,8 @@ export default function ProfileForm() {
                         : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
-                    <Icon className="w-4 h-4" />
-                    <span className="hidden sm:inline">{tab.label}</span>
+                    <Icon className="w-4 h-4 shrink-0" />
+                    <span className="inline text-[11px] sm:text-sm leading-none">{tab.label}</span>
                   </button>
                 );
               })}
@@ -3554,8 +3554,8 @@ export default function ProfileForm() {
                         : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
-                    <Icon className="w-4 h-4" />
-                    <span className="hidden sm:inline">{tab.label}</span>
+                    <Icon className="w-4 h-4 shrink-0" />
+                    <span className="inline text-[11px] sm:text-sm leading-none">{tab.label}</span>
                   </button>
                 );
               })}
@@ -3636,8 +3636,8 @@ export default function ProfileForm() {
                         : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
-                    <Icon className="w-4 h-4" />
-                    <span className="hidden sm:inline">{tab.label}</span>
+                    <Icon className="w-4 h-4 shrink-0" />
+                    <span className="inline text-[11px] sm:text-sm leading-none">{tab.label}</span>
                   </button>
                 );
               })}
