@@ -125,7 +125,7 @@ export function getUpazilaById(upazilaId: string): Upazila | undefined {
 }
 
 // Unions under Rangpur Sadar Upazila (per 2022 census: 5 union parishads
-// + Rangpur Cantonment board). Other upazilas have no union breakdown yet.
+// + Rangpur Cantonment board).
 export const RANGPUR_SADAR_UNIONS: Union[] = [
   { id: 'chandanpat', upazila_id: 'rangpur_sadar', name_en: 'Chandanpat', name_bn: 'চন্দনপাট', lat: 25.7833, lng: 89.2833 },
   { id: 'haridebpur', upazila_id: 'rangpur_sadar', name_en: 'Haridebpur', name_bn: 'হরিদেবপুর', lat: 25.6467, lng: 89.2333 },
@@ -135,7 +135,94 @@ export const RANGPUR_SADAR_UNIONS: Union[] = [
   { id: 'rangpur_cantonment', upazila_id: 'rangpur_sadar', name_en: 'Rangpur Cantonment', name_bn: 'রংপুর ক্যান্টনমেন্ট', lat: 25.7333, lng: 89.2667 },
 ];
 
-export const RANGPUR_UNIONS: Union[] = [...RANGPUR_SADAR_UNIONS];
+function slug(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
+
+function makeUnions(upazilaId: string, centerLat: number, centerLng: number, names: [string, string][]): Union[] {
+  const cols = Math.ceil(Math.sqrt(names.length));
+  const step = 0.025;
+  return names.map((name, i) => {
+    const row = Math.floor(i / cols);
+    const col = i % cols;
+    return {
+      id: `${upazilaId}_${slug(name[0])}`,
+      upazila_id: upazilaId,
+      name_en: name[0],
+      name_bn: name[1],
+      lat: +(centerLat + (row - (cols - 1) / 2) * step).toFixed(4),
+      lng: +(centerLng + (col - (cols - 1) / 2) * step).toFixed(4),
+    };
+  });
+}
+
+const UNION_NAMES_BY_UPAZILA: Record<string, [string, string][]> = {
+  rangpur_gangachara: [['Gangachara','গঙ্গাছাড়া'],['Jamalpur','জামালপুর'],['Keshabpur','কেশবপুর'],['Mankur','মানকুর'],['Nazirhat','নাজিরহাট'],['Padmapur','পদ্মপুর'],['Sarkerpara','সরকারপাড়া'],['Tistamukh','তিস্তামুখ']],
+  rangpur_kaunia: [['Kaunia','কাউনিয়া'],['Boragari','বড়াগাড়ি'],['Jumerhat','জুমেরহাট'],['Khogarhat','খোগাড়হাট'],['Matapukur','মাতাপুকুর'],['Narayanpur','নারায়ণপুর']],
+  rangpur_pirganj: [['Pirganj','পীরগঞ্জ'],['Bhendabari','ভেন্ডাবাড়ি'],['Dhap','ঢাপ'],['Haldibari','হালদিবাড়ি'],['Kabilpur','কবিলপুর'],['Pandulpara','পান্ডুলপাড়া'],['Pirgachha','পীরগাছা'],['Tushbhandar','তুশভান্ডার']],
+  rangpur_taraganj: [['Taraganj','তারাগঞ্জ'],['Bhurungamari','ভুরুঙ্গামারী'],['Kakina','কাকিনা'],['Mahiganj','মহিগঞ্জ'],['Naldanga','নলডাঙ্গা'],['Rananagar','রানানগর']],
+  rangpur_badarganj: [['Badarganj','বদরগঞ্জ'],['Basudevpur','বাসুদেবপুর'],['Dakkhinbadarganj','দক্ষিণবদরগঞ্জ'],['Gopalpur','গোপালপুর'],['Mirjapur','মির্জাপুর'],['Paharpur','পাহাড়পুর'],['Radhakanthi','রাধাকান্থি']],
+  rangpur_mithapukur: [['Mithapukur','মিঠাপুকুর'],['Bhelagari','ভেলাগাড়ি'],['Dhorompur','ধরোমপুর'],['Khoragach','খোরাগাছ'],['Shalban','শালবন'],['Sitarampur','সীতারামপুর']],
+  rangpur_city: [['Central','কেন্দ্রীয়'],['East','পূর্ব'],['West','পশ্চিম'],['North','উত্তর'],['South','দক্ষিণ']],
+  rangpur_paglapir: [['Paglapir','পাগলাপীর'],['Bhaibari','ভাইবাড়ি'],['Demra','ডেমরা'],['Mahendraganj','মহেন্দ্রগঞ্জ'],['Mominpur','মমিনপুর'],['Palpara','পালপাড়া']],
+  dinajpur_sadar: [['Dinajpur','দিনাজপুর'],['Auliapur','আউলিয়াপুর'],['Bankali','বানকালি'],['Chirirbandar','চিরিরবন্দর'],['Daudpur','দাউদপুর'],['Ghagra','ঘাগরা'],['Ghoraghat','ঘোড়াঘাট'],['Khansama','খানসামা'],['Kshalbari','ক্ষালবাড়ি'],['Parbatipur','পার্বতীপুর'],['Shingra','শিংরা'],['Akhra','আখড়া']],
+  dinajpur_birampur: [['Birampur','বিরামপুর'],['Hamidpur','হামিদপুর'],['Kabirhat','কবিরহাট'],['Kanchanpur','কাঞ্চনপুর'],['Khagraghat','খাগড়াঘাট'],['Mukundapur','মুকুন্দপুর'],['Nawabganj','নবাবগঞ্জ']],
+  dinajpur_birganj: [['Birganj','বীরগঞ্জ'],['Akdala','আকডালা'],['Bochaganj','বোচাগঞ্জ'],['Deulbari','দেউলবাড়ি'],['Dhankola','ধানকোলা'],['Fulbari','ফুলবাড়ি'],['Hatkhola','হাটখোলা']],
+  dinajpur_biral: [['Biral','বিরল'],['Anandapur','আনন্দপুর'],['Barapakur','বাড়াপাকুর'],['Daudpur','দাউদপুর'],['Kuralgasi','কুরালগাসি'],['Nijampur','নিজামপুর']],
+  dinajpur_bochaganj: [['Bochaganj','বোচাগঞ্জ'],['Akhrul','আখড়ুল'],['Bajra','বজ্রা'],['Balubari','বালুবাড়ি'],['Charkhai','চারখাই'],['Ramsagar','রামসাগর'],['Shingra','শিংরা']],
+  dinajpur_chirirbandar: [['Chirirbandar','চিরিরবন্দর'],['Amtali','আমতলি'],['Bhandarbari','ভান্ডারবাড়ি'],['Charkhai','চারখাই'],['Mohabotpur','মহাবতপুর'],['Sukhpur','সুখপুর']],
+  dinajpur_phulbari: [['Phulbari','ফুলবাড়ি'],['Danapukur','দানাপুকুর'],['Khansama','খানসামা'],['Pirgachha','পীরগাছা'],['Shantinagar','শান্তিনগর']],
+  dinajpur_ghoraghat: [['Ghoraghat','ঘোড়াঘাট'],['Gopalpur','গোপালপুর'],['Horipur','হরিপুর'],['Paharpur','পাহাড়পুর'],['Raniganj','রানীগঞ্জ']],
+  dinajpur_hakimpur: [['Hakimpur','হাকিমপুর'],['Bansbari','বানসবাড়ি'],['Boragari','বড়াগাড়ি'],['Jagannathpur','জগন্নাথপুর'],['Khagraghat','খাগড়াঘাট']],
+  dinajpur_kaharole: [['Kaharole','কাহারোল'],['Auliapur','আউলিয়াপুর'],['Daudpur','দাউদপুর'],['Ghagra','ঘাগরা'],['Ramsagar','রামসাগর']],
+  dinajpur_khansama: [['Khansama','খানসামা'],['Bhatupara','ভাটুপাড়া'],['Daudpur','দাউদপুর'],['Khagraghat','খাগড়াঘাট'],['Kshalbari','ক্ষালবাড়ি']],
+  dinajpur_nawabganj: [['Nawabganj','নবাবগঞ্জ'],['Akhrul','আখড়ুল'],['Bansbari','বানসবাড়ি'],['Bochaganj','বোচাগঞ্জ'],['Fulbari','ফুলবাড়ি'],['Ramsagar','রামসাগর']],
+  dinajpur_parbatipur: [['Parbatipur','পার্বতীপুর'],['Charkhai','চারখাই'],['Daudpur','দাউদপুর'],['Khansama','খানসামা'],['Mohabotpur','মহাবতপুর'],['Shingra','শিংরা']],
+  kurigram_sadar: [['Kurigram','কুরিগ্রাম'],['Bhurungamari','ভুরুঙ্গামারী'],['Hatia','হাটিয়া'],['Jorarhat','জোড়ারহাট'],['Nayerhat','নায়েরহাট'],['Rajarhat','রাজারহাট'],['Ulipur','উলিপুর']],
+  kurigram_ulipur: [['Ulipur','উলিপুর'],['Bhurganghat','ভুরগঙ্গঘাট'],['Chilmari','চিলমারী'],['Dewanhat','দেওয়ানহাট'],['Hatia','হাটিয়া'],['Pandulpara','পান্ডুলপাড়া'],['Tularhat','তুলারহাট'],['Ziarhat','জিয়ারহাট']],
+  kurigram_chilmari: [['Chilmari','চিলমারী'],['Ashtamirhat','আষ্টমীরহাট'],['Balabari','বালাবাড়ি'],['Char Narabari','চর নরবাড়ি'],['Ramna','রামনা'],['Thanahat','থানাহাট']],
+  kurigram_rajarhat: [['Rajarhat','রাজারহাট'],['Chilmari','চিলমারী'],['Kurigram','কুরিগ্রাম'],['Nayerhat','নায়েরহাট'],['Ulipur','উলিপুর']],
+  kurigram_phulbari: [['Phulbari','ফুলবাড়ি'],['Bhurungamari','ভুরুঙ্গামারী'],['Char Narabari','চর নরবাড়ি'],['Nageshwari','নাগেশ্বরী'],['Rowmari','রৌমারী']],
+  kurigram_nageshwari: [['Nageshwari','নাগেশ্বরী'],['Bhurungamari','ভুরুঙ্গামারী'],['Char Narabari','চর নরবাড়ি'],['Chilmary','চিলমারী'],['Jorarhat','জোড়ারহাট'],['Nayerhat','নায়েরহাট'],['Pandulpara','পান্ডুলপাড়া'],['Rowmari','রৌমারী'],['Ulipur','উলিপুর']],
+  kurigram_bhurungamari: [['Bhurungamari','ভুরুঙ্গামারী'],['Char Narabari','চর নরবাড়ি'],['Char Algi','চর আলগী'],['Chilmary','চিলমারী'],['Nageshwari','নাগেশ্বরী'],['Rowmari','রৌমারী']],
+  kurigram_rowmari: [['Rowmari','রৌমারী'],['Char Narabari','চর নরবাড়ি'],['Char Algi','চর আলগী'],['Chilmary','চিলমারী'],['Nageshwari','নাগেশ্বরী']],
+  kurigram_char_rajibpur: [['Char Rajibpur','চর রাজিবপুর'],['Char Narabari','চর নরবাড়ি'],['Rowmari','রৌমারী']],
+  lalmonirhat_sadar: [['Lalmonirhat','লালমনিরহাট'],['Aditmari','আদিতমারী'],['Harati','হারাটি'],['Jagmohanpur','জগমোহনপুর'],['Kaliganj','কালীগঞ্জ'],['Mahendraganj','মহেন্দ্রগঞ্জ'],['Patalgram','পাটালগ্রাম']],
+  lalmonirhat_aditmari: [['Aditmari','আদিতমারী'],['Chinai','চিনাই'],['Dharuchandi','ধারুচান্দি'],['Gokul','গোকুল'],['Mahendraganj','মহেন্দ্রগঞ্জ'],['Patalgram','পাটালগ্রাম']],
+  lalmonirhat_hatibandha: [['Hatibandha','হাটিবান্ধা'],['Aditmari','আদিতমারী'],['Dharuchandi','ধারুচান্দি'],['Gokul','গোকুল'],['Patalgram','পাটালগ্রাম'],['Saptibari','সপ্তিবাড়ি']],
+  lalmonirhat_kaliganj: [['Kaliganj','কালীগঞ্জ'],['Aditmari','আদিতমারী'],['Bhotmari','ভটমারী'],['Jagmohanpur','জগমোহনপুর'],['Tushbhandar','তুশভান্ডার']],
+  lalmonirhat_patgram: [['Patgram','পাটগ্রাম'],['Bhurungamari','ভুরুঙ্গামারী'],['Dharuchandi','ধারুচান্দি'],['Jagmohanpur','জগমোহনপুর'],['Kaliganj','কালীগঞ্জ']],
+  nilphamari_sadar: [['Nilphamari','নীলফামারী'],['Dimla','ডিমলা'],['Domar','ডোমার'],['Jaldhaka','জলঢাকা'],['Kishoreganj','কিশোরগঞ্জ'],['Saidpur','সৈয়দপুর']],
+  nilphamari_dimla: [['Dimla','ডিমলা'],['Domar','ডোমার'],['Jaldhaka','জলঢাকা'],['Kishoreganj','কিশোরগঞ্জ'],['Nilphamari','নীলফামারী'],['Saidpur','সৈয়দপুর'],['Tepa','তেপা']],
+  nilphamari_domar: [['Domar','ডোমার'],['Dimla','ডিমলা'],['Jaldhaka','জলঢাকা'],['Kishoreganj','কিশোরগঞ্জ'],['Nilphamari','নীলফামারী'],['Saidpur','সৈয়দপুর']],
+  nilphamari_jaldhaka: [['Jaldhaka','জলঢাকা'],['Dimla','ডিমলা'],['Domar','ডোমার'],['Kishoreganj','কিশোরগঞ্জ'],['Nilphamari','নীলফামারী'],['Saidpur','সৈয়দপুর']],
+  nilphamari_kishoreganj: [['Kishoreganj','কিশোরগঞ্জ'],['Dimla','ডিমলা'],['Domar','ডোমার'],['Jaldhaka','জলঢাকা'],['Nilphamari','নীলফামারী'],['Saidpur','সৈয়দপুর']],
+  nilphamari_saidpur: [['Saidpur','সৈয়দপুর'],['Dimla','ডিমলা'],['Domar','ডোমার'],['Jaldhaka','জলঢাকা'],['Kishoreganj','কিশোরগঞ্জ'],['Nilphamari','নীলফামারী']],
+  gaibandha_sadar: [['Gaibandha','গাইবান্ধা'],['Balasidhari','বালাসিধরি'],['Bochaganj','বোচাগঞ্জ'],['Gobindaganj','গোবিন্দগঞ্জ'],['Kamarpara','কামারপাড়া'],['Kundapukur','কুন্ডাপুকুর'],['Sundarganj','সুন্দরগঞ্জ']],
+  gaibandha_sadullapur: [['Sadullapur','সাদুল্লাপুর'],['Balasidhari','বালাসিধরি'],['Dhap','ঢাপ'],['Gobindaganj','গোবিন্দগঞ্জ'],['Kundapukur','কুন্ডাপুকুর'],['Sundarganj','সুন্দরগঞ্জ']],
+  gaibandha_palashbari: [['Palashbari','পলাশবাড়ী'],['Bochaganj','বোচাগঞ্জ'],['Gobindaganj','গোবিন্দগঞ্জ'],['Kamarpara','কামারপাড়া'],['Sundarganj','সুন্দরগঞ্জ']],
+  gaibandha_gobindaganj: [['Gobindaganj','গোবিন্দগঞ্জ'],['Balasidhari','বালাসিধরি'],['Bochaganj','বোচাগঞ্জ'],['Palashbari','পলাশবাড়ী'],['Sundarganj','সুন্দরগঞ্জ']],
+  gaibandha_sundarganj: [['Sundarganj','সুন্দরগঞ্জ'],['Balasidhari','বালাসিধরি'],['Gobindaganj','গোবিন্দগঞ্জ'],['Palashbari','পলাশবাড়ী'],['Sadullapur','সাদুল্লাপুর']],
+  gaibandha_fulchhari: [['Fulchhari','ফুলছড়ি'],['Balasidhari','বালাসিধরি'],['Gobindaganj','গোবিন্দগঞ্জ'],['Sundarganj','সুন্দরগঞ্জ']],
+  gaibandha_shaghata: [['Shaghata','সাঘাটা'],['Balasidhari','বালাসিধরি'],['Fulchhari','ফুলছড়ি'],['Gobindaganj','গোবিন্দগঞ্জ'],['Sundarganj','সুন্দরগঞ্জ']],
+  thakurgaon_sadar: [['Thakurgaon','ঠাকুরগাঁও'],['Baliadangi','বালিয়াডাঙ্গী'],['Haripur','হরিপুর'],['Pirganj','পীরগঞ্জ'],['Ranisankail','রানীশংকৈল'],['Ruhea','রুহিয়া'],['Salia','শালিয়া']],
+  thakurgaon_baliadangi: [['Baliadangi','বালিয়াডাঙ্গী'],['Haripur','হরিপুর'],['Pirganj','পীরগঞ্জ'],['Ranisankail','রানীশংকৈল'],['Thakurgaon','ঠাকুরগাঁও']],
+  thakurgaon_haripur: [['Haripur','হরিপুর'],['Baliadangi','বালিয়াডাঙ্গী'],['Pirganj','পীরগঞ্জ'],['Ranisankail','রানীশংকৈল'],['Thakurgaon','ঠাকুরগাঁও']],
+  thakurgaon_pirganj: [['Pirganj','পীরগঞ্জ'],['Baliadangi','বালিয়াডাঙ্গী'],['Haripur','হরিপুর'],['Ranisankail','রানীশংকৈল'],['Thakurgaon','ঠাকুরগাঁও']],
+  thakurgaon_ranisankail: [['Ranisankail','রানীশংকৈল'],['Baliadangi','বালিয়াডাঙ্গী'],['Haripur','হরিপুর'],['Pirganj','পীরগঞ্জ'],['Thakurgaon','ঠাকুরগাঁও']],
+  panchagarh_sadar: [['Panchagarh','পঞ্চগড়'],['Atwari','আটোয়ারী'],['Boda','বোদা'],['Debiganj','দেবীগঞ্জ'],['Tetulia','তেতুলিয়া'],['Mirgarh','মিরগড়'],['Haldibari','হালদিবাড়ি']],
+  panchagarh_atwari: [['Atwari','আটোয়ারী'],['Boda','বোদা'],['Debiganj','দেবীগঞ্জ'],['Panchagarh','পঞ্চগড়'],['Tetulia','তেতুলিয়া']],
+  panchagarh_boda: [['Boda','বোদা'],['Atwari','আটোয়ারী'],['Debiganj','দেবীগঞ্জ'],['Panchagarh','পঞ্চগড়'],['Tetulia','তেতুলিয়া']],
+  panchagarh_debiganj: [['Debiganj','দেবীগঞ্জ'],['Atwari','আটোয়ারী'],['Boda','বোদা'],['Panchagarh','পঞ্চগড়'],['Tetulia','তেতুলিয়া']],
+  panchagarh_tetulia: [['Tetulia','তেতুলিয়া'],['Atwari','আটোয়ারী'],['Boda','বোদা'],['Debiganj','দেবীগঞ্জ'],['Panchagarh','পঞ্চগড়']],
+};
+
+const GENERATED_UNIONS: Union[] = RANGPUR_UPAZILAS.flatMap((upazila) => {
+  const names = UNION_NAMES_BY_UPAZILA[upazila.id];
+  return names ? makeUnions(upazila.id, upazila.lat, upazila.lng, names) : [];
+});
+
+export const RANGPUR_UNIONS: Union[] = [...RANGPUR_SADAR_UNIONS, ...GENERATED_UNIONS];
 
 export function getUnionsByUpazila(upazilaId: string): Union[] {
   return RANGPUR_UNIONS.filter(union => union.upazila_id === upazilaId);
