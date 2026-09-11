@@ -97,7 +97,8 @@ export async function serverLogin(
    *  or super) is accepted — the default for backwards compatibility. */
   expectedAdminScope: "full" | "district" | "any" = "any",
 ): Promise<{ user: AuthUser; redirectTo: string }> {
-  const key = `login:${identifier.toLowerCase()}`;
+  const trimmedIdentifier = identifier.trim();
+  const key = `login:${trimmedIdentifier.toLowerCase()}`;
   const usePg = isSupabaseAvailable();
 
   // ── Rate limit check ──────────────────────────────────────────────
@@ -138,15 +139,21 @@ export async function serverLogin(
   }
 
   // ── Look up profile ───────────────────────────────────────────────
+  // Emails are case-insensitive in practice — normalize to lowercase so
+  // "User@Gmail.com" matches the stored "user@gmail.com". Phone numbers
+  // are numeric and left as-is (after trim).
+  const lookupValue = isEmail(trimmedIdentifier)
+    ? trimmedIdentifier.toLowerCase()
+    : trimmedIdentifier;
   let profile: any;
   if (usePg) {
-    const col = isEmail(identifier) ? "email" : "phone";
-    const { rows } = await pgQuery(`SELECT * FROM profiles WHERE ${col} = $1`, [identifier]);
+    const col = isEmail(trimmedIdentifier) ? "email" : "phone";
+    const { rows } = await pgQuery(`SELECT * FROM profiles WHERE ${col} = $1`, [lookupValue]);
     profile = rows[0] || null;
   } else {
-    profile = isEmail(identifier)
-      ? ((await getProfileByEmail(identifier)) as any)
-      : ((await getProfileByPhone(identifier)) as any);
+    profile = isEmail(trimmedIdentifier)
+      ? ((await getProfileByEmail(lookupValue)) as any)
+      : ((await getProfileByPhone(lookupValue)) as any);
   }
 
   if (!profile) {
@@ -243,7 +250,8 @@ export async function serverRegister(input: {
   upazila?: string;
   address?: string;
 }): Promise<{ user: AuthUser; redirectTo: string }> {
-  const key = `register:${input.email.toLowerCase()}`;
+  const normalizedEmail = input.email.trim().toLowerCase();
+  const key = `register:${normalizedEmail}`;
   const usePg = isSupabaseAvailable();
 
   // ── Rate limit + email uniqueness + profile creation ──────────────────
@@ -262,7 +270,7 @@ export async function serverRegister(input: {
       throw new Error("Too many registration attempts. Please try later.");
     }
 
-    const existing = await pgQuery("SELECT 1 FROM profiles WHERE email = $1", [input.email]);
+    const existing = await pgQuery("SELECT 1 FROM profiles WHERE email = $1", [normalizedEmail]);
     if (existing.rows.length > 0) {
       throw new Error("An account with this email already exists.");
     }
@@ -273,7 +281,7 @@ export async function serverRegister(input: {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        RETURNING id`,
       [
-        input.email,
+        normalizedEmail,
         passwordHash,
         input.fullName,
         input.fullName,
@@ -304,7 +312,7 @@ export async function serverRegister(input: {
       throw new Error("Too many registration attempts. Please try later.");
     }
 
-    const existing = (await getProfileByEmail(input.email)) as any;
+    const existing = (await getProfileByEmail(normalizedEmail)) as any;
     if (existing) {
       await recordFailedAttempt(key);
       throw new Error("An account with this email already exists.");
@@ -312,7 +320,7 @@ export async function serverRegister(input: {
 
     const passwordHash = await hashPassword(input.password);
     profileId = dbCreateProfile({
-      email: input.email,
+      email: normalizedEmail,
       passwordHash,
       fullNameEn: input.fullName,
       fullNameBn: input.fullName,
@@ -337,7 +345,7 @@ export async function serverRegister(input: {
   // Welcome email (best-effort — never blocks registration).
   try {
     await sendWelcomeEmail({
-      to: input.email,
+      to: normalizedEmail,
       name: input.fullName,
       role: input.role,
     });
@@ -347,7 +355,7 @@ export async function serverRegister(input: {
 
   const payload: SessionPayload = {
     sub: String(profileId),
-    email: input.email,
+    email: normalizedEmail,
     role: input.role,
   };
   await createSession(payload, false);
@@ -355,7 +363,7 @@ export async function serverRegister(input: {
   return {
     user: {
       id: profileId,
-      email: input.email,
+      email: normalizedEmail,
       role: input.role,
       full_name_en: input.fullName,
       full_name_bn: input.fullName,

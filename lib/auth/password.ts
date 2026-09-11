@@ -22,7 +22,10 @@ export async function verifyPassword(
 
 /** Detect whether a stored password_hash is already a bcrypt hash. */
 export function isBcryptHash(value: string): boolean {
-  return typeof value === "string" && value.startsWith("$2a$") ||
-    value.startsWith("$2b$") ||
-    value.startsWith("$2y$");
+  return (
+    typeof value === "string" &&
+    (value.startsWith("$2a$") ||
+      value.startsWith("$2b$") ||
+      value.startsWith("$2y$"))
+  );
 }

@@ -70,7 +70,7 @@ export default function LoginForm() {
 
     try {
       const { user, redirectTo } = await serverLogin(
-        values.identifier,
+        values.identifier.trim(),
         values.password,
         rememberMe,
       );
