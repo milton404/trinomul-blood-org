@@ -82,6 +82,7 @@ export function toBanglish(input: string): string {
 }
 
 const districtById = new Map(RANGPUR_DISTRICTS.map((d) => [d.id, d]));
+const upazilaById = new Map(RANGPUR_UPAZILAS.map((u) => [u.id, u]));
 
 function slugify(id: string): string {
   return id.replace(/_/g, "-");
@@ -103,20 +104,24 @@ function buildAreas(): Area[] {
     };
   });
 
-  const unionAreas: Area[] = RANGPUR_UNIONS.map((un) => ({
-    slug: slugify(un.id),
-    id: un.id,
-    kind: "union" as const,
-    nameEn: un.name_en,
-    nameBn: un.name_bn,
-    banglish: toBanglish(un.name_bn),
-    districtId: "rangpur",
-    districtNameEn: "Rangpur",
-    districtNameBn: "রংপুর",
-    upazilaId: un.upazila_id,
-    upazilaNameEn: "Rangpur Sadar",
-    upazilaNameBn: "রংপুর সদর",
-  }));
+  const unionAreas: Area[] = RANGPUR_UNIONS.map((un) => {
+    const upazila = upazilaById.get(un.upazila_id);
+    const district = upazila ? districtById.get(upazila.district_id) : undefined;
+    return {
+      slug: slugify(un.id),
+      id: un.id,
+      kind: "union" as const,
+      nameEn: un.name_en,
+      nameBn: un.name_bn,
+      banglish: toBanglish(un.name_bn),
+      districtId: district?.id ?? "rangpur",
+      districtNameEn: district?.name_en ?? "Rangpur",
+      districtNameBn: district?.name_bn ?? "রংপুর",
+      upazilaId: un.upazila_id,
+      upazilaNameEn: upazila?.name_en ?? "",
+      upazilaNameBn: upazila?.name_bn ?? "",
+    };
+  });
 
   // Paglapir Bazar — a market locality under Paglapir upazila, given its own
   // landing page right after Sadar priority.
@@ -211,8 +216,8 @@ export function getAreaMeta(area: Area, locale: string): AreaMeta {
       : `${name} Blood Bank — Blood Donors in ${name}`;
 
   const description = isBn
-    ? `${district}, রংপুর বিভাগের ${name}${kindWordBn ? ` ${kindWordBn}` : ""} এলাকায় রক্তদাতা খুঁজুন ও জরুরি রক্তের জন্য অনুরোধ করুন। তৃণমূল ব্লাড ব্যাংক রংপুর ${name} এলাকার রক্তদাতা, রোগী ও হাসপাতালকে যুক্ত করে প্রাণ বাঁচাতে সহায়তা করে।`
-    : `Find blood donors and request emergency blood in ${name}${kindWordEn ? ` ${kindWordEn}` : ""}, ${district} district, Rangpur division, Bangladesh. Trinomul Blood Bank Rangpur connects donors, patients and hospitals in ${name} to save lives.`;
+    ? `${district}, রংপুর বিভাগের ${name}${kindWordBn ? ` ${kindWordBn}` : ""}${area.upazilaNameBn && area.kind === "union" ? `, ${area.upazilaNameBn} উপজেলা` : ""} এলাকায় রক্তদাতা খুঁজুন ও জরুরি রক্তের জন্য অনুরোধ করুন। তৃণমূল ব্লাড ব্যাংক রংপুর ${name} এলাকার রক্তদাতা, রোগী ও হাসপাতালকে যুক্ত করে প্রাণ বাঁচাতে সহায়তা করে।`
+    : `Find blood donors and request emergency blood in ${name}${kindWordEn ? ` ${kindWordEn}` : ""}${area.upazilaNameEn && area.kind === "union" ? `, ${area.upazilaNameEn} upazila` : ""}, ${district} district, Rangpur division, Bangladesh. Trinomul Blood Bank Rangpur connects donors, patients and hospitals in ${name} to save lives.`;
 
   const keywords = Array.from(
     new Set([
@@ -223,6 +228,11 @@ export function getAreaMeta(area: Area, locale: string): AreaMeta {
       `blood donors ${area.nameEn}`,
       `blood bank ${area.nameEn}`,
       `${area.districtNameEn} blood bank`,
+      ...(area.upazilaNameEn ? [
+        `${area.upazilaNameEn} blood bank`,
+        `${area.upazilaNameEn} blood donors`,
+        `blood donors ${area.upazilaNameEn}`,
+      ] : []),
       // Banglish
       `${area.nameEn.toLowerCase()} blood bank`,
       banglish,
@@ -233,6 +243,10 @@ export function getAreaMeta(area: Area, locale: string): AreaMeta {
       `${area.nameBn} রক্তদাতা`,
       `${area.nameBn} রক্তদান`,
       `${area.districtNameBn} ব্লাড ব্যাংক`,
+      ...(area.upazilaNameBn ? [
+        `${area.upazilaNameBn} ব্লাড ব্যাংক`,
+        `${area.upazilaNameBn} রক্তদাতা`,
+      ] : []),
       "রক্তদাতা রংপুর",
       "রক্তদান রংপুর",
     ]),

@@ -72,11 +72,15 @@ export default async function AreaPage({
     ? `/${locale}/donors?upazila=${area.id}`
     : `/${locale}/donors?upazila=${area.upazilaId}`;
 
-  const siblings = ALL_AREAS.filter((a) =>
-    area.kind === "union" || area.kind === "bazar"
-      ? a.id !== area.id && (a.kind === "union" || a.kind === "bazar" || (a.kind === "upazila" && a.districtId === "rangpur"))
-      : a.id !== area.id && a.kind === "upazila" && a.districtId === area.districtId,
-  );
+  const siblings = ALL_AREAS.filter((a) => {
+    if (a.id === area.id) return false;
+    if (area.kind === "union" || area.kind === "bazar") {
+      if (a.kind === "upazila") return a.id === area.upazilaId;
+      if (a.kind === "union") return a.upazilaId === area.upazilaId;
+      return false;
+    }
+    return a.kind === "upazila" && a.districtId === area.districtId;
+  });
 
   const faqs = isBn
     ? [
@@ -108,10 +112,51 @@ export default async function AreaPage({
         },
       ];
 
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  };
+
+  const breadcrumbItems = [
+    { name: isBn ? "হোম" : "Home", url: `${SITE_URL}/${locale}` },
+    { name: isBn ? "ব্লাড ব্যাংক" : "Blood Bank", url: `${SITE_URL}/${locale}/blood-bank` },
+  ];
+  if (area.kind === "union" && area.upazilaNameEn && area.upazilaId) {
+    breadcrumbItems.push({
+      name: isBn ? area.upazilaNameBn! : area.upazilaNameEn,
+      url: `${SITE_URL}/${locale}/blood-bank/${area.upazilaId.replace(/_/g, "-")}`,
+    });
+  }
+  breadcrumbItems.push({ name: title, url: `${SITE_URL}/${locale}/blood-bank/${slug}` });
+
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: breadcrumbItems.map((item, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: item.name,
+      item: item.url,
+    })),
+  };
+
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
       <Navbar />
       <main className="flex-1 w-full max-w-5xl mx-auto px-4 py-10 md:py-14">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }}
+        />
         <nav className="text-sm text-slate-500 mb-4">
           <a href={`/${locale}/blood-bank`} className="hover:text-red-600">
             {isBn ? "ব্লাড ব্যাংক" : "Blood Bank"}
@@ -129,6 +174,20 @@ export default async function AreaPage({
               ? `বাংলা: ${area.nameBn} · English: ${area.nameEn} · Banglish: ${area.banglish}`
               : `English: ${area.nameEn} · বাংলা: ${area.nameBn} · Banglish: ${area.banglish}`}
           </p>
+          {(area.kind === "union" || area.kind === "bazar") && area.upazilaNameEn && (
+            <p className="mt-2 text-sm text-slate-500">
+              {isBn
+                ? `উপজেলা: ${area.upazilaNameBn} · জেলা: ${area.districtNameBn} · রংপুর বিভাগ`
+                : `Upazila: ${area.upazilaNameEn} · District: ${area.districtNameEn} · Rangpur Division`}
+            </p>
+          )}
+          {area.kind === "upazila" && (
+            <p className="mt-2 text-sm text-slate-500">
+              {isBn
+                ? `জেলা: ${area.districtNameBn} · রংপুর বিভাগ`
+                : `District: ${area.districtNameEn} · Rangpur Division`}
+            </p>
+          )}
         </header>
 
         <p className="text-lg text-slate-700 leading-relaxed max-w-3xl">
