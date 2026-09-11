@@ -6,6 +6,7 @@ export const OG_SIZE = { width: 1200, height: 630 } as const;
 export const OG_CONTENT_TYPE = "image/png";
 
 const FONT_FAMILY = '"Hind Siliguri", sans-serif';
+const FONT_NAME = "Hind Siliguri";
 
 export type OgCardProps = {
   title: string;
@@ -15,31 +16,31 @@ export type OgCardProps = {
   siteUrl?: string;
 };
 
-function loadFont(
-  filename: string,
-  weight: 400 | 700,
-): { name: string; data: ArrayBuffer; weight: 400 | 700; style: "normal" } | null {
+function getOgfFonts() {
+  const fonts: { name: string; data: ArrayBuffer; weight: number; style: string }[] = [];
   try {
     const buf = fs.readFileSync(
-      path.join(process.cwd(), "lib", "og", "fonts", filename),
+      path.join(process.cwd(), "lib", "og", "fonts", "HindSiliguri-Regular.ttf"),
     );
-    const data = buf.buffer.slice(
-      buf.byteOffset,
-      buf.byteOffset + buf.byteLength,
-    ) as ArrayBuffer;
-    return { name: FONT_FAMILY, data, weight, style: "normal" };
-  } catch {
-    return null;
-  }
-}
-
-function getOgfFonts() {
-  const regular = loadFont("HindSiliguri-Regular.ttf", 400);
-  const bold = loadFont("HindSiliguri-Bold.ttf", 700);
-  return [regular, bold].filter(
-    (f): f is { name: string; data: ArrayBuffer; weight: 400 | 700; style: "normal" } =>
-      f !== null,
-  );
+    fonts.push({
+      name: FONT_NAME,
+      data: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer,
+      weight: 400,
+      style: "normal",
+    });
+  } catch {}
+  try {
+    const buf = fs.readFileSync(
+      path.join(process.cwd(), "lib", "og", "fonts", "HindSiliguri-Bold.ttf"),
+    );
+    fonts.push({
+      name: FONT_NAME,
+      data: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) as ArrayBuffer,
+      weight: 700,
+      style: "normal",
+    });
+  } catch {}
+  return fonts;
 }
 
 function getLogoDataUrl(): string | null {
