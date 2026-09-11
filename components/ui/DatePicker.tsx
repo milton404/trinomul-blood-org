@@ -165,9 +165,10 @@ export default function DatePicker({
             <button
               type="button"
               onClick={handleHeaderClick}
-              className="text-sm font-semibold text-slate-800 hover:text-red-600 transition-colors px-2 py-0.5 rounded-lg hover:bg-red-50"
+              className="flex items-center gap-1 text-sm font-semibold text-slate-800 hover:text-red-600 transition-colors px-3 py-1 rounded-lg border border-slate-200 bg-slate-50 hover:bg-red-50 hover:border-red-200"
             >
               {headerLabel}
+              <ChevronRight className="w-3 h-3 rotate-90 opacity-50" />
             </button>
             <button
               type="button"
