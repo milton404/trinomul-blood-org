@@ -37,7 +37,7 @@ function getOgfFonts() {
   const regular = loadFont("HindSiliguri-Regular.ttf", 400);
   const bold = loadFont("HindSiliguri-Bold.ttf", 700);
   return [regular, bold].filter(
-    (f): f is { name: string; data: ArrayBuffer; weight: 400 | 700; style: string } =>
+    (f): f is { name: string; data: ArrayBuffer; weight: 400 | 700; style: "normal" } =>
       f !== null,
   );
 }
