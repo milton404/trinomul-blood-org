@@ -15,6 +15,8 @@ function resolveSiteUrl(): string {
 
 export const SITE_URL = resolveSiteUrl();
 
+export const SITE_DISPLAY_DOMAIN = "www.trinomul.org";
+
 export const SITE_NAME = "Trinomul Blood Bank Rangpur";
 export const SITE_NAME_SHORT = "Trinomul";
 export const SITE_NAME_BN = "তৃণমূল ব্লাড ব্যাংক রংপুর";

@@ -4,7 +4,7 @@ import {
   OG_CONTENT_TYPE,
 } from "@/lib/og/og-card";
 import { serverGetPostById } from "@/lib/db-actions";
-import { SITE_NAME } from "@/lib/seo";
+import { SITE_NAME, SITE_DISPLAY_DOMAIN } from "@/lib/seo";
 
 export const size = OG_SIZE;
 export const contentType = OG_CONTENT_TYPE;
@@ -31,6 +31,6 @@ export default async function Image({
     description: snippet || undefined,
     badge: "Community",
     siteName: SITE_NAME,
-    siteUrl: "trinomul.vercel.app",
+    siteUrl: SITE_DISPLAY_DOMAIN,
   });
 }

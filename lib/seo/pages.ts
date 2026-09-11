@@ -3,6 +3,7 @@ import {
   SITE_URL,
   SITE_NAME,
   SITE_NAME_BN,
+  SITE_DISPLAY_DOMAIN,
 } from "@/lib/seo";
 import type { OgCardProps } from "@/lib/og/og-card";
 
@@ -222,12 +223,11 @@ export function buildPageMetadata({
 
 export function pageOgCardProps(page: PageKey): OgCardProps {
   const p = PAGES[page];
-  const displayDomain = SITE_URL.replace(/^https?:\/\//, "");
   return {
     title: p.titleEn,
     description: p.descriptionEn,
     badge: p.badgeEn,
     siteName: SITE_NAME,
-    siteUrl: displayDomain,
+    siteUrl: SITE_DISPLAY_DOMAIN,
   };
 }

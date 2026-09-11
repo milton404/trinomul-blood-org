@@ -7,7 +7,7 @@ import {
   serverGetBloodRequestById,
   serverGetBloodRequestByTrackingCode,
 } from "@/lib/db-actions";
-import { SITE_NAME, SITE_URL } from "@/lib/seo";
+import { SITE_NAME, SITE_DISPLAY_DOMAIN } from "@/lib/seo";
 
 export const size = OG_SIZE;
 export const contentType = OG_CONTENT_TYPE;
@@ -25,7 +25,6 @@ export default async function Image({
     if (!req) req = await serverGetBloodRequestByTrackingCode(id);
   } catch {}
 
-  const displayDomain = SITE_URL.replace(/^https?:\/\//, "");
   return renderOgImage({
     title: req
       ? `Blood Request \u2014 ${req.blood_group ?? "Needed"}`
@@ -35,6 +34,6 @@ export default async function Image({
       : "Track the status of a blood request by tracking code or ID.",
     badge: req ? req.urgency_level ?? "Request" : "Tracking",
     siteName: SITE_NAME,
-    siteUrl: displayDomain,
+    siteUrl: SITE_DISPLAY_DOMAIN,
   });
 }

@@ -52,7 +52,7 @@ export function OgCard({
   description,
   badge,
   siteName = "Trinomul Blood Bank Rangpur",
-  siteUrl = "trinomul.org",
+  siteUrl = "www.trinomul.org",
 }: OgCardProps) {
   const desc =
     description && description.length > 128
