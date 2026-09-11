@@ -174,6 +174,10 @@ export default function RegisterForm({ defaultRole }: RegisterFormProps) {
           onClick: () => router.push("/profile"),
         },
       });
+      // Invalidate the stale router cache left by the server action so the
+      // target page fetches fresh server-component data instead of rendering
+      // a blank screen on first navigation.
+      router.refresh();
       router.push(redirectTo);
     } catch (error: any) {
       console.error("Registration error:", error);

@@ -89,6 +89,10 @@ export default function LoginForm() {
       toast.success(t("login_success") || "Login successful!");
       // If a redirect target was passed (e.g. from feed page), return there.
       const redirectParam = searchParams.get("redirect");
+      // Invalidate the stale router cache left by the server action so the
+      // target page fetches fresh server-component data instead of rendering
+      // a blank screen on first navigation.
+      router.refresh();
       router.push(redirectParam || redirectTo);
     } catch (error: any) {
       console.error("Login error:", error);

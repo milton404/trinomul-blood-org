@@ -106,6 +106,7 @@ export default function AdminLoginForm() {
       saveSession(user.email);
 
       toast.success(t("login_success") || "Login successful!");
+      router.refresh();
       router.push(redirectTo);
     } catch (error: any) {
       console.error("Admin login error:", error);
