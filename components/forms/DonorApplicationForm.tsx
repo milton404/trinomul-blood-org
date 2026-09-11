@@ -43,6 +43,7 @@ type FormValues = z.infer<typeof formSchema>;
 export default function DonorApplicationForm() {
   const t = useTranslations("donor_application");
   const locale = useLocale();
+  const isBn = locale === "bn";
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -321,7 +322,13 @@ export default function DonorApplicationForm() {
 
           <label className="flex items-start gap-3 cursor-pointer">
             <input type="checkbox" checked={termsAgreed} onChange={(e) => setTermsAgreed(e.target.checked)} className="w-5 h-5 rounded border-slate-300 text-red-600 focus:ring-red-500 mt-0.5" />
-            <span className="text-sm text-slate-700">{t("terms_agree_label")}</span>
+            <span className="text-sm text-slate-700">
+              {isBn ? (
+                <>আমি <Link href={`/${locale}/guidance`} className="text-red-600 underline hover:text-red-700">রক্তদাতা নিয়মাবলী</Link>, <Link href={`/${locale}/terms`} className="text-red-600 underline hover:text-red-700">শর্তাবলী</Link> এবং <Link href={`/${locale}/privacy`} className="text-red-600 underline hover:text-red-700">গোপনীয়তা নীতি</Link> পড়েছি এবং সম্মত আছি</>
+              ) : (
+                <>I have read and agree to the <Link href={`/${locale}/guidance`} className="text-red-600 underline hover:text-red-700">donor rules</Link>, <Link href={`/${locale}/terms`} className="text-red-600 underline hover:text-red-700">terms</Link>, and <Link href={`/${locale}/privacy`} className="text-red-600 underline hover:text-red-700">privacy policy</Link></>
+              )}
+            </span>
           </label>
           {!termsAgreed && (
             <p className="text-xs text-amber-600">{t("terms_required")}</p>
