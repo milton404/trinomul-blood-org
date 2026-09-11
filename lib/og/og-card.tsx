@@ -18,7 +18,7 @@ export type OgCardProps = {
 function loadFont(
   filename: string,
   weight: 400 | 700,
-): { name: string; data: ArrayBuffer; weight: 400 | 700; style: string } | null {
+): { name: string; data: ArrayBuffer; weight: 400 | 700; style: "normal" } | null {
   try {
     const buf = fs.readFileSync(
       path.join(process.cwd(), "lib", "og", "fonts", filename),
