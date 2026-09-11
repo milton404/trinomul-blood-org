@@ -17,7 +17,7 @@ export type OgCardProps = {
 };
 
 function getOgfFonts() {
-  const fonts: { name: string; data: ArrayBuffer; weight: number; style: string }[] = [];
+  const fonts: { name: string; data: ArrayBuffer; weight: 400 | 700; style: "normal" }[] = [];
   try {
     const buf = fs.readFileSync(
       path.join(process.cwd(), "lib", "og", "fonts", "HindSiliguri-Regular.ttf"),
