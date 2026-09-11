@@ -12,6 +12,7 @@ import { serverSubmitDonorApplication } from "@/lib/db-actions";
 import { uploadImageToCloudinary } from "@/lib/cloudinary";
 import { RANGPUR_DISTRICTS, getUpazilasByDistrict, getUnionsByUpazila } from "@/lib/constants/rangpur";
 import ImageAdjustPreview from "@/components/ui/ImageAdjustPreview";
+import DatePicker from "@/components/ui/DatePicker";
 
 const bloodGroups = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
 
@@ -220,7 +221,12 @@ export default function DonorApplicationForm() {
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">{t("date_of_birth")} *</label>
-              <input {...register("dateOfBirth")} type="date" className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition" />
+              <DatePicker
+                value={watch("dateOfBirth") || ""}
+                onChange={(v) => setValue("dateOfBirth", v, { shouldValidate: true })}
+                max={new Date().toISOString().split("T")[0]}
+                placeholder={t("date_of_birth")}
+              />
               {errors.dateOfBirth && <p className="text-red-500 text-xs mt-1">{errors.dateOfBirth.message}</p>}
             </div>
             <div>
@@ -253,14 +259,24 @@ export default function DonorApplicationForm() {
               </div>
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">{t("last_hb_date")}</label>
-                <input {...register("lastHbTestDate")} type="date" className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition" />
+                <DatePicker
+                  value={watch("lastHbTestDate") || ""}
+                  onChange={(v) => setValue("lastHbTestDate", v)}
+                  max={new Date().toISOString().split("T")[0]}
+                  placeholder={t("last_hb_date")}
+                />
               </div>
             </div>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">{t("last_donation_date")}</label>
-            <input {...register("lastDonationDate")} type="date" className="w-full px-4 py-2.5 rounded-xl border border-slate-300 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition" />
+            <DatePicker
+              value={watch("lastDonationDate") || ""}
+              onChange={(v) => setValue("lastDonationDate", v)}
+              max={new Date().toISOString().split("T")[0]}
+              placeholder={t("last_donation_date")}
+            />
           </div>
 
           <div className="flex items-start gap-3">
