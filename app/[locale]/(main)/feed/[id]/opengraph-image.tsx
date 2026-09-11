@@ -4,7 +4,7 @@ import {
   OG_CONTENT_TYPE,
 } from "@/lib/og/og-card";
 import { serverGetPostById } from "@/lib/db-actions";
-import { SITE_NAME, SITE_DISPLAY_DOMAIN } from "@/lib/seo";
+import { SITE_NAME, SITE_NAME_BN, SITE_DISPLAY_DOMAIN } from "@/lib/seo";
 
 export const size = OG_SIZE;
 export const contentType = OG_CONTENT_TYPE;
@@ -15,7 +15,8 @@ export default async function Image({
 }: {
   params: Promise<{ locale: string; id: string }>;
 }) {
-  const { id } = await params;
+  const { locale, id } = await params;
+  const isBn = locale === "bn";
   let post: any = null;
   try {
     const postId = Number(id);
@@ -27,10 +28,10 @@ export default async function Image({
   const snippet = rawContent.slice(0, 120).trim();
 
   return renderOgImage({
-    title: authorName ? authorName : "Community Post",
+    title: authorName ? authorName : (isBn ? "কমিউনিটি পোস্ট" : "Community Post"),
     description: snippet || undefined,
-    badge: "Community",
-    siteName: SITE_NAME,
+    badge: isBn ? "কমিউনিটি" : "Community",
+    siteName: isBn ? SITE_NAME_BN : SITE_NAME,
     siteUrl: SITE_DISPLAY_DOMAIN,
   });
 }
