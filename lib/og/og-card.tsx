@@ -5,6 +5,8 @@ import path from "path";
 export const OG_SIZE = { width: 1200, height: 630 } as const;
 export const OG_CONTENT_TYPE = "image/png";
 
+const FONT_FAMILY = '"Hind Siliguri", sans-serif';
+
 export type OgCardProps = {
   title: string;
   description?: string;
@@ -12,6 +14,33 @@ export type OgCardProps = {
   siteName?: string;
   siteUrl?: string;
 };
+
+function loadFont(
+  filename: string,
+  weight: number,
+): { name: string; data: ArrayBuffer; weight: number; style: string } | null {
+  try {
+    const buf = fs.readFileSync(
+      path.join(process.cwd(), "lib", "og", "fonts", filename),
+    );
+    const data = buf.buffer.slice(
+      buf.byteOffset,
+      buf.byteOffset + buf.byteLength,
+    ) as ArrayBuffer;
+    return { name: FONT_FAMILY, data, weight, style: "normal" };
+  } catch {
+    return null;
+  }
+}
+
+function getOgfFonts() {
+  const regular = loadFont("HindSiliguri-Regular.ttf", 400);
+  const bold = loadFont("HindSiliguri-Bold.ttf", 700);
+  return [regular, bold].filter(
+    (f): f is { name: string; data: ArrayBuffer; weight: number; style: string } =>
+      f !== null,
+  );
+}
 
 function getLogoDataUrl(): string | null {
   try {
@@ -72,7 +101,7 @@ export function OgCard({
         color: "#ffffff",
         padding: "72px",
         position: "relative",
-        fontFamily: "sans-serif",
+        fontFamily: FONT_FAMILY,
       }}
     >
       <div
@@ -98,7 +127,7 @@ export function OgCard({
           style={{
             display: "flex",
             fontSize: 26,
-            fontWeight: 600,
+            fontWeight: 700,
             letterSpacing: 0.5,
           }}
         >
@@ -117,7 +146,7 @@ export function OgCard({
             borderRadius: 999,
             padding: "8px 22px",
             fontSize: 22,
-            fontWeight: 600,
+            fontWeight: 700,
             marginBottom: 22,
           }}
         >
@@ -129,7 +158,7 @@ export function OgCard({
         style={{
           display: "flex",
           fontSize: 68,
-          fontWeight: 800,
+          fontWeight: 700,
           lineHeight: 1.08,
           maxWidth: 940,
           marginBottom: 24,
@@ -171,5 +200,5 @@ export function OgCard({
 }
 
 export function renderOgImage(props: OgCardProps): ImageResponse {
-  return new ImageResponse(OgCard(props), { ...OG_SIZE });
+  return new ImageResponse(OgCard(props), { ...OG_SIZE, fonts: getOgfFonts() });
 }
