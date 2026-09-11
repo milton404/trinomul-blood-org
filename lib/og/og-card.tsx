@@ -17,8 +17,8 @@ export type OgCardProps = {
 
 function loadFont(
   filename: string,
-  weight: number,
-): { name: string; data: ArrayBuffer; weight: number; style: string } | null {
+  weight: 400 | 700,
+): { name: string; data: ArrayBuffer; weight: 400 | 700; style: string } | null {
   try {
     const buf = fs.readFileSync(
       path.join(process.cwd(), "lib", "og", "fonts", filename),
@@ -37,7 +37,7 @@ function getOgfFonts() {
   const regular = loadFont("HindSiliguri-Regular.ttf", 400);
   const bold = loadFont("HindSiliguri-Bold.ttf", 700);
   return [regular, bold].filter(
-    (f): f is { name: string; data: ArrayBuffer; weight: number; style: string } =>
+    (f): f is { name: string; data: ArrayBuffer; weight: 400 | 700; style: string } =>
       f !== null,
   );
 }
