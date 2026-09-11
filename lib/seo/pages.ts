@@ -31,6 +31,7 @@ type PageSeo = {
   descriptionEn: string;
   descriptionBn: string;
   badgeEn: string;
+  badgeBn: string;
 };
 
 export const PAGES: Record<PageKey, PageSeo> = {
@@ -43,6 +44,7 @@ export const PAGES: Record<PageKey, PageSeo> = {
     descriptionBn:
       "রক্তের গ্রুপ, এলাকা ও দূরত্ব অনুযায়ী রংপুর বিভাগের যাচাইকৃত রক্তদাতা খুঁজুন ও সরাসরি যোগাযোগ করুন।",
     badgeEn: "Donor Directory",
+    badgeBn: "ডোনার ডিরেক্টরি",
   },
   requests: {
     path: "/requests",
@@ -53,6 +55,7 @@ export const PAGES: Record<PageKey, PageSeo> = {
     descriptionBn:
       "রংপুর বিভাগের চলমান জরুরি রক্তের অনুরোধ দেখুন। একটি অনুরোধে সাড়া দিন ও প্রাণ বাঁচান।",
     badgeEn: "Emergency Requests",
+    badgeBn: "জরুরি অনুরোধ",
   },
   request: {
     path: "/request",
@@ -63,6 +66,7 @@ export const PAGES: Record<PageKey, PageSeo> = {
     descriptionBn:
       "জরুরি রক্তের অনুরোধ জমা দিন। এটি রংপুর বিভাগের কাছাকাছি রক্তদাতাদের কাছে তাৎক্ষণিকভাবে পৌঁছে যাবে।",
     badgeEn: "Post a Request",
+    badgeBn: "অনুরোধ করুন",
   },
   becomeDonor: {
     path: "/become-donor",
@@ -73,6 +77,7 @@ export const PAGES: Record<PageKey, PageSeo> = {
     descriptionBn:
       "রক্তদাতা হিসেবে নিবন্ধন করুন ও রংপুর বিভাগে প্রাণ বাঁচাতে সাহায্য করুন।",
     badgeEn: "Donor Registration",
+    badgeBn: "ডোনার নিবন্ধন",
   },
   bloodBank: {
     path: "/blood-bank",
@@ -83,6 +88,7 @@ export const PAGES: Record<PageKey, PageSeo> = {
     descriptionBn:
       "রংপুর বিভাগের ব্লাড ব্যাংক এলাকা পেজ ব্রাউজ করুন — জেলা, উপজেলা ও ইউনিয়ন।",
     badgeEn: "Area Directory",
+    badgeBn: "এলাকা ডিরেক্টরি",
   },
   map: {
     path: "/map",
@@ -93,6 +99,7 @@ export const PAGES: Record<PageKey, PageSeo> = {
     descriptionBn:
       "রংপুর বিভাগের রক্তদাতা ও চলমান অনুরোধের ইন্টারঅ্যাকটিভ ম্যাপ দেখুন।",
     badgeEn: "Interactive Map",
+    badgeBn: "ইন্টারঅ্যাকটিভ ম্যাপ",
   },
   leaderboard: {
     path: "/leaderboard",
@@ -101,6 +108,7 @@ export const PAGES: Record<PageKey, PageSeo> = {
     descriptionEn: "Top blood donors ranked by donations across Rangpur division.",
     descriptionBn: "রংপুর বিভাগে রক্তদান অনুযায়ী শীর্ষ রক্তদাতাদের তালিকা।",
     badgeEn: "Top Donors",
+    badgeBn: "শীর্ষ ডোনার",
   },
   transparency: {
     path: "/transparency",
@@ -110,6 +118,7 @@ export const PAGES: Record<PageKey, PageSeo> = {
     descriptionBn:
       "তৃণমূল ব্লাড ব্যাংক রংপুরের পাবলিক পরিসংখ্যান ও ইম্প্যাক্ট ডেটা।",
     badgeEn: "Open Data",
+    badgeBn: "ওপেন ডেটা",
   },
   teams: {
     path: "/teams",
@@ -119,6 +128,7 @@ export const PAGES: Record<PageKey, PageSeo> = {
     descriptionBn:
       "তৃণমূল ব্লাড ব্যাংক রংপুরের স্বেচ্ছাসেবক ও দলের সাথে পরিচিত হোন।",
     badgeEn: "Volunteers",
+    badgeBn: "স্বেচ্ছাসেবক",
   },
   feed: {
     path: "/feed",
@@ -129,6 +139,7 @@ export const PAGES: Record<PageKey, PageSeo> = {
     descriptionBn:
       "রংপুর বিভাগের সাম্প্রতিক রক্তদান, অনুরোধ ও কমিউনিটি কার্যক্রম।",
     badgeEn: "Live Feed",
+    badgeBn: "লাইভ ফিড",
   },
   guidance: {
     path: "/guidance",
@@ -139,6 +150,7 @@ export const PAGES: Record<PageKey, PageSeo> = {
     descriptionBn:
       "কে রক্ত দিতে পারেন, যোগ্যতা, দানের আগে/পরে যত্ন ও সাধারণ প্রশ্ন।",
     badgeEn: "Guide & FAQ",
+    badgeBn: "গাইড ও প্রশ্ন",
   },
   about: {
     path: "/about",
@@ -149,6 +161,7 @@ export const PAGES: Record<PageKey, PageSeo> = {
     descriptionBn:
       "তৃণমূল রংপুরের একটি কমিউনিটি-ভিত্তিক স্বেচ্ছাসেবী সংগঠন, ২০১৭ থেকে মানবসেবায় নিয়োজিত।",
     badgeEn: "About",
+    badgeBn: "পরিচিতি",
   },
   contact: {
     path: "/contact",
@@ -158,6 +171,7 @@ export const PAGES: Record<PageKey, PageSeo> = {
     descriptionBn:
       "তৃণমূল ব্লাড ব্যাংক রংপুরের সাথে যোগাযোগ করুন — ফোন, ইমেইল ও সোশ্যাল।",
     badgeEn: "Contact",
+    badgeBn: "যোগাযোগ",
   },
   privacy: {
     path: "/privacy",
@@ -168,6 +182,7 @@ export const PAGES: Record<PageKey, PageSeo> = {
     descriptionBn:
       "তৃণমূল ব্লাড ব্যাংক রংপুর আপনার ডেটা কীভাবে সংগ্রহ, ব্যবহার ও সুরক্ষিত করে।",
     badgeEn: "Legal",
+    badgeBn: "আইনি",
   },
   terms: {
     path: "/terms",
@@ -176,6 +191,7 @@ export const PAGES: Record<PageKey, PageSeo> = {
     descriptionEn: "Terms and conditions for using Trinomul Blood Bank Rangpur.",
     descriptionBn: "তৃণমূল ব্লাড ব্যাংক রংপুর ব্যবহারের শর্ত ও নিয়মাবলি।",
     badgeEn: "Legal",
+    badgeBn: "আইনি",
   },
 };
 
@@ -221,13 +237,14 @@ export function buildPageMetadata({
   };
 }
 
-export function pageOgCardProps(page: PageKey): OgCardProps {
+export function pageOgCardProps(page: PageKey, locale = "en"): OgCardProps {
   const p = PAGES[page];
+  const isBn = locale === "bn";
   return {
-    title: p.titleEn,
-    description: p.descriptionEn,
-    badge: p.badgeEn,
-    siteName: SITE_NAME,
+    title: isBn ? p.titleBn : p.titleEn,
+    description: isBn ? p.descriptionBn : p.descriptionEn,
+    badge: isBn ? p.badgeBn : p.badgeEn,
+    siteName: isBn ? SITE_NAME_BN : SITE_NAME,
     siteUrl: SITE_DISPLAY_DOMAIN,
   };
 }
