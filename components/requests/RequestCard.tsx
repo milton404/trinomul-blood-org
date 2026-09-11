@@ -24,7 +24,7 @@ import {
   Check,
   Share2,
   Download,
-  Facebook,
+
   Link2,
   Eye,
 } from "lucide-react";
@@ -44,7 +44,7 @@ import {
 } from "@/lib/db-actions";
 import RequestShareImage from "./RequestShareImage";
 import BengaliShareImage from "./BengaliShareImage";
-import QuickAddDonor from "@/components/admin/QuickAddDonor";
+
 import { useClientSide } from "@/lib/hooks/useClientSide";
 
 const QR_GRADIENTS: { stops: [number, number, number][] }[] = [
@@ -211,7 +211,7 @@ export default function RequestCard({ request }: RequestCardProps) {
   const [downloading, setDownloading] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
   const [textCopied, setTextCopied] = useState(false);
-  const [showShareMenu, setShowShareMenu] = useState(false);
+
   const [translating, setTranslating] = useState(false);
   const [translateStep, setTranslateStep] = useState(0);
   const [showQrModal, setShowQrModal] = useState(false);
@@ -252,12 +252,6 @@ export default function RequestCard({ request }: RequestCardProps) {
     return () => clearInterval(interval);
   }, [translating]);
 
-  useEffect(() => {
-    if (!showShareMenu) return;
-    const handler = () => setShowShareMenu(false);
-    document.addEventListener("click", handler);
-    return () => document.removeEventListener("click", handler);
-  }, [showShareMenu]);
 
 
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
@@ -703,11 +697,7 @@ whatsapp_number: request.whatsapp_number || null,
     }
   };
 
-  const shareText = buildShareText();
-  const shareLink = cardShareUrl || absoluteTrackingUrl;
-  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(`${shareText}\n\n🔗 ${shareLink}`)}`;
-  const facebookUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareLink)}`;
-  const messengerUrl = `https://www.facebook.com/dialog/send?link=${encodeURIComponent(shareLink)}&app_id=0&redirect_uri=${encodeURIComponent(shareLink)}`;
+
 
   const downloadDataUrl = (url: string, filename: string) => {
     const a = document.createElement("a");
@@ -1065,54 +1055,23 @@ whatsapp_number: request.whatsapp_number || null,
               </span>
             </button>
 
-            {/* Share menu */}
-            <div className="relative">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowShareMenu(!showShareMenu);
-                }}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-slate-200 text-[11px] font-semibold text-slate-600 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition-colors"
-                title={isBn ? "শেয়ার করুন" : "Share"}
-              >
-                <Share2 className="w-3 h-3 shrink-0" />
-                <span className="leading-none">{isBn ? "শেয়ার" : "Share"}</span>
-              </button>
-              {showShareMenu && (
-                <div className="absolute right-0 bottom-full mb-1 z-30 bg-white rounded-xl shadow-lg border border-slate-200 p-1 flex flex-col gap-0.5 min-w-[120px]">
-                  <a
-                    href={whatsappUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => setShowShareMenu(false)}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-slate-700 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
-                  >
-                    <MessageCircle className="w-3 h-3 shrink-0" />
-                    WhatsApp
-                  </a>
-                  <a
-                    href={facebookUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => setShowShareMenu(false)}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                  >
-                    <Facebook className="w-3 h-3 shrink-0" />
-                    Facebook
-                  </a>
-                  <a
-                    href={messengerUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    onClick={() => setShowShareMenu(false)}
-                    className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-slate-700 hover:bg-blue-50 hover:text-blue-600 transition-colors"
-                  >
-                    <MessageCircle className="w-3 h-3 shrink-0" />
-                    Messenger
-                  </a>
-                </div>
-              )}
-            </div>
+            {/* Share — uses the device native share sheet (Web Share API),
+                falls back to clipboard copy where navigator.share is absent */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleShare();
+              }}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full border border-slate-200 text-[11px] font-semibold text-slate-600 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition-colors"
+              title={isBn ? "শেয়ার করুন" : "Share"}
+            >
+              <Share2 className="w-3 h-3 shrink-0" />
+              <span className="leading-none">
+                {shareCopied
+                  ? (isBn ? "কপি হয়েছে" : "Copied")
+                  : (isBn ? "শেয়ার" : "Share")}
+              </span>
+            </button>
 
             <button
               onClick={handleDownloadImage}
@@ -1231,14 +1190,7 @@ whatsapp_number: request.whatsapp_number || null,
                     ))
                   )}
                 </div>
-                <QuickAddDonor
-                  defaultBloodGroup={request.blood_group}
-                  locale={locale}
-                  onCreated={(donor) => {
-                    setDonors((prev) => [...prev, donor]);
-                    setSelectedDonorId(donor.id);
-                  }}
-                />
+
               </div>
 
               <div className="grid grid-cols-2 gap-3">

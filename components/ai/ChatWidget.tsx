@@ -39,6 +39,8 @@ export default function ChatWidget() {
   const [hintVisible, setHintVisible] = useState(true);
   const [confirmNewChat, setConfirmNewChat] = useState(false);
   const [workflowState, setWorkflowState] = useState<AssistantWorkflowState | null>(null);
+  const [isMobileOrPwa, setIsMobileOrPwa] = useState(false);
+  const [isScanModalOpen, setIsScanModalOpen] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -68,12 +70,52 @@ export default function ChatWidget() {
       ];
 
   // Hide on admin and auth pages
+  // On phone/PWA browsers also hide on community (/feed), profile, and when
+  // the QR scan modal is open. PC browsers keep the chatbot everywhere.
+  const onMobileHiddenPage =
+    isMobileOrPwa &&
+    (pathname.includes("/feed") ||
+      pathname.includes("/profile") ||
+      isScanModalOpen);
+
   const hidden =
     pathname.includes("/admin") ||
     pathname.includes("/login") ||
     pathname.includes("/register") ||
     pathname.includes("/forgot-password") ||
-    pathname.includes("/reset-password");
+    pathname.includes("/reset-password") ||
+    onMobileHiddenPage;
+
+  // Detect phone (<=767px, matches the md: breakpoint where BottomNav shows)
+  // or PWA (display-mode: standalone / iOS navigator.standalone)
+  useEffect(() => {
+    const mql = window.matchMedia("(max-width: 767px)");
+    const pwaMql = window.matchMedia("(display-mode: standalone)");
+    const iosStandalone =
+      (window.navigator as Navigator & { standalone?: boolean }).standalone ===
+      true;
+    const update = () =>
+      setIsMobileOrPwa(mql.matches || pwaMql.matches || iosStandalone);
+    update();
+    mql.addEventListener("change", update);
+    pwaMql.addEventListener("change", update);
+    return () => {
+      mql.removeEventListener("change", update);
+      pwaMql.removeEventListener("change", update);
+    };
+  }, []);
+
+  // Track when the QR scan modal is open so the chatbot can hide on phone/PWA
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ open: boolean }>).detail;
+      if (detail && typeof detail.open === "boolean") {
+        setIsScanModalOpen(detail.open);
+      }
+    };
+    window.addEventListener("tbb:scan-modal", handler);
+    return () => window.removeEventListener("tbb:scan-modal", handler);
+  }, []);
 
   // Rotate hint messages when chat is closed: show each hint briefly,
   // then hide it until the next 5s tick brings the next hint

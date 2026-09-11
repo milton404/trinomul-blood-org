@@ -1,3 +1,9 @@
+import {
+  RANGPUR_DISTRICTS,
+  RANGPUR_UPAZILAS,
+  RANGPUR_UNIONS,
+} from "@/lib/constants/rangpur";
+
 const FALLBACK_SITE_URL = "https://trinomul.vercel.app";
 
 function resolveSiteUrl(): string {
@@ -27,6 +33,64 @@ export const DEFAULT_LOCALE = "bn";
 
 export const LOGO_URL = `${SITE_URL}/trinomul-logo.png`;
 
+const GEO_KEYWORDS_EN: string[] = (() => {
+  const out: string[] = [];
+  for (const d of RANGPUR_DISTRICTS) {
+    out.push(
+      `blood donor ${d.name_en}`,
+      `blood bank ${d.name_en}`,
+      `blood donation ${d.name_en}`,
+      `emergency blood ${d.name_en}`,
+      `blood request ${d.name_en}`,
+      `${d.name_en} blood`,
+    );
+  }
+  for (const u of RANGPUR_UPAZILAS) {
+    out.push(
+      `blood donor ${u.name_en}`,
+      `blood bank ${u.name_en}`,
+      `blood ${u.name_en}`,
+      `${u.name_en} blood donor`,
+    );
+  }
+  for (const n of RANGPUR_UNIONS) {
+    out.push(
+      `blood donor ${n.name_en}`,
+      `blood ${n.name_en}`,
+      `${n.name_en} union blood`,
+    );
+  }
+  return out;
+})();
+
+const GEO_KEYWORDS_BN: string[] = (() => {
+  const out: string[] = [];
+  for (const d of RANGPUR_DISTRICTS) {
+    out.push(
+      `রক্তদাতা ${d.name_bn}`,
+      `ব্লাড ব্যাংক ${d.name_bn}`,
+      `রক্তদান ${d.name_bn}`,
+      `জরুরি রক্ত ${d.name_bn}`,
+      `রক্ত ${d.name_bn}`,
+    );
+  }
+  for (const u of RANGPUR_UPAZILAS) {
+    out.push(
+      `রক্তদাতা ${u.name_bn}`,
+      `রক্ত ${u.name_bn}`,
+      `ব্লাড ${u.name_bn}`,
+    );
+  }
+  for (const n of RANGPUR_UNIONS) {
+    out.push(
+      `রক্তদাতা ${n.name_bn}`,
+      `রক্ত ${n.name_bn}`,
+      `${n.name_bn} ইউনিয়ন রক্ত`,
+    );
+  }
+  return out;
+})();
+
 export const KEYWORDS_EN = [
   "blood bank Rangpur",
   "blood donation Rangpur",
@@ -48,6 +112,7 @@ export const KEYWORDS_EN = [
   "rare blood group Bangladesh",
   "O negative blood Rangpur",
   "Rangpur division",
+  ...GEO_KEYWORDS_EN,
 ];
 
 export const KEYWORDS_BN = [
@@ -63,6 +128,7 @@ export const KEYWORDS_BN = [
   "ব্লাড ডোনার খোঁজা",
   "রক্তদানে উৎসাহ",
   "তৃণমূল ব্লাড ব্যাংক",
+  ...GEO_KEYWORDS_BN,
 ];
 
 export const KEYWORDS_BANGLISH = [
@@ -93,9 +159,9 @@ const TEXTS: Record<string, Pick<SeoTexts, "title" | "description" | "ogTitle" |
     title: SITE_NAME,
     ogTitle: `${SITE_NAME} — Find Blood Donors & Request Blood`,
     description:
-      "Trinomul Blood Bank Rangpur connects blood donors, patients and hospitals across Rangpur division, Bangladesh. Find blood donors, request blood in an emergency and donate blood to save lives in Rangpur, Dinajpur, Kurigram, Lalmonirhat, Nilphamari, Gaibandha, Thakurgaon and Panchagarh.",
+      "Trinomul Blood Bank Rangpur connects blood donors, patients and hospitals across every district, upazila and union of Rangpur division, Bangladesh. Find blood donors by union, upazila or district — Rangpur, Dinajpur, Kurigram, Lalmonirhat, Nilphamari, Gaibandha, Thakurgaon and Panchagarh. Request blood in an emergency and donate blood to save lives.",
     ogDescription:
-      "Find blood donors and request blood in an emergency across Rangpur division, Bangladesh. Join Trinomul Blood Bank Rangpur and save lives.",
+      "Find blood donors by union, upazila or district across Rangpur division, Bangladesh. Request emergency blood and donate to save lives with Trinomul Blood Bank Rangpur.",
     ogLocale: "en_US",
     ogLocaleAlternate: "bn_BD",
   },
@@ -103,9 +169,9 @@ const TEXTS: Record<string, Pick<SeoTexts, "title" | "description" | "ogTitle" |
     title: SITE_NAME_BN,
     ogTitle: `${SITE_NAME_BN} — রক্তদাতা খুঁজুন ও রক্তের অনুরোধ করুন`,
     description:
-      "তৃণমূল ব্লাড ব্যাংক রংপুর — রংপুর বিভাগের রক্তদাতা, রোগী ও হাসপাতালকে যুক্ত করে এক প্ল্যাটফর্মে। রক্তদাতা খুঁজুন, জরুরি রক্তের অনুরোধ করুন এবং রক্তদান করে বাঁচান প্রাণ। রংপুর, দিনাজপুর, কুড়িগ্রাম, লালমনিরহাট, নীলফামারী, গাইবান্ধা, ঠাকুরগাঁও ও পঞ্চগড় জুড়ে।",
+      "তৃণমূল ব্লাড ব্যাংক রংপুর — রংপুর বিভাগের প্রতিটি জেলা, উপজেলা ও ইউনিয়নের রক্তদাতা, রোগী ও হাসপাতালকে যুক্ত করে এক প্ল্যাটফর্মে। ইউনিয়ন, উপজেলা বা জেলা অনুযায়ী রক্তদাতা খুঁজুন — রংপুর, দিনাজপুর, কুড়িগ্রাম, লালমনিরহাট, নীলফামারী, গাইবান্ধা, ঠাকুরগাঁও ও পঞ্চগড়। জরুরি রক্তের অনুরোধ করুন ও রক্তদান করে প্রাণ বাঁচান।",
     ogDescription:
-      "রংপুর বিভাগে রক্তদাতা খুঁজুন ও জরুরি রক্তের অনুরোধ করুন। তৃণমূল ব্লাড ব্যাংক রংপুরে যোগ দিন এবং প্রাণ বাঁচান।",
+      "রংপুর বিভাগের ইউনিয়ন, উপজেলা বা জেলা অনুযায়ী রক্তদাতা খুঁজুন। জরুরি রক্তের অনুরোধ করুন ও তৃণমূল ব্লাড ব্যাংক রংপুরে যোগ দিয়ে প্রাণ বাঁচান।",
     ogLocale: "bn_BD",
     ogLocaleAlternate: "en_US",
   },
@@ -138,10 +204,10 @@ export function organizationJsonLd(locale: string) {
         logo: { "@type": "ImageObject", url: LOGO_URL },
         image: LOGO_URL,
         description: isBn ? TEXTS.bn.description : TEXTS.en.description,
-        areaServed: {
+        areaServed: RANGPUR_DISTRICTS.map((d) => ({
           "@type": "AdministrativeArea",
-          name: "Rangpur Division, Bangladesh",
-        },
+          name: isBn ? d.name_bn : d.name_en,
+        })),
         foundingLocation: {
           "@type": "Place",
           name: "Rangpur, Bangladesh",
@@ -151,6 +217,8 @@ export function organizationJsonLd(locale: string) {
           "Blood donor",
           "Blood bank",
           "Emergency blood request",
+          ...RANGPUR_UPAZILAS.map((u) => (isBn ? u.name_bn : u.name_en)),
+          ...RANGPUR_UNIONS.map((n) => (isBn ? n.name_bn : n.name_en)),
         ],
       },
       {

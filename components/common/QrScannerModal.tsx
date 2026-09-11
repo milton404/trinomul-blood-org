@@ -157,6 +157,13 @@ export default function QrScannerModal({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [stopCamera, onClose]);
 
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent("tbb:scan-modal", { detail: { open: true } }));
+    return () => {
+      window.dispatchEvent(new CustomEvent("tbb:scan-modal", { detail: { open: false } }));
+    };
+  }, []);
+
   const scanFromGallery = async (file: File) => {
     try {
       setImageScanning(true);
