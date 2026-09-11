@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { serverGetProfileByEmail } from '@/lib/db-actions';
 
@@ -31,11 +31,8 @@ export default function AuthProvider({
   children: React.ReactNode;
 }) {
   const { setUser, setRole, setIsLoading } = useAuthStore();
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
-
     const initAuth = async () => {
       try {
         const savedSession = localStorage.getItem(SESSION_KEY);
@@ -50,7 +47,10 @@ export default function AuthProvider({
           }
         }
 
-        if (!emailToCheck) return;
+        if (!emailToCheck) {
+          setIsLoading(false);
+          return;
+        }
 
         const profile = await serverGetProfileByEmail(emailToCheck) as any;
 
@@ -80,10 +80,6 @@ export default function AuthProvider({
 
     initAuth();
   }, [setUser, setRole, setIsLoading]);
-
-  if (!mounted) {
-    return null;
-  }
 
   return <>{children}</>;
 }
