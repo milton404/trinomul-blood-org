@@ -601,8 +601,8 @@ export default function DonorCard({ donor }: DonorCardProps) {
 
       {/* Engagement actions — bookmark, save contact, share, download card, QR */}
       {!isAnonymous && donor.id && (
-        <div className="flex items-center justify-between gap-2 mt-2 pt-2 border-t border-gray-50">
-          <div className="flex items-center gap-1 min-w-0 overflow-hidden">
+        <div className="flex items-center justify-between gap-2.5 mt-3 pt-3 border-t border-gray-50">
+          <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
             <BookmarkDonorButton donorId={donor.id} compact />
             <SaveContactButton
               fullName={donor.full_name}
@@ -623,28 +623,28 @@ export default function DonorCard({ donor }: DonorCardProps) {
               type="button"
               onClick={handleDownloadCard}
               disabled={downloadingCard}
-              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-600 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium text-slate-600 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-colors disabled:opacity-50"
               title={isBn ? "কার্ড ডাউনলোড" : "Download Card"}
             >
               {downloadingCard ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
-                <Download className="w-3 h-3" />
+                <Download className="w-4 h-4" />
               )}
             </button>
             <button
               type="button"
               onClick={handleCopyText}
               disabled={copyingText}
-              className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-600 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-colors disabled:opacity-50"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium text-slate-600 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-colors disabled:opacity-50"
               title={isBn ? "টেক্সট কপি" : "Copy Text"}
             >
               {copyingText ? (
-                <Loader2 className="w-3 h-3 animate-spin" />
+                <Loader2 className="w-4 h-4 animate-spin" />
               ) : textCopied ? (
-                <Check className="w-3 h-3 text-emerald-500" />
+                <Check className="w-4 h-4 text-emerald-500" />
               ) : (
-                <Copy className="w-3 h-3" />
+                <Copy className="w-4 h-4" />
               )}
             </button>
           </div>

@@ -66,13 +66,13 @@ export default function ShareProfileButton({
       type="button"
       onClick={handleShare}
       disabled={loading}
-      className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-600 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-colors disabled:opacity-50"
+      className="inline-flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium text-slate-600 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 transition-colors disabled:opacity-50"
       title={isBn ? "শেয়ার" : "Share"}
     >
       {loading ? (
-        <Loader2 className="w-3 h-3 animate-spin" />
+        <Loader2 className="w-4 h-4 animate-spin" />
       ) : (
-        <Share2 className="w-3 h-3" />
+        <Share2 className="w-4 h-4" />
       )}
       {!compact && (isBn ? "শেয়ার" : "Share")}
     </button>

@@ -83,9 +83,9 @@ export default function BookmarkDonorButton({
       <button
         type="button"
         disabled
-        className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium text-slate-400 rounded-lg border border-slate-200"
-      >
-        <Loader2 className="w-3 h-3 animate-spin" />
+      className="inline-flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium text-slate-400 rounded-lg border border-slate-200"
+    >
+      <Loader2 className="w-4 h-4 animate-spin" />
       </button>
     );
   }
@@ -95,7 +95,7 @@ export default function BookmarkDonorButton({
       type="button"
       onClick={handleToggle}
       disabled={loading}
-      className={`inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded-lg border transition-colors disabled:opacity-50 ${
+      className={`inline-flex items-center gap-1 px-2.5 py-1.5 text-sm font-medium rounded-lg border transition-colors disabled:opacity-50 ${
         bookmarked
           ? "text-emerald-700 border-emerald-200 bg-emerald-50 hover:bg-emerald-100"
           : "text-slate-600 border-slate-200 bg-white hover:bg-slate-50"
@@ -103,11 +103,11 @@ export default function BookmarkDonorButton({
       title={isBn ? "সংরক্ষণ" : "Bookmark"}
     >
       {loading ? (
-        <Loader2 className="w-3 h-3 animate-spin" />
+        <Loader2 className="w-4 h-4 animate-spin" />
       ) : bookmarked ? (
-        <BookmarkCheck className="w-3 h-3" />
+        <BookmarkCheck className="w-4 h-4" />
       ) : (
-        <Bookmark className="w-3 h-3" />
+        <Bookmark className="w-4 h-4" />
       )}
       {!compact && (isBn ? "সংরক্ষণ" : "Save")}
     </button>
