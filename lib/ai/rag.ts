@@ -12,19 +12,23 @@
  *  - FAQ_DOCUMENTS (static authoritative content)
  *  - Live DB snapshot (donors, inventory, requests — summarized)
  *
- * Embeddings are cached in SQLite so we only pay for embedding
- * generation once per document. Query embeddings are cached in
- * memory (30 min TTL). The FAQ index is built lazily, refreshed
- * when content changes, and re-checked at most once per minute.
+ * IMPORTANT: the live DB snapshot goes through the Supabase-aware
+ * `serverGet*` wrappers in lib/db-actions.ts, NOT through raw SQLite.
+ * In production (DATABASE_URL set) the app serves Supabase data, so a
+ * SQLite read here would feed the model stale/empty numbers and invite
+ * hallucination. Embeddings are persisted in Supabase too, so cold
+ * starts do not lose the semantic index; SQLite remains the local-dev
+ * fallback only.
  */
 
 import { getDb } from "@/lib/db";
-import { FAQ_DOCUMENTS } from "./faq-content";
+import { isSupabaseAvailable, query as pgQuery } from "@/lib/supabase/client";
 import {
-  getBloodInventory,
-  getActiveBloodRequests,
-  getProfilesByRole,
-} from "@/lib/db";
+  serverGetBloodInventory,
+  serverGetActiveBloodRequests,
+  serverGetProfilesByRole,
+} from "@/lib/db-actions";
+import { FAQ_DOCUMENTS } from "./faq-content";
 
 // ── Types ───────────────────────────────────────────────────────────
 
@@ -34,6 +38,13 @@ export interface RetrievedChunk {
   category: string;
   content: string;
   score: number; // fused RRF score (higher = better)
+}
+
+interface StoredDoc {
+  id: string;
+  source: "faq" | "db";
+  category: string;
+  content: string;
 }
 
 // ── Table schema ────────────────────────────────────────────────────
@@ -57,10 +68,193 @@ const INDEX_HASH_TABLE = `
   );
 `;
 
-function ensureTables() {
+const PG_EMBEDDINGS_TABLE = `
+  CREATE TABLE IF NOT EXISTS rag_embeddings (
+    id TEXT PRIMARY KEY,
+    source TEXT NOT NULL,
+    category TEXT NOT NULL,
+    content TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    embedding JSONB NOT NULL,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  );
+`;
+
+const PG_INDEX_HASH_TABLE = `
+  CREATE TABLE IF NOT EXISTS rag_index_meta (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+`;
+
+function ensureSqliteTables() {
   const db = getDb();
   db.exec(EMBEDDINGS_TABLE);
   db.exec(INDEX_HASH_TABLE);
+}
+
+let pgTablesReady = false;
+
+async function ensurePgTables() {
+  if (pgTablesReady) return;
+  await pgQuery(PG_EMBEDDINGS_TABLE);
+  await pgQuery(PG_INDEX_HASH_TABLE);
+  pgTablesReady = true;
+}
+
+// ── Embedding storage backend (Supabase in prod, SQLite in dev) ──────
+
+/** id → content_hash for every stored document. */
+async function readStoredHashes(): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (isSupabaseAvailable()) {
+    await ensurePgTables();
+    const { rows } = await pgQuery<{ id: string; content_hash: string }>(
+      "SELECT id, content_hash FROM rag_embeddings",
+    );
+    for (const r of rows) map.set(r.id, r.content_hash);
+    return map;
+  }
+  const db = getDb();
+  ensureSqliteTables();
+  const rows = db
+    .prepare("SELECT id, content_hash FROM rag_embeddings")
+    .all() as { id: string; content_hash: string }[];
+  for (const r of rows) map.set(r.id, r.content_hash);
+  return map;
+}
+
+/**
+ * Stored documents with their embedding vectors. `embedding` is a JSONB
+ * array under Postgres (already parsed by `pg`) but a JSON string under
+ * SQLite — the caller normalises both shapes.
+ */
+async function readEmbeddingRows(): Promise<
+  { id: string; embedding: number[] | string }[]
+> {
+  if (isSupabaseAvailable()) {
+    await ensurePgTables();
+    const { rows } = await pgQuery<{ id: string; embedding: number[] | string }>(
+      "SELECT id, embedding FROM rag_embeddings",
+    );
+    return rows;
+  }
+  const db = getDb();
+  ensureSqliteTables();
+  return db
+    .prepare("SELECT id, embedding FROM rag_embeddings")
+    .all() as { id: string; embedding: number[] | string }[];
+}
+
+/** Doc metadata used to rehydrate the in-memory corpus on a cold start. */
+async function readStoredDocs(): Promise<StoredDoc[]> {
+  if (isSupabaseAvailable()) {
+    await ensurePgTables();
+    const { rows } = await pgQuery<{
+      id: string;
+      source: string;
+      category: string;
+      content: string;
+    }>("SELECT id, source, category, content FROM rag_embeddings");
+    return rows.map((r) => ({
+      id: r.id,
+      source: r.source as "faq" | "db",
+      category: r.category,
+      content: r.content,
+    }));
+  }
+  const db = getDb();
+  ensureSqliteTables();
+  const rows = db
+    .prepare("SELECT id, source, category, content FROM rag_embeddings")
+    .all() as { id: string; source: string; category: string; content: string }[];
+  return rows.map((r) => ({
+    id: r.id,
+    source: r.source as "faq" | "db",
+    category: r.category,
+    content: r.content,
+  }));
+}
+
+async function upsertEmbedding(
+  doc: StoredDoc,
+  contentHash: string,
+  embedding: number[],
+): Promise<void> {
+  if (isSupabaseAvailable()) {
+    await ensurePgTables();
+    await pgQuery(
+      `INSERT INTO rag_embeddings (id, source, category, content, content_hash, embedding, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, NOW())
+       ON CONFLICT (id) DO UPDATE SET
+         source = EXCLUDED.source,
+         category = EXCLUDED.category,
+         content = EXCLUDED.content,
+         content_hash = EXCLUDED.content_hash,
+         embedding = EXCLUDED.embedding,
+         updated_at = NOW()`,
+      [
+        doc.id,
+        doc.source,
+        doc.category,
+        doc.content,
+        contentHash,
+        JSON.stringify(embedding),
+      ],
+    );
+    return;
+  }
+
+  const db = getDb();
+  ensureSqliteTables();
+  const now = new Date().toISOString();
+  db.prepare(
+    `INSERT INTO rag_embeddings (id, source, category, content, content_hash, embedding, updated_at)
+     VALUES (@id, @source, @category, @content, @content_hash, @embedding, @updated_at)
+     ON CONFLICT(id) DO UPDATE SET
+       content = @content,
+       content_hash = @content_hash,
+       embedding = @embedding,
+       updated_at = @updated_at`,
+  ).run({
+    id: doc.id,
+    source: doc.source,
+    category: doc.category,
+    content: doc.content,
+    content_hash: contentHash,
+    embedding: JSON.stringify(embedding),
+    updated_at: now,
+  });
+}
+
+async function writeIndexMeta(key: string, value: string): Promise<void> {
+  if (isSupabaseAvailable()) {
+    await ensurePgTables();
+    await pgQuery(
+      `INSERT INTO rag_index_meta (key, value) VALUES ($1, $2)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      [key, value],
+    );
+    return;
+  }
+  const db = getDb();
+  ensureSqliteTables();
+  db.prepare(
+    `INSERT INTO rag_index_meta (key, value) VALUES (?, ?)
+     ON CONFLICT(key) DO UPDATE SET value = ?`,
+  ).run(key, value, value);
+}
+
+/** Normalise a stored embedding into a number[] regardless of backend. */
+function parseStoredEmbedding(value: number[] | string | null): number[] {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string") return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
 }
 
 // ── Embedding API (always Zhipu — independent of chat provider order) ──
@@ -210,16 +404,23 @@ function simpleHash(text: string): string {
 
 /**
  * Build short text summaries of live DB data to embed alongside FAQ.
- * These give the RAG system awareness of current inventory, donor
- * counts, and active requests without exposing private data.
+ *
+ * INVARIANT: these summaries carry COUNTS ONLY. Never include donor
+ * names, phone numbers, patient names or any other personal data —
+ * `serverGetProfilesByRole` returns full profile rows and it is easy to
+ * leak one by accident. Only aggregate over the rows.
  */
-function buildDBSummaries(): { id: string; category: string; content: string }[] {
+async function buildDBSummaries(): Promise<
+  { id: string; category: string; content: string }[]
+> {
   const summaries: { id: string; category: string; content: string }[] = [];
 
   try {
-    const inventory = getBloodInventory();
-    const activeReqs = getActiveBloodRequests(50) as any[];
-    const donors = getProfilesByRole("donor") as any[];
+    const [inventory, activeReqs, donors] = await Promise.all([
+      serverGetBloodInventory() as Promise<{ blood_group: string; count: number }[]>,
+      serverGetActiveBloodRequests(50) as Promise<any[]>,
+      serverGetProfilesByRole("donor") as Promise<any[]>,
+    ]);
 
     // Inventory summary
     const invText = inventory
@@ -228,7 +429,7 @@ function buildDBSummaries(): { id: string; category: string; content: string }[]
     summaries.push({
       id: "db-inventory",
       category: "inventory",
-      content: `Current blood donor inventory by group: ${invText}. Total active donors: ${donors.length}.`,
+      content: `Current blood donor inventory by group: ${invText}. Total registered donor records: ${donors.length}.`,
     });
 
     // Active requests summary
@@ -243,7 +444,9 @@ function buildDBSummaries(): { id: string; category: string; content: string }[]
     });
 
     // District coverage
-    const districts = new Set(donors.map((d) => d.district).filter(Boolean));
+    const districts = new Set(
+      donors.map((d) => d.district).filter(Boolean) as string[],
+    );
     summaries.push({
       id: "db-coverage",
       category: "coverage",
@@ -260,7 +463,7 @@ function buildDBSummaries(): { id: string; category: string; content: string }[]
  * The full in-memory document list (FAQ + DB summaries), used by the
  * lexical retriever. Rebuilt at most once per minute by ensureIndex.
  */
-let lexicalDocs: { id: string; source: "faq" | "db"; category: string; content: string }[] = [];
+let lexicalDocs: StoredDoc[] = [];
 
 // ── Index management ────────────────────────────────────────────────
 
@@ -280,12 +483,9 @@ async function ensureIndex() {
 
   indexingPromise = (async () => {
     try {
-      ensureTables();
-      const db = getDb();
-
-      // Combine FAQ + DB summaries
-      const dbSummaries = buildDBSummaries();
-      const allDocs: { id: string; source: "faq" | "db"; category: string; content: string }[] = [
+      // Combine FAQ + live DB summaries
+      const dbSummaries = await buildDBSummaries();
+      const allDocs: StoredDoc[] = [
         ...FAQ_DOCUMENTS.map((d) => ({
           id: d.id,
           source: "faq" as const,
@@ -299,35 +499,23 @@ async function ensureIndex() {
       ];
 
       // Refresh in-memory lexical corpus
-      lexicalDocs = allDocs.map((d) => ({
-        id: d.id,
-        source: d.source,
-        category: d.category,
-        content: d.content,
-      }));
+      lexicalDocs = allDocs;
 
-      // Check which docs need (re)embedding
-      const stmt = db.prepare(
-        "SELECT id, content_hash FROM rag_embeddings WHERE id = ?",
-      );
-      const upsert = db.prepare(
-        `INSERT INTO rag_embeddings (id, source, category, content, content_hash, embedding, updated_at)
-         VALUES (@id, @source, @category, @content, @content_hash, @embedding, @updated_at)
-         ON CONFLICT(id) DO UPDATE SET
-           content = @content,
-           content_hash = @content_hash,
-           embedding = @embedding,
-           updated_at = @updated_at`,
-      );
+      // Read stored hashes once, then embed only what changed / is missing
+      let storedHashes: Map<string, string>;
+      try {
+        storedHashes = await readStoredHashes();
+      } catch (err) {
+        console.warn("[RAG] Could not read stored embeddings:", err);
+        lastIndexCheck = Date.now();
+        return;
+      }
 
-      const now = new Date().toISOString();
       let embedded = 0;
 
       for (const doc of allDocs) {
         const hash = simpleHash(doc.content);
-        const existing = stmt.get(doc.id) as { content_hash: string } | undefined;
-
-        if (existing && existing.content_hash === hash) continue; // up to date
+        if (storedHashes.get(doc.id) === hash) continue; // up to date
 
         const embedding = await createEmbedding(doc.content);
         if (!embedding) {
@@ -335,15 +523,13 @@ async function ensureIndex() {
           continue;
         }
 
-        upsert.run({
-          id: doc.id,
-          source: doc.source,
-          category: doc.category,
-          content: doc.content,
-          content_hash: hash,
-          embedding: JSON.stringify(embedding),
-          updated_at: now,
-        });
+        try {
+          await upsertEmbedding(doc, hash, embedding);
+        } catch (err) {
+          // Persisting must never break retrieval — keep lexical-only.
+          console.warn(`[RAG] Could not persist embedding for ${doc.id}:`, err);
+          continue;
+        }
         embedded++;
 
         // Rate limit: Zhipu embedding API allows ~50 req/s, but we add
@@ -351,11 +537,11 @@ async function ensureIndex() {
         if (embedded % 10 === 0) await new Promise((r) => setTimeout(r, 100));
       }
 
-      // Record last index time
-      db.prepare(
-        `INSERT INTO rag_index_meta (key, value) VALUES ('last_index', ?)
-         ON CONFLICT(key) DO UPDATE SET value = ?`,
-      ).run(now, now);
+      try {
+        await writeIndexMeta("last_index", new Date().toISOString());
+      } catch {
+        // non-fatal
+      }
 
       lastIndexCheck = Date.now();
     } finally {
@@ -369,6 +555,11 @@ async function ensureIndex() {
 // ── Public API ──────────────────────────────────────────────────────
 
 const RRF_K = 60;
+
+/** Minimum cosine similarity for a semantically-ranked doc to count.
+ *  Without a floor, every doc gets a rank contribution and irrelevant
+ *  chunks dilute the retrieved context. */
+const SEMANTIC_MIN_SCORE = 0.3;
 
 /**
  * Retrieve the top-K most relevant knowledge chunks for a user query
@@ -406,21 +597,16 @@ export async function retrieveContext(
   const queryEmbedding = await getQueryEmbedding(query);
   if (queryEmbedding) {
     try {
-      const db = getDb();
-      const rows = db.prepare(
-        "SELECT id, embedding FROM rag_embeddings",
-      ).all() as { id: string; embedding: string }[];
-
+      const rows = await readEmbeddingRows();
       semanticRanked = rows
-        .map((row) => {
-          let embedding: number[];
-          try {
-            embedding = JSON.parse(row.embedding);
-          } catch {
-            embedding = [];
-          }
-          return { id: row.id, score: cosineSimilarity(queryEmbedding, embedding) };
-        })
+        .map((row) => ({
+          id: row.id,
+          score: cosineSimilarity(
+            queryEmbedding,
+            parseStoredEmbedding(row.embedding),
+          ),
+        }))
+        .filter((row) => row.score >= SEMANTIC_MIN_SCORE)
         .sort((a, b) => b.score - a.score);
     } catch (err) {
       console.warn("[RAG] Semantic ranking failed:", err);
@@ -438,20 +624,11 @@ export async function retrieveContext(
 
   const docById = new Map(lexicalDocs.map((d) => [d.id, d]));
   // lexicalDocs may be empty on very first call before ensureIndex
-  // completes — fall back to reading stored contents from SQLite.
+  // completes — fall back to the stored documents.
   if (docById.size === 0) {
     try {
-      const db = getDb();
-      const rows = db.prepare(
-        "SELECT id, source, category, content FROM rag_embeddings",
-      ).all() as { id: string; source: string; category: string; content: string }[];
-      for (const r of rows) {
-        docById.set(r.id, {
-          id: r.id,
-          source: r.source as "faq" | "db",
-          category: r.category,
-          content: r.content,
-        });
+      for (const r of await readStoredDocs()) {
+        docById.set(r.id, r);
       }
     } catch {
       // ignore

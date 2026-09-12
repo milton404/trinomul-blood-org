@@ -3724,6 +3724,36 @@ export function getBloodInventory() {
     .all() as { blood_group: string; count: number }[];
 }
 
+/**
+ * Eligible-donor counts grouped by district + blood group.
+ *
+ * Counts only — never names or phone numbers. The eligibility predicate
+ * mirrors findMatchingDonors so these numbers agree with what a donor
+ * search actually returns.
+ */
+export function getEligibleDonorMatrix() {
+  const db = getDb();
+  return db
+    .prepare(
+      `
+    SELECT district, blood_group, COUNT(*) as count
+    FROM profiles
+    WHERE role = 'donor'
+      AND is_active = 1
+      AND is_approved = 1
+      AND district IS NOT NULL AND district != ''
+      AND blood_group IS NOT NULL AND blood_group != ''
+      AND NOT (
+        (sex = 'female' AND hb_level IS NOT NULL AND hb_level < 12.5)
+        OR (sex != 'female' AND hb_level IS NOT NULL AND hb_level < 13.0)
+      )
+    GROUP BY district, blood_group
+    ORDER BY district, blood_group
+  `,
+    )
+    .all() as { district: string; blood_group: string; count: number }[];
+}
+
 export function getDistrictStats() {
   const db = getDb();
   return db

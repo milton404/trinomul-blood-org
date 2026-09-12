@@ -27,6 +27,7 @@ import {
   serverGetBloodInventory as getBloodInventory,
   serverGetActiveBloodRequests as getActiveBloodRequests,
   serverGetProfilesByRole as getProfilesByRole,
+  serverGetEligibleDonorMatrix as getEligibleDonorMatrix,
   serverGetBloodRequestByTrackingCode as getBloodRequestByTrackingCode,
   serverFindMatchingDonors as findMatchingDonors,
   serverFindRequestsNearby as findRequestsNearby,
@@ -37,6 +38,7 @@ import {
   getBloodGroup,
   isBloodAvailabilityQuestion,
   isNearMe,
+  resolveArea,
   type AssistantWorkflowState,
 } from "./assistant-workflow";
 import { retrieveContext, formatRetrievedContext } from "./rag";
@@ -148,6 +150,8 @@ interface UserDBContext {
   districtsCovered: number;
   totalDonations: number;
   topDistricts: { district: string; donorCount: number }[];
+  /** Eligible donors per district + blood group (counts only). */
+  groupByDistrict: { district: string; bloodGroup: string; count: number }[];
 }
 
 async function buildUserContext(): Promise<UserDBContext> {
@@ -158,6 +162,25 @@ async function buildUserContext(): Promise<UserDBContext> {
   const inventory = (await getBloodInventory()) as { blood_group: string; count: number }[];
   const activeReqs = (await getActiveBloodRequests(100)) as any[];
   const donors = (await getProfilesByRole("donor")) as any[];
+
+  // District × group matrix — lets the assistant answer "how many B+ in
+  // Rangpur?" from real counts instead of estimating. Counts only.
+  let groupByDistrict: UserDBContext["groupByDistrict"] = [];
+  try {
+    const matrix = (await getEligibleDonorMatrix()) as {
+      district: string;
+      blood_group: string;
+      count: number;
+    }[];
+    groupByDistrict = matrix.map((row) => ({
+      district: row.district,
+      bloodGroup: row.blood_group,
+      count: Number(row.count) || 0,
+    }));
+  } catch (err) {
+    console.warn("[Assistant] Donor matrix unavailable:", err);
+  }
+
   const districts = new Set(
     donors.map((d) => d.district).filter(Boolean),
   );
@@ -183,6 +206,7 @@ async function buildUserContext(): Promise<UserDBContext> {
     districtsCovered: districts.size,
     totalDonations: 0,
     topDistricts,
+    groupByDistrict,
   };
 
   cachedContext = ctx;
@@ -197,14 +221,32 @@ function userContextToText(ctx: UserDBContext): string {
   const topDist = ctx.topDistricts
     .map((d) => `${d.district} (${d.donorCount} donors)`)
     .join(", ");
-  return [
+  const lines = [
     `Registered donors: ${ctx.totalDonors}`,
     `Active blood requests: ${ctx.activeRequests} (${ctx.urgentRequests} urgent/critical)`,
     `Districts covered: ${ctx.districtsCovered}`,
     `Blood inventory (eligible donors per group): ${inv}`,
     `Top donor districts: ${topDist}`,
     `Compatibility chart: O-→all, O+→O+/A+/B+/AB+, A-→A-/A+/AB-/AB+, A+→A+/AB+, B-→B-/B+/AB-/AB+, B+→B+/AB+, AB-→AB-/AB+, AB+→AB+`,
-  ].join("\n");
+  ];
+
+  // Compact district × group matrix so location-specific count
+  // questions are answerable verbatim. Capped to protect prompt budget.
+  if (ctx.groupByDistrict.length > 0) {
+    const byDistrict = new Map<string, string[]>();
+    for (const row of ctx.groupByDistrict) {
+      const list = byDistrict.get(row.district) ?? [];
+      list.push(`${row.bloodGroup} ${row.count}`);
+      byDistrict.set(row.district, list);
+    }
+    const matrixText = Array.from(byDistrict.entries())
+      .slice(0, 15)
+      .map(([district, groups]) => `${district}: ${groups.join(", ")}`)
+      .join(" | ");
+    lines.push(`Eligible donors by district & group: ${matrixText}`);
+  }
+
+  return lines.join("\n");
 }
 
 // ── 1. Chat Assistant ───────────────────────────────────────────────
@@ -230,6 +272,10 @@ ANTI-HALLUCINATION RULES (critical):
 - ALWAYS ground your answers in the LIVE APP DATA (CONTEXT) and RETRIEVED KNOWLEDGE (RAG_CONTEXT) below.
 - NEVER invent, guess, or fabricate donor names, phone numbers, counts, statistics, or availability. If the data is not in CONTEXT or RAG_CONTEXT, say honestly that you don't have that information right now.
 - When asked about donor counts or availability, quote the exact numbers from CONTEXT.
+- If the user asks for a count or availability and no matching row exists in CONTEXT, reply that you don't have that number and point to the Find Donor page. Do NOT estimate or extrapolate.
+- If the requested district + blood group combination is absent from the district × group matrix in CONTEXT, say plainly that there are no available donors for that exact combination, and quote the counts you do have.
+- Never describe a donor as "near you" or "nearby" unless that donor's district/upazila matches the user's stated area.
+- The CONTEXT numbers are a live snapshot of the app database. "No donors found" is a real, correct answer — do not soften it into a guess.
 - When asked about blood group compatibility, use ONLY the compatibility chart in CONTEXT.
 - For greetings (hi, hello, thanks, bye), respond naturally and briefly, then offer to help with blood donation topics.
 - For casual/off-topic chat (haha, lol, jokes, politics, news, coding), briefly acknowledge and redirect to blood donation topics. Do NOT engage with off-topic content.
@@ -433,26 +479,19 @@ async function handleNearMeQuery(
 
   // Nearby donors (only when a specific blood group is requested)
   let donorCards: Record<string, unknown>[] = [];
+  let donorsMatchedArea = true;
+  let donorsCompatible = false;
   if (bloodGroup) {
-    const donors = await findMatchingDonors(
+    const outcome = await findDonorsInArea(
       bloodGroup,
       district,
       undefined,
-      "normal",
-      5,
-      lat,
-      lng,
-      true,
+      lat ?? undefined,
+      lng ?? undefined,
     );
-    donorCards = donors.map((d) => ({
-      name: d.full_name_en || d.full_name_bn || "Anonymous",
-      bloodGroup: d.blood_group,
-      district: d.district,
-      upazila: d.upazila,
-      phone: d.phone,
-      distance: d.distance_km != null ? `${d.distance_km} km` : null,
-      availability: "available",
-    }));
+    donorsMatchedArea = outcome.matchedArea;
+    donorsCompatible = outcome.usedCompatible;
+    donorCards = toDonorCards(outcome.donors, outcome.usedCompatible);
   }
 
   const areaLabel = district || (isBn ? "আপনার এলাকায়" : "your area");
@@ -466,13 +505,28 @@ async function handleNearMeQuery(
 
   let reply: string;
   if (bloodGroup) {
-    const dPart = isBn
-      ? donorCards.length > 0
-        ? `${areaLabel}-এ ${donorCards.length} জন ${bloodGroup} দাতা পাওয়া গেছে`
-        : `${areaLabel}-এ কোনো ${bloodGroup} দাতা পাওয়া যায়নি`
-      : donorCards.length > 0
-        ? `found ${donorCards.length} ${bloodGroup} donor(s) near ${areaLabel}`
+    const donorCount = donorCards.length;
+    let dPart: string;
+    if (donorCount === 0) {
+      dPart = isBn
+        ? `${areaLabel}-এ কোনো ${bloodGroup} দাতা পাওয়া যায়নি`
         : `no ${bloodGroup} donors found near ${areaLabel}`;
+    } else if (!donorsMatchedArea) {
+      const places = [...new Set(
+        donorCards.map((d) => (d.upazila || d.district) as string).filter(Boolean),
+      )].slice(0, 3).join(", ");
+      dPart = isBn
+        ? `${areaLabel}-এ ${bloodGroup} দাতা নেই, নিকটতম দাতারা আছেন${places ? ` ${places}-এ` : ""}`
+        : `no ${bloodGroup} donors in ${areaLabel}, but the closest are${places ? ` in ${places}` : ""}`;
+    } else if (donorsCompatible) {
+      dPart = isBn
+        ? `${areaLabel}-এ সঠিক ${bloodGroup} দাতা পাওয়া যায়নি, তবে ${donorCount} জন সামঞ্জস্যপূর্ণ দাতা পাওয়া গেছে`
+        : `no exact ${bloodGroup} donors near ${areaLabel}, but ${donorCount} compatible donor(s) are available`;
+    } else {
+      dPart = isBn
+        ? `${areaLabel}-এ ${donorCount} জন ${bloodGroup} দাতা পাওয়া গেছে`
+        : `found ${donorCount} ${bloodGroup} donor(s) near ${areaLabel}`;
+    }
     const rPart = isBn
       ? requestCards.length > 0
         ? ` এবং ${requestCards.length}টি সক্রিয় রক্তের রিকোয়েস্ট আছে`
@@ -481,8 +535,8 @@ async function handleNearMeQuery(
         ? ` and ${requestCards.length} active blood request(s)`
         : "";
     reply = isBn
-      ? `${greet}${dPart}${rPart}।${donorCards.length === 0 && requestCards.length === 0 ? " আশেপাশের জেলায় খুঁজতে \"Find Donor\" পেজ দেখুন।" : ""}`
-      : `${greet}I ${dPart}${rPart}.${donorCards.length === 0 && requestCards.length === 0 ? " Try the \"Find Donor\" page to search neighbouring districts." : ""}`;
+      ? `${greet}${dPart}${rPart}।${donorCount === 0 && requestCards.length === 0 ? " আশেপাশের জেলায় খুঁজতে \"Find Donor\" পেজ দেখুন।" : ""}`
+      : `${greet}${dPart}${rPart}.${donorCount === 0 && requestCards.length === 0 ? " Try the \"Find Donor\" page to search neighbouring districts." : ""}`;
   } else {
     reply = isBn
       ? requestCards.length > 0
@@ -496,6 +550,197 @@ async function handleNearMeQuery(
   return { reply, intent: "find_donor", data, usingAI: false, provider: "rules" };
 }
 
+
+interface DonorSearchOutcome {
+  donors: any[];
+  /** True when the returned donors actually sit in the requested area. */
+  matchedArea: boolean;
+  /** True when the donors are compatible groups, not the exact group. */
+  usedCompatible: boolean;
+}
+
+/**
+ * Find donors for a blood group, scoped to a resolved area.
+ *
+ * Attempt order:
+ *   1. exact blood group, inside the requested area
+ *   2. compatible blood groups, inside the requested area
+ *   3. exact group, widened (no area filter)
+ *   4. compatible groups, widened
+ *
+ * A wide pool (25) is fetched before filtering because the area filter
+ * runs in memory — with a limit of 5 an in-area donor ranked 6th would
+ * otherwise be missed and wrongly reported as "no donors in your area".
+ *
+ * `matchedArea` lets callers avoid claiming donors are "near you" when
+ * they were in fact found in another district.
+ */
+async function findDonorsInArea(
+  bloodGroup: string,
+  district?: string,
+  upazila?: string,
+  lat?: number,
+  lng?: number,
+): Promise<DonorSearchOutcome> {
+  const norm = (v: unknown) => String(v ?? "").trim().toLowerCase();
+  const dNorm = norm(district);
+  const uNorm = norm(upazila);
+  const hasArea = Boolean(dNorm || uNorm);
+  const hasCoords = lat != null && lng != null;
+
+  const inArea = (d: any) => {
+    if (hasArea) {
+      const dd = norm(d.district);
+      const du = norm(d.upazila);
+      if (uNorm) return du === uNorm && (!dNorm || dd === dNorm);
+      return dd === dNorm;
+    }
+    if (hasCoords) {
+      // No named area — only call it "nearby" when it is genuinely close.
+      return d.distance_km != null && Number(d.distance_km) <= 50;
+    }
+    return true;
+  };
+
+  // "ANY" means every group, so it must use the compatible-group query.
+  const exactParam = bloodGroup === "ANY" ? false : true;
+
+  const search = (exact: boolean) =>
+    findMatchingDonors(
+      bloodGroup,
+      district,
+      upazila,
+      "normal",
+      25,
+      lat ?? null,
+      lng ?? null,
+      exact,
+    ) as Promise<any[]>;
+
+  const exactPool = await search(exactParam);
+  const exactScoped = exactPool.filter(inArea);
+  if (exactScoped.length > 0) {
+    return { donors: exactScoped.slice(0, 5), matchedArea: true, usedCompatible: false };
+  }
+
+  let compatiblePool: any[] = [];
+  if (bloodGroup !== "ANY") {
+    compatiblePool = await search(false);
+    const compatScoped = compatiblePool.filter(inArea);
+    if (compatScoped.length > 0) {
+      return { donors: compatScoped.slice(0, 5), matchedArea: true, usedCompatible: true };
+    }
+  }
+
+  // Nothing inside the requested area — widen rather than report zero.
+  if (exactPool.length > 0) {
+    return { donors: exactPool.slice(0, 5), matchedArea: false, usedCompatible: false };
+  }
+  if (compatiblePool.length > 0) {
+    return { donors: compatiblePool.slice(0, 5), matchedArea: false, usedCompatible: true };
+  }
+  return { donors: [], matchedArea: false, usedCompatible: false };
+}
+
+/** Map a donor search outcome to the card shape the chat widget renders. */
+function toDonorCards(donors: any[], compatible: boolean) {
+  return donors.map((donor) => ({
+    name: donor.full_name_en || donor.full_name_bn || "Anonymous",
+    bloodGroup: donor.blood_group,
+    district: donor.district,
+    upazila: donor.upazila,
+    phone: donor.phone,
+    distance: donor.distance_km != null ? `${donor.distance_km} km` : null,
+    availability: "available",
+    compatible,
+  }));
+}
+
+/**
+ * Build an honest reply for a donor search. Only claims donors are
+ * "near {area}" when they actually matched that area; otherwise it says
+ * where they really are. Compatible-group results are always labelled
+ * so nobody thinks they got the exact group they asked for.
+ */
+function buildDonorSearchReply(params: {
+  donors: any[];
+  bloodGroup: string;
+  areaLabel: string | null;
+  matchedArea: boolean;
+  usedCompatible: boolean;
+  useBangla: boolean;
+}): string {
+  const { donors, bloodGroup, areaLabel, matchedArea, usedCompatible, useBangla } = params;
+  const count = donors.length;
+  const groupLabel = bloodGroup === "ANY" ? null : bloodGroup;
+  const where = areaLabel ? ` ${areaLabel}` : "";
+
+  if (count === 0) {
+    return useBangla
+      ? areaLabel
+        ? `${areaLabel}-এ ${groupLabel ?? "যেকোনো গ্রুপের"} কোনো রক্তদাতা পাওয়া যায়নি। অন্য জেলা বা উপজেলা দেখুন, অথবা একটি রক্তের রিকোয়েস্ট তৈরি করুন।`
+        : `${groupLabel ?? "যেকোনো গ্রুপের"} কোনো রক্তদাতা পাওয়া যায়নি। অন্য জেলা বা উপজেলা দেখুন, অথবা একটি রক্তের রিকোয়েস্ট তৈরি করুন।`
+      : areaLabel
+        ? `No ${groupLabel ?? "matching"} donors were found in ${areaLabel}. Try a nearby district or upazila, or create a blood request.`
+        : `No ${groupLabel ?? "matching"} donors were found. Try a nearby district or upazila, or create a blood request.`;
+  }
+
+  // Donors exist, but they are outside the requested area.
+  if (!matchedArea) {
+    const places = [...new Set(donors.map((d) => d.upazila || d.district).filter(Boolean))];
+    const placeList = places.slice(0, 3).join(", ");
+    const compatNote = usedCompatible
+      ? useBangla
+        ? ` এগুলো ${groupLabel} নয়, তবে ${groupLabel} রোগীর জন্য সামঞ্জস্যপূর্ণ।`
+        : ` These are compatible for a ${groupLabel} patient, though not ${groupLabel} themselves.`
+      : "";
+    return useBangla
+      ? `দুঃখিত, ${areaLabel ?? "আপনার এলাকায়"} কোনো ${groupLabel ?? "মিলে যাওয়া"} রক্তদাতা নেই। নিকটতম রক্তদাতারা আছেন${placeList ? ` ${placeList}-এ` : ""}।${compatNote}`
+      : `Sorry, there are no ${groupLabel ?? "matching"} donors in ${areaLabel ?? "your area"}. The closest available are${placeList ? ` in ${placeList}` : ""}.${compatNote}`;
+  }
+
+  if (usedCompatible) {
+    return useBangla
+      ? `${groupLabel} গ্রুপের সঠিক দাতা${where}-এ পাওয়া যায়নি, তবে ${count} জন সামঞ্জস্যপূর্ণ রক্তদাতা পাওয়া গেছে (নিচে দেখুন)। চূড়ান্ত সামঞ্জস্যতা রক্তদানকেন্দ্রে যাচাই হবে।`
+      : `No exact ${groupLabel} donors were found${where}, but ${count} compatible donor(s) are available (shown below). Final cross-matching is confirmed at the blood bank.`;
+  }
+
+  if (bloodGroup === "ANY") {
+    return useBangla
+      ? `${where ? `${where.trim()}-এ` : ""} ${count} জন রক্তদাতা পাওয়া গেছে।`
+      : `I found ${count} blood donor(s)${where}.`;
+  }
+
+  return useBangla
+    ? `${where ? `${where.trim()}-এ` : ""} ${count} জন ${groupLabel} রক্তদাতা পাওয়া গেছে। ফোন নম্বরে ট্যাপ করে সরাসরি কল করতে পারেন।`
+    : `I found ${count} ${groupLabel} blood donor(s)${where}. Tap a phone number to call directly.`;
+}
+
+/**
+ * Find a district/upazila mentioned anywhere inside a free-text question.
+ * Scans longest token windows first so "rangpur sadar" wins over "rangpur".
+ */
+function findAreaInText(message: string) {
+  const tokens = message
+    .toLowerCase()
+    .replace(/[.,!?;:'"()\[\]]/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+  for (let size = Math.min(3, tokens.length); size >= 1; size--) {
+    for (let i = 0; i + size <= tokens.length; i++) {
+      const slice = tokens.slice(i, i + size);
+      // Try both the plain join and, for a pair, the "upazila, district"
+      // form (which resolveArea needs to disambiguate same-named upazilas).
+      const candidates = [slice.join(" ")];
+      if (size === 2) candidates.push(`${slice[0]}, ${slice[1]}`);
+      for (const candidate of candidates) {
+        const resolved = resolveArea(candidate);
+        if (resolved) return resolved;
+      }
+    }
+  }
+  return null;
+}
 
 /**
  * Chat with the AI assistant. Available to all visitors (no login required).
@@ -520,7 +765,44 @@ export async function chatWithAssistant(
 
   if (!workflowState && isBloodAvailabilityQuestion(message)) {
     const bloodGroup = extractBloodGroup(message);
+    const area = findAreaInText(message);
     if (bloodGroup) {
+      // If the question names a district/upazila, answer from the
+      // district × group matrix so the count is grounded in real,
+      // location-scoped data instead of a global number.
+      if (area?.district) {
+        const total = ctx.groupByDistrict
+          .filter((row) => row.bloodGroup === bloodGroup && row.district === area.district)
+          .reduce((sum, row) => sum + row.count, 0);
+        const district = area.district;
+        let reply: string;
+        if (total > 0) {
+          reply = useBangla
+            ? area.upazila
+              ? `${district} জেলায় ${bloodGroup} গ্রুপের মোট ${total} জন যোগ্য রক্তদাতা আছেন (জেলা-ভিত্তিক সংখ্যা; ${area.upazila} উপজেলার নির্দিষ্ট তালিকা দেখতে "Find Donor" পেজে সার্চ করুন)।`
+              : `${district} জেলায় ${bloodGroup} গ্রুপের মোট ${total} জন যোগ্য রক্তদাতা আছেন।`
+            : area.upazila
+              ? `There are ${total} eligible ${bloodGroup} donors in ${district} district (district-level count; search the Find Donor page for the exact ${area.upazila} upazila list).`
+              : `There are ${total} eligible ${bloodGroup} donors in ${district} district.`;
+        } else {
+          reply = useBangla
+            ? `${district} জেলায় ${bloodGroup} গ্রুপের কোনো যোগ্য রক্তদাতা পাওয়া যায়নি।`
+            : `No eligible ${bloodGroup} donors were found in ${district} district.`;
+        }
+        return {
+          reply,
+          intent: "find_donor",
+          data: {
+            bloodGroup,
+            district,
+            upazila: area.upazila,
+            donorCount: total,
+            scopedToArea: true,
+          },
+          usingAI: false,
+          provider: "rules",
+        };
+      }
       const count = ((await getBloodInventory()) as { blood_group: string; count: number }[]).find((item) => item.blood_group === bloodGroup)?.count ?? 0;
       return {
         reply: useBangla
@@ -585,46 +867,33 @@ export async function chatWithAssistant(
   }
 
   if (workflow.shouldSearchDonors && workflow.state?.values.bloodGroup) {
-    const { bloodGroup, location: area } = workflow.state.values;
+    const { bloodGroup, district, upazila, location: area } = workflow.state.values;
     try {
-      const donors = await findMatchingDonors(
+      const outcome = await findDonorsInArea(
         bloodGroup,
-        area,
-        undefined,
-        "normal",
-        5,
+        district,
+        upazila,
         location?.latitude,
         location?.longitude,
-        true,
       );
+      const { donors, matchedArea, usedCompatible } = outcome;
+      const areaLabel = upazila
+        ? `${upazila}${district ? `, ${district}` : ""}`
+        : district || area || (isNearMe(message) ? (useBangla ? "আপনার এলাকায়" : "your area") : null);
+
       const data = {
         bloodGroup,
         donorCount: donors.length,
-        donors: donors.map((donor) => ({
-          name: donor.full_name_en || donor.full_name_bn || "Anonymous",
-          bloodGroup: donor.blood_group,
-          district: donor.district,
-          upazila: donor.upazila,
-          phone: donor.phone,
-          distance: donor.distance_km != null ? `${donor.distance_km} km` : null,
-          availability: "available",
-        })),
+        donors: toDonorCards(donors, usedCompatible),
       };
-      const reply = donors.length > 0
-        ? useBangla
-          ? bloodGroup === "ANY"
-            ? `আপনার শর্ত অনুযায়ী ${donors.length} জন রক্তদাতা (যেকোনো রক্তের গ্রুপ) পাওয়া গেছে।`
-            : `আপনার শর্ত অনুযায়ী ${donors.length} জন ${bloodGroup} রক্তদাতা পাওয়া গেছে।`
-          : bloodGroup === "ANY"
-            ? `I found ${donors.length} matching blood donor(s) (any blood group) for your search.`
-            : `I found ${donors.length} matching ${bloodGroup} blood donor(s) for your search.`
-        : useBangla
-          ? bloodGroup === "ANY"
-            ? `আপনার দেওয়া শর্ত অনুযায়ী কোনো রক্তদাতা (যেকোনো রক্তের গ্রুপ) পাওয়া যায়নি।`
-            : `আপনার দেওয়া শর্ত অনুযায়ী কোনো ${bloodGroup} রক্তদাতা পাওয়া যায়নি।`
-          : bloodGroup === "ANY"
-            ? `I could not find a matching donor (any blood group) for your current search criteria.`
-            : `I could not find a matching ${bloodGroup} donor for your current search criteria.`;
+      const reply = buildDonorSearchReply({
+        donors,
+        bloodGroup,
+        areaLabel,
+        matchedArea,
+        usedCompatible,
+        useBangla,
+      });
       return { reply, intent: "find_donor", data, workflowState: null, usingAI: false, provider: "rules" };
     } catch {
       return {
@@ -714,7 +983,7 @@ export async function chatWithAssistant(
     const result = await callLLM(userMessage, {
       jsonMode: true,
       systemPrompt,
-      temperature: 0.7,
+      temperature: 0.15,
       maxTokens: 2000,
       timeoutMs: 30_000,
     });
@@ -731,7 +1000,7 @@ export async function chatWithAssistant(
         if (language === "bn" && !hasBengaliScript(reply)) {
           const retryResult = await callLLM(
             `${userMessage}`,
-            { jsonMode: true, systemPrompt, temperature: 0.5, maxTokens: 2000, timeoutMs: 30_000 },
+            { jsonMode: true, systemPrompt, temperature: 0.15, maxTokens: 2000, timeoutMs: 30_000 },
           );
           if (retryResult) {
             try {

@@ -1052,6 +1052,27 @@ export async function getBloodInventoryPg() {
   return rows;
 }
 
+/**
+ * Eligible-donor counts grouped by district + blood group.
+ *
+ * Counts only — never names or phone numbers. The eligibility predicate
+ * mirrors findMatchingDonorsPg so these numbers agree with what a donor
+ * search actually returns.
+ */
+export async function getEligibleDonorMatrixPg() {
+  const { rows } = await query(
+    `SELECT district, blood_group, COUNT(*)::int as count FROM profiles
+     WHERE role = 'donor' AND is_active = TRUE AND is_approved = TRUE
+       AND district IS NOT NULL AND district != ''
+       AND blood_group IS NOT NULL AND blood_group != ''
+       AND NOT ((sex = 'female' AND hb_level IS NOT NULL AND hb_level < 12.5)
+             OR (sex <> 'female' AND hb_level IS NOT NULL AND hb_level < 13.0))
+     GROUP BY district, blood_group
+     ORDER BY district, blood_group`,
+  );
+  return rows as { district: string; blood_group: string; count: number }[];
+}
+
 export async function getDistrictStatsPg() {
   const { rows } = await query(
     `SELECT COALESCE(district, 'Unknown') as district, COUNT(*) as donors,

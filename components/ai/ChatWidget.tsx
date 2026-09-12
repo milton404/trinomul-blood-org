@@ -486,7 +486,14 @@ export default function ChatWidget() {
                           const item = donor as Record<string, unknown>;
                           return (
                             <div key={donorIndex} className="border border-rose-100 bg-rose-50/70 px-2.5 py-2 text-xs text-slate-700 rounded-lg">
-                              <p className="font-semibold text-slate-800">{String(item.name ?? "Donor")} · {String(item.bloodGroup ?? "")}</p>
+                              <p className="font-semibold text-slate-800">
+                                {String(item.name ?? "Donor")} · {String(item.bloodGroup ?? "")}
+                                {item.compatible === true ? (
+                                  <span className="ml-1.5 rounded-full bg-amber-100 px-1.5 py-0.5 align-middle text-[10px] font-medium text-amber-700">
+                                    {isBn ? "সামঞ্জস্যপূর্ণ" : "Compatible"}
+                                  </span>
+                                ) : null}
+                              </p>
                               <p>{[item.upazila, item.district].filter(Boolean).join(", ")}</p>
                               {item.distance ? <p>{String(item.distance)} away</p> : null}
                               {item.phone ? <a className="text-red-600 font-medium" href={`tel:${String(item.phone)}`}>{String(item.phone)}</a> : null}

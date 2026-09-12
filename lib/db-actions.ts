@@ -34,6 +34,7 @@ import {
   getWeeklyStats,
   getHomepageStats,
   getBloodInventory,
+  getEligibleDonorMatrix,
   getDistrictStats,
   seedDonorEligibilityData,
   findMatchingDonors,
@@ -229,6 +230,7 @@ import {
   getDashboardStatsPg,
   getAnalyticsStatsPg,
   getBloodInventoryPg,
+  getEligibleDonorMatrixPg,
   getDistrictStatsPg,
   getMonthlyStatsPg,
   getDailyStatsPg,
@@ -1388,6 +1390,13 @@ export async function serverGetHomepageStats() {
 export async function serverGetBloodInventory() {
   if (isSupabaseAvailable()) return getBloodInventoryPg();
   return getBloodInventory();
+}
+
+/** Eligible-donor counts per district + blood group (counts only, no
+ *  personal data). Used to ground the AI assistant's count answers. */
+export async function serverGetEligibleDonorMatrix() {
+  if (isSupabaseAvailable()) return getEligibleDonorMatrixPg();
+  return getEligibleDonorMatrix();
 }
 
 export async function serverGetDistrictStats() {

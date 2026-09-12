@@ -1,3 +1,5 @@
+import { RANGPUR_DISTRICTS, RANGPUR_UPAZILAS } from "@/lib/constants/rangpur";
+
 export type AssistantLanguage = "bn" | "en";
 export type AssistantWorkflow =
   | "eligibility"
@@ -31,6 +33,8 @@ export interface AssistantWorkflowState {
     donationDate?: string;
     bloodGroup?: string;
     location?: string;
+    district?: string;
+    upazila?: string;
     units?: number;
     urgency?: "normal" | "urgent" | "critical";
   };
@@ -106,6 +110,18 @@ function askFor(field: AssistantPendingField, locale: AssistantLanguage): string
   return text(locale, bangla, english);
 }
 
+/** Re-ask for a location when the typed area is not recognised, listing
+ *  valid districts so the user can pick one instead of getting a
+ *  misleading empty result. */
+function askForUnknownArea(locale: AssistantLanguage): string {
+  const districts = districtOptionsText();
+  return text(
+    locale,
+    `দুঃখিত, এই এলাকাটি খুঁজে পাইনি। অনুগ্রহ করে জেলার নাম লিখুন: ${districts}। উপজেলা লিখলে জেলার নামও দিন (যেমন: "পীরগঞ্জ, রংপুর")।`,
+    `Sorry, I couldn't find that area. Please name a district: ${districts}. If you give an upazila, add its district too (e.g. "Pirganj, Rangpur").`,
+  );
+}
+
 function normalizeBanglaGroup(word: string): "A" | "B" | "O" | "AB" | undefined {
   const w = word.replace(/\s+/g, "");
   if (w === "এবি") return "AB";
@@ -159,6 +175,136 @@ export function isNearMe(message: string): boolean {
   return /\b(near me|nearby|around me|closest|amar kache|kacher|amar area)\b|আমার\s*(কাছে|এলাকায়)|কাছাকাছি/i.test(message);
 }
 
+// ── Area resolution ─────────────────────────────────────────────────
+
+export interface ResolvedArea {
+  district?: string;
+  upazila?: string;
+}
+
+function canonicalArea(input: string): string {
+  return input
+    .trim()
+    .toLowerCase()
+    .replace(/[.,!?;:'"()\[\]]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function stripAreaSuffix(value: string): string {
+  return value
+    .replace(/\b(sadar|sodor)\b/g, " ")
+    .replace(/\b(zila|zilla|district|jela|upazila|upozila|thana)\b/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function districtNameById(districtId: string): string | undefined {
+  return RANGPUR_DISTRICTS.find((d) => d.id === districtId)?.name_en;
+}
+
+function matchDistrict(value: string) {
+  return RANGPUR_DISTRICTS.find(
+    (d) =>
+      d.id === value ||
+      canonicalArea(d.name_en) === value ||
+      canonicalArea(d.name_bn) === value,
+  );
+}
+
+function matchUpazilas(value: string) {
+  return RANGPUR_UPAZILAS.filter(
+    (u) =>
+      canonicalArea(u.name_en) === value ||
+      canonicalArea(u.name_bn) === value ||
+      u.id.replace(/_/g, " ") === value,
+  );
+}
+
+/**
+ * Resolve a free-text location into a district and/or upazila.
+ *
+ * Returns null when the text matches nothing, so callers can re-ask
+ * instead of silently searching a place that does not exist (which used
+ * to produce a misleading "0 donors found near you" answer).
+ *
+ * Upazila names that exist in more than one district (Pirganj, Phulbari)
+ * are only resolved when the district is unambiguous — either because
+ * the name maps to a single district, or because the user wrote
+ * "upazila, district". Otherwise null is returned so the bot asks which
+ * district they mean.
+ */
+export function resolveArea(input: string): ResolvedArea | null {
+  // "Pirganj, Rangpur" — disambiguate an upazila by its district.
+  // Check the comma on the RAW input: canonicalArea() strips punctuation,
+  // so the comma is gone by the time we canonicalize.
+  const rawInput = input.trim();
+  if (rawInput.includes(",")) {
+    const [areaPart, districtPart] = rawInput.split(",").map((s) => canonicalArea(s));
+    const district = districtPart ? matchDistrict(districtPart) : undefined;
+    if (district && areaPart) {
+      const upazila = RANGPUR_UPAZILAS.find(
+        (u) =>
+          u.district_id === district.id &&
+          (canonicalArea(u.name_en) === areaPart ||
+            canonicalArea(u.name_bn) === areaPart),
+      );
+      return upazila
+        ? { upazila: upazila.name_en, district: district.name_en }
+        : { district: district.name_en };
+    }
+    if (district) return { district: district.name_en };
+    if (areaPart) return resolveArea(areaPart);
+    return null;
+  }
+
+  const raw = canonicalArea(input);
+  if (!raw) return null;
+
+  const upazilaMatches = matchUpazilas(raw);
+  if (upazilaMatches.length === 1) {
+    const u = upazilaMatches[0];
+    return { upazila: u.name_en, district: districtNameById(u.district_id) };
+  }
+  if (upazilaMatches.length > 1) {
+    // Ambiguous upazila name — prefer the home district, otherwise ask.
+    const home = upazilaMatches.find((u) => u.district_id === "rangpur");
+    if (home) return { upazila: home.name_en, district: districtNameById(home.district_id) };
+    return null;
+  }
+
+  const districtExact = matchDistrict(raw);
+  if (districtExact) return { district: districtExact.name_en };
+
+  // Loose pass: "Rangpur Sadar" → upazila, "Rangpur Zila" → district.
+  const hasDistrictSuffix = /\b(zila|zilla|district|jela)\b/i.test(raw);
+  const stripped = stripAreaSuffix(raw);
+  if (stripped && stripped !== raw) {
+    // A district suffix means the user means the district, not the
+    // same-named "Sadar" upazila — so skip the upazila loose match.
+    if (!hasDistrictSuffix) {
+      const looseUpazilas = RANGPUR_UPAZILAS.filter(
+        (u) => stripAreaSuffix(canonicalArea(u.name_en)) === stripped,
+      );
+      if (looseUpazilas.length === 1) {
+        const u = looseUpazilas[0];
+        return { upazila: u.name_en, district: districtNameById(u.district_id) };
+      }
+    }
+    const looseDistrict = RANGPUR_DISTRICTS.find(
+      (d) => stripAreaSuffix(canonicalArea(d.name_en)) === stripped || d.id === stripped,
+    );
+    if (looseDistrict) return { district: looseDistrict.name_en };
+  }
+
+  return null;
+}
+
+/** Human-readable district list for re-ask prompts. */
+export function districtOptionsText(): string {
+  return RANGPUR_DISTRICTS.map((d) => d.name_en).join(", ");
+}
+
 function isEligibilityStart(message: string): boolean {
   return /can\s+i\s+donate|eligible|eligib|donate\s+blood|রক্ত\s*দিতে\s*পারি|রক্তদান.*যোগ্য|rokto\s*dite\s*pari/i.test(message);
 }
@@ -172,7 +318,11 @@ function isRequestStart(message: string): boolean {
 }
 
 export function isBloodAvailabilityQuestion(message: string): boolean {
-  return /\b(how many|available|availability|any donor|do we have|have.*donor|donor ache|donor ase|blood ache|blood ase)\b|কতজন|কোনো.*দাতা.*(আছে|আছে কি)|দাতা.*(আছে|আছে কি)|রক্ত.*(আছে|আছে কি)/i.test(message);
+  const english = /\b(how many|available|availability|any donor|do we have|have.*donor|donor ache|donor ase|blood ache|blood ase)\b/i;
+  // Banglish count phrasings: "koto jon", "koy jon", "koto joner", "koyta ache"
+  const banglish = /\b(koto|koy|koyta|kotota|kotojon)\b[\s\S]{0,25}\b(jon|joner|dati|donta|ache|ase|donor|donar|rokto)\b/i;
+  const bangla = /কতজন|কত\s*জন|কয়জন|কয়\s*জন|কোনো.*দাতা.*(আছে|আছে কি)|দাতা.*(আছে|আছে কি)|রক্ত.*(আছে|আছে কি)/;
+  return english.test(message) || banglish.test(message) || bangla.test(message);
 }
 
 function isBloodNeed(message: string): boolean {
@@ -335,9 +485,35 @@ export function advanceAssistantWorkflow(
     }
     if (state.pendingField === "location") {
       if (!trimmed) return { reply: askFor("location", locale), state };
+
+      // "near me" / "আমার কাছে" — use the device location, no name needed.
+      if (isNearMe(trimmed)) {
+        return {
+          reply: "",
+          state: { ...state, values: { ...state.values, location: trimmed } },
+          shouldSearchDonors: true,
+          needsLocationPermission: true,
+        };
+      }
+
+      const area = resolveArea(trimmed);
+      if (!area) {
+        // Do not search a place that does not exist — that used to
+        // produce a misleading "0 donors found near you" answer.
+        return { reply: askForUnknownArea(locale), state };
+      }
+
       return {
         reply: "",
-        state: { ...state, values: { ...state.values, location: trimmed } },
+        state: {
+          ...state,
+          values: {
+            ...state.values,
+            location: trimmed,
+            district: area.district,
+            upazila: area.upazila,
+          },
+        },
         shouldSearchDonors: true,
       };
     }
@@ -357,7 +533,18 @@ export function advanceAssistantWorkflow(
     }
     if (state.pendingField === "location") {
       if (!trimmed) return { reply: askFor("location", locale), state };
-      const next = { ...state, pendingField: "units" as const, values: { ...state.values, location: trimmed } };
+      const area = resolveArea(trimmed);
+      if (!area) return { reply: askForUnknownArea(locale), state };
+      const next = {
+        ...state,
+        pendingField: "units" as const,
+        values: {
+          ...state.values,
+          location: trimmed,
+          district: area.district,
+          upazila: area.upazila,
+        },
+      };
       return { reply: askFor("units", locale), state: next };
     }
     if (state.pendingField === "units") {

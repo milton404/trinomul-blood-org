@@ -265,4 +265,108 @@ export const FAQ_DOCUMENTS: FAQDocument[] = [
       "ভুল: নিরামিষভোগী রক্ত দিতে পারেন না। সত্য: হিমোগ্লোবিন মান পূরণ করলে দিতে পারেন। " +
       "ভুল: রক্ত দেওয়া কষ্টকর। সত্য: সূচের আঁচড় ছাড়া কোনো ব্যথা নেই।",
   },
+  {
+    id: "faq-find-donors",
+    category: "process",
+    title_en: "How to find a blood donor on this app",
+    title_bn: "এই অ্যাপে কীভাবে রক্তদাতা খুঁজবেন",
+    content_en:
+      "Open the Find Donor page on the website. Filter by blood group and by district/upazila, or allow location access to sort donors " +
+      "nearest-first by GPS. Each donor card shows the donor's name, blood group, area (upazila, district), distance where available, " +
+      "and a phone number with a tap-to-call link. Viewing public donor cards does not require login. " +
+      "If no donor appears for a specific area, the app can also show compatible blood groups instead of returning nothing.",
+    content_bn:
+      "ওয়েবসাইটের Find Donor পেজ খুলুন। রক্তের গ্রুপ এবং জেলা/উপজেলা দিয়ে ফিল্টার করুন, অথবা লোকেশন অনুমতি দিয়ে জিপিএস অনুযায়ী " +
+      "নিকটতম দাতা আগে দেখুন। প্রতিটি দাতা কার্ডে দাতার নাম, রক্তের গ্রুপ, এলাকা (উপজেলা, জেলা), সম্ভব হলে দূরত্ব " +
+      "এবং ট্যাপ-টু-কল লিংকসহ ফোন নম্বর থাকে। পাবলিক দাতা কার্ড দেখতে লগইন লাগে না। " +
+      "নির্দিষ্ট এলাকায় দাতা না থাকলে অ্যাপটি খালি ফলাফলের বদলে সামঞ্জস্যপূর্ণ রক্তের গ্রুপও দেখাতে পারে।",
+  },
+  {
+    id: "faq-donor-privacy",
+    category: "coverage",
+    title_en: "Donor privacy and what is shown publicly",
+    title_bn: "দাতার গোপনীয়তা ও পাবলিক তথ্য",
+    content_en:
+      "Only donors who have not hidden their profile can appear in search results. Public donor cards show a limited set of fields: " +
+      "name, blood group, district/upazila area, distance (when GPS is used), and the phone number the donor chose to publish. " +
+      "The app never shows a donor's email address, home address, government ID, or donation history. " +
+      "If a donor keeps their profile private, their details are never exposed by the assistant or the donor list.",
+    content_bn:
+      "যেসব দাতা তাদের প্রোফাইল গোপন রাখেননি কেবল তারাই সার্চ ফলাফলে আসেন। পাবলিক দাতা কার্ডে সীমিত তথ্য থাকে: " +
+      "নাম, রক্তের গ্রুপ, জেলা/উপজেলা এলাকা, দূরত্ব (জিপিএস ব্যবহারে) এবং দাতার প্রকাশ করা ফোন নম্বর। " +
+      "অ্যাপ কখনোই দাতার ইমেইল, বাসার ঠিকানা, সরকারি পরিচয়পত্র বা রক্তদানের ইতিহাস দেখায় না। " +
+      "দাতা প্রোফাইল গোপন রাখলে তার তথ্য সহকারী বা দাতা তালিকায় কখনো প্রকাশ করা হয় না।",
+  },
+  {
+    id: "faq-matching",
+    category: "compatibility",
+    title_en: "How the app matches donors (exact then compatible)",
+    title_bn: "অ্যাপ কীভাবে দাতা মেলায় (সঠিক তারপর সামঞ্জস্যপূর্ণ)",
+    content_en:
+      "The app first searches for donors with the exact blood group requested in the chosen area. " +
+      "If none are found in that area, it widens the search and can fall back to compatible blood groups, " +
+      "which are clearly labelled as compatible. Compatibility rule used by the app: " +
+      "B+ patients can receive from B+, B-, O+, O-. A+ from A+, A-, O+, O-. AB+ from all groups. " +
+      "O+ from O+, O-. O- only from O-. A- / B- / AB- accept the matching Rh-negative groups plus O-. " +
+      "Any compatible donor is a suggestion only — the final cross-match is always confirmed at the blood bank or hospital.",
+    content_bn:
+      "অ্যাপ প্রথমে নির্বাচিত এলাকায় অনুরোধ করা সঠিক রক্তের গ্রুপের দাতা খোঁজে। " +
+      "সেখানে কেউ না থাকলে সার্চ বাড়িয়ে সামঞ্জস্যপূর্ণ গ্রুপে যেতে পারে, এবং সেগুলো স্পষ্টভাবে 'সামঞ্জস্যপূর্ণ' হিসেবে চিহ্নিত করা হয়। " +
+      "অ্যাপে ব্যবহৃত সামঞ্জস্যের নিয়ম: " +
+      "B+ রোগী গ্রহণ করতে পারে B+, B-, O+, O- থেকে। A+ থেকে A+, A-, O+, O-। AB+ সব গ্রুপ থেকে। " +
+      "O+ থেকে O+, O-। O- শুধু O- থেকে। " +
+      "সামঞ্জস্যপূর্ণ দাতা কেবল পরামর্শ — চূড়ান্ত ক্রস-ম্যাচ সর্বদা ব্লাড ব্যাংক বা হাসপাতালে নিশ্চিত হয়।",
+  },
+  {
+    id: "faq-upazila-coverage",
+    category: "coverage",
+    title_en: "District and upazila coverage details",
+    title_bn: "জেলা ও উপজেলা কভারেজের বিবরণ",
+    content_en:
+      "The app covers all 8 districts of Rangpur Division: Rangpur, Dinajpur, Kurigram, Gaibandha, Nilphamari, Panchagarh, Thakurgaon, " +
+      "and Lalmonirhat, including their upazilas. You can filter donor searches down to a specific upazila. " +
+      "Aggregate donor counts are stored per district and blood group; upazila-level aggregate counts are not pre-calculated, " +
+      "so for an upazila the app points you to the Find Donor page to see the individual donors in that upazila. " +
+      "Some upazila names exist in more than one district (for example Pirganj), so include the district name to avoid confusion.",
+    content_bn:
+      "অ্যাপ রংপুর বিভাগের ৮টি জেলা কভার করে: রংপুর, দিনাজপুর, কুড়িগ্রাম, গাইবান্ধা, নীলফামারী, পঞ্চগড়, ঠাকুরগাঁও " +
+      "এবং লালমনিরহাট, তাদের উপজেলাসহ। আপনি নির্দিষ্ট উপজেলা পর্যন্ত দাতা সার্চ ফিল্টার করতে পারেন। " +
+      "সমষ্টিগত দাতা সংখ্যা জেলা ও রক্তের গ্রুপ অনুযায়ী সংরক্ষিত; উপজেলা পর্যায়ের সমষ্টি আগে থেকে হিসাব করা হয় না, " +
+      "তাই উপজেলার জন্য অ্যাপ আপনাকে Find Donor পেজে পাঠায় সেই উপজেলার নির্দিষ্ট দাতা দেখতে। " +
+      "কিছু উপজেলার নাম একাধিক জেলায় আছে (যেমন পীরগঞ্জ), তাই বিভ্রান্তি এড়াতে জেলার নামও লিখুন।",
+  },
+  {
+    id: "faq-emergency-steps",
+    category: "emergency",
+    title_en: "Step-by-step emergency blood process",
+    title_bn: "ধাপে ধাপে জরুরি রক্ত প্রক্রিয়া",
+    content_en:
+      "In an emergency: 1) Submit a blood request with urgency set to 'critical'. 2) Note the tracking code (TBB-YYYY-XXXX) shown after submission. " +
+      "3) Critical requests are prioritised and shown to matching donors right away. 4) Open the donor results and call donors directly using the " +
+      "tap-to-call phone link on each card. 5) Contact the hospital's blood bank to confirm availability and arrange cross-matching. " +
+      "6) Keep the tracking code to check status. The assistant cannot place a request or reserve blood for you — the request must be submitted on the website.",
+    content_bn:
+      "জরুরি অবস্থায়: ১) জরুরিতা 'অত্যন্ত জরুরি' দিয়ে রক্তের অনুরোধ জমা দিন। ২) জমা দেওয়ার পর দেখানো ট্র্যাকিং কোড (TBB-YYYY-XXXX) নোট করুন। " +
+      "৩) জরুরি অনুরোধ অগ্রাধিকার পায় এবং সঙ্গে সঙ্গে সংশ্লিষ্ট দাতাদের দেখানো হয়। ৪) দাতার ফলাফল খুলে প্রতিটি কার্ডের " +
+      "ট্যাপ-টু-কল ফোন লিংক দিয়ে সরাসরি কল করুন। ৫) প্রাপ্যতা নিশ্চিত করতে ও ক্রস-ম্যাচের ব্যবস্থা করতে হাসপাতালের ব্লাড ব্যাংকে যোগাযোগ করুন। " +
+      "৬) অবস্থা দেখতে ট্র্যাকিং কোড রাখুন। সহকারী আপনার হয়ে অনুরোধ জমা দিতে বা রক্ত সংরক্ষণ করতে পারে না — অনুরোধ ওয়েবসাইটে জমা দিতে হবে।",
+  },
+  {
+    id: "faq-data-accuracy",
+    category: "coverage",
+    title_en: "Where the assistant's numbers come from",
+    title_bn: "সহকারীর সংখ্যা কোথা থেকে আসে",
+    content_en:
+      "The assistant answers data questions only from this app's live database: registered active donors and the blood inventory. " +
+      "Counts reflect donors who are active and approved, and the district-by-blood-group counts come straight from the database. " +
+      "If a particular district and blood group has no row, the assistant says there are none rather than estimating. " +
+      "The assistant never invents donor names, phone numbers, or statistics, and it will tell you honestly when it does not have a figure. " +
+      "Counts can change as donors register or become unavailable, so always confirm by opening the Find Donor page.",
+    content_bn:
+      "সহকারী ডেটা সংক্রান্ত প্রশ্নের উত্তর দেয় কেবল এই অ্যাপের লাইভ ডাটাবেস থেকে: নিবন্ধিত সক্রিয় দাতা এবং রক্তের ইনভেন্টরি। " +
+      "সংখ্যা সেই দাতাদের প্রতিফলিত করে যারা সক্রিয় ও অনুমোদিত, এবং জেলা-ভিত্তিক রক্তের গ্রুপের সংখ্যা সরাসরি ডাটাবেস থেকে আসে। " +
+      "নির্দিষ্ট জেলা ও রক্তের গ্রুপের কোনো সারি না থাকলে সহকারী অনুমান না করে সরাসরি বলে যে সেখানে কেউ নেই। " +
+      "সহকারী কখনোই দাতার নাম, ফোন নম্বর বা পরিসংখ্যান বানায় না এবং সংখ্যা না জানলে সৎভাবে জানায়। " +
+      "দাতা নিবন্ধন বা অনুপলব্ধ হওয়ার সাথে সংখ্যা বদলাতে পারে, তাই Find Donor পেজ খুলে সবসময় নিশ্চিত করুন।",
+  },
 ];
