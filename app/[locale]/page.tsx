@@ -21,12 +21,13 @@ import {
   Map,
   Sparkles,
   Users,
-  Facebook,
+
   MessageCircle,
   Heart,
   Share2,
   Hand,
 } from "lucide-react";
+import { Facebook } from "@/components/ui/brand-icons";
 import ModernSelect, { type SelectOption } from "@/components/ui/ModernSelect";
 import RequestCard from "@/components/requests/RequestCard";
 

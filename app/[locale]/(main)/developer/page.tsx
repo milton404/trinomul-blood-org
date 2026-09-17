@@ -3,7 +3,6 @@
 import { useLocale } from 'next-intl';
 import {
   Code2,
-  Facebook,
   Mail,
   MapPin,
   Heart,
@@ -13,11 +12,10 @@ import {
   ArrowRight,
   HeartHandshake,
   Link as LinkIcon,
-  Github,
   Briefcase,
   Quote,
-  Linkedin,
 } from 'lucide-react';
+import { Facebook, Github, Linkedin } from "@/components/ui/brand-icons";
 import Navbar from '@/components/common/Navbar';
 import Footer from '@/components/common/Footer';
 import { Link } from '@/i18n/routing';

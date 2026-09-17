@@ -7,6 +7,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -14,11 +15,16 @@ import {
 } from 'react-native';
 
 import { Brand } from '@/constants/brand';
-import { BLOOD_GROUPS } from '@/constants/data';
+import { BLOOD_GROUPS, DISTRICTS, getUpazilasByDistrict } from '@/constants/data';
+import { getUnionsByUpazila } from '@/constants/unions';
 import { Strings } from '@/constants/strings';
 import { Spacing } from '@/constants/theme';
 import { useUserLocation } from '@/hooks/use-user-location';
 import { submitRequest } from '@/lib/api';
+import { reverseGeocodeAndResolve } from '@/lib/reverse-geocode';
+import { SelectDropdown } from '@/components/select-dropdown';
+
+const DISTRICT_OPTIONS = DISTRICTS.map((d) => ({ value: d.id, label: d.name }));
 
 type SosState = 'idle' | 'countdown' | 'form' | 'submitting' | 'success';
 
@@ -33,8 +39,44 @@ export function EmergencySOSButton() {
   const [contactNumber, setContactNumber] = useState('');
   const [reason, setReason] = useState('');
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [districtId, setDistrictId] = useState('');
+  const [upazilaId, setUpazilaId] = useState('');
+  const [unionId, setUnionId] = useState('');
+  const [isGeoLocating, setIsGeoLocating] = useState(false);
+  const [geoLabel, setGeoLabel] = useState<string | null>(null);
 
   const { location: gps, isLocating, requestLocation } = useUserLocation();
+
+  const upazilaOptions = districtId
+    ? getUpazilasByDistrict(districtId).map((u) => ({ value: u.id, label: u.name }))
+    : [];
+  const unionOptions = upazilaId
+    ? getUnionsByUpazila(upazilaId).map((u) => ({ value: u.id, label: u.name_en }))
+    : [];
+
+  const handleUseMyLocation = async () => {
+    setIsGeoLocating(true);
+    try {
+      await requestLocation();
+    } catch { /* location hook handles errors */ }
+  };
+
+  useEffect(() => {
+    if (!gps || !isGeoLocating) return;
+    (async () => {
+      try {
+        const resolved = await reverseGeocodeAndResolve(gps.lat, gps.lng);
+        if (resolved) {
+          if (resolved.districtId) setDistrictId(resolved.districtId);
+          if (resolved.upazilaId) setUpazilaId(resolved.upazilaId);
+          if (resolved.unionId) setUnionId(resolved.unionId);
+          if (resolved.label) setGeoLabel(resolved.label);
+        }
+      } finally {
+        setIsGeoLocating(false);
+      }
+    })();
+  }, [gps, isGeoLocating]);
 
   const startSOS = () => {
     setState('countdown');
@@ -61,25 +103,30 @@ export function EmergencySOSButton() {
   const canSubmit =
     bloodGroup !== '' &&
     patientName.trim().length >= 2 &&
-    contactNumber.trim().length >= 10;
+    contactNumber.trim().length >= 10 &&
+    districtId !== '' &&
+    upazilaId !== '';
 
   const handleSubmit = async () => {
     if (!canSubmit || state === 'submitting') return;
     setState('submitting');
     setSubmitError(null);
     try {
+      const unionName = unionId
+        ? getUnionsByUpazila(upazilaId).find((u) => u.id === unionId)?.name_en ?? null
+        : null;
       await submitRequest({
         patientName: patientName.trim(),
         bloodGroup,
         unitsNeeded: 1,
         urgencyLevel: 'critical',
         whenNeeded: 'now',
-        districtId: 'rangpur',
-        upazilaId: 'rangpur_sadar',
+        districtId,
+        upazilaId,
         hospitalName: location.trim() || 'Emergency SOS',
-        hospitalAddress: gps ? `${gps.lat.toFixed(4)}, ${gps.lng.toFixed(4)}` : 'Emergency location',
+        hospitalAddress: geoLabel || (gps ? `${gps.lat.toFixed(4)}, ${gps.lng.toFixed(4)}` : 'Emergency location'),
         contactNumber: contactNumber.trim(),
-        reason: `🚨 EMERGENCY SOS: ${reason.trim() || 'Critical emergency'}`,
+        reason: `🚨 EMERGENCY SOS: ${reason.trim() || 'Critical emergency'}${unionName ? ` | Union: ${unionName}` : ''}`,
         lat: gps?.lat ?? null,
         lng: gps?.lng ?? null,
       });
@@ -98,6 +145,21 @@ export function EmergencySOSButton() {
     setContactNumber('');
     setReason('');
     setSubmitError(null);
+    setDistrictId('');
+    setUpazilaId('');
+    setUnionId('');
+    setGeoLabel(null);
+  };
+
+  const handleDistrictChange = (val: string) => {
+    setDistrictId(val);
+    setUpazilaId('');
+    setUnionId('');
+  };
+
+  const handleUpazilaChange = (val: string) => {
+    setUpazilaId(val);
+    setUnionId('');
   };
 
   const call999 = () => Linking.openURL('tel:999');
@@ -176,7 +238,7 @@ export function EmergencySOSButton() {
               <Text style={styles.sosWarningText}>{Strings.sosWarning}</Text>
             </View>
 
-            <View style={styles.sosContent}>
+            <ScrollView style={styles.sosContent} keyboardShouldPersistTaps="handled">
               <Pressable onPress={call999} style={({ pressed }) => [styles.call999Bar, pressed && styles.pressed]}>
                 <SymbolView
                   name={{ ios: 'phone.fill', android: 'call', web: 'phone' } as never}
@@ -212,6 +274,77 @@ export function EmergencySOSButton() {
               </View>
 
               <View style={styles.sosField}>
+                <SelectDropdown
+                  value={districtId}
+                  options={DISTRICT_OPTIONS}
+                  onChange={handleDistrictChange}
+                  placeholder="Select district"
+                  label={Strings.district}
+                  searchable
+                  searchPlaceholder="Search district…"
+                />
+              </View>
+
+              <View style={styles.sosField}>
+                <SelectDropdown
+                  value={upazilaId}
+                  options={upazilaOptions}
+                  onChange={handleUpazilaChange}
+                  placeholder="Select upazila"
+                  label={Strings.upazila}
+                  disabled={!districtId}
+                  searchable
+                  searchPlaceholder="Search upazila…"
+                />
+              </View>
+
+              <View style={styles.sosField}>
+                <SelectDropdown
+                  value={unionId}
+                  options={unionOptions}
+                  onChange={setUnionId}
+                  placeholder="Select union (optional)"
+                  label={Strings.unionOptional}
+                  disabled={!upazilaId}
+                  searchable
+                  searchPlaceholder="Search union…"
+                />
+              </View>
+
+              <Pressable
+                onPress={handleUseMyLocation}
+                disabled={isGeoLocating || isLocating}
+                style={({ pressed }) => [
+                  styles.geoBtn,
+                  (isGeoLocating || isLocating) && styles.geoBtnDisabled,
+                  pressed && styles.pressed,
+                ]}>
+                {(isGeoLocating || isLocating) ? (
+                  <ActivityIndicator size="small" color={Brand.red} />
+                ) : (
+                  <SymbolView
+                    name={{ ios: 'location.fill', android: 'my_location', web: 'navigation' } as never}
+                    size={16}
+                    tintColor={Brand.red}
+                  />
+                )}
+                <Text style={styles.geoBtnText}>
+                  {(isGeoLocating || isLocating) ? Strings.locating : Strings.useMyLocation}
+                </Text>
+              </Pressable>
+
+              {geoLabel && (
+                <View style={styles.geoResolvedBox}>
+                  <SymbolView
+                    name={{ ios: 'checkmark.circle.fill', android: 'check_circle', web: 'check_circle' } as never}
+                    size={14}
+                    tintColor="#16a34a"
+                  />
+                  <Text style={styles.geoResolvedText}>{geoLabel}</Text>
+                </View>
+              )}
+
+              <View style={styles.sosField}>
                 <Text style={styles.sosLabel}>{Strings.sosLocation}</Text>
                 <TextInput
                   value={location}
@@ -220,10 +353,6 @@ export function EmergencySOSButton() {
                   placeholderTextColor="#94a3b8"
                   style={styles.sosInput}
                 />
-                {isLocating && <Text style={styles.gpsText}>{Strings.locating}</Text>}
-                {gps && !location && (
-                  <Text style={styles.gpsText}>GPS: {gps.lat.toFixed(4)}, {gps.lng.toFixed(4)}</Text>
-                )}
               </View>
 
               <View style={styles.sosField}>
@@ -279,7 +408,7 @@ export function EmergencySOSButton() {
                   </>
                 )}
               </Pressable>
-            </View>
+            </ScrollView>
           </KeyboardAvoidingView>
         )}
       </Modal>
@@ -485,6 +614,42 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#64748b',
     marginTop: 2,
+  },
+  geoBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: '#f0f9ff',
+    borderWidth: 1.5,
+    borderColor: Brand.red,
+    borderRadius: 14,
+    paddingVertical: 12,
+  },
+  geoBtnDisabled: {
+    opacity: 0.6,
+  },
+  geoBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Brand.red,
+  },
+  geoResolvedBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  geoResolvedText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#16a34a',
+    flex: 1,
   },
 
   bgGrid: {

@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
 import * as Linking from 'expo-linking';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
 import { Brand } from '@/constants/brand';
 import { QRShareButton } from '@/components/qr-share-button';
@@ -16,12 +16,18 @@ export interface DonorCardData {
   bloodGroup: string;
   districtName: string;
   upazilaName: string;
+  unionName?: string | null;
   phone: string;
   totalDonations: number;
   isActive: boolean;
   isVerified: boolean;
+  verificationStatus?: string | null;
+  isEligible?: boolean;
   eligibleTypesCount: number;
   nextEligibleDate: string | null;
+  donationType?: string | null;
+  lastDonationDate?: string | null;
+  preferredContact?: string | null;
   createdAt: string;
   distanceKm?: number | null;
   eligibleWholeBlood?: boolean;
@@ -34,6 +40,8 @@ export interface DonorCardData {
   lastActiveAt?: string | null;
   isAnonymous?: boolean;
   avatarUrl?: string | null;
+  responseCount?: number;
+  responseTotalMs?: number;
 }
 
 function getInitials(name: string): string {
@@ -78,7 +86,7 @@ function typeBadgeStyle(eligible: boolean | undefined): { bg: string; text: stri
     : { bg: '#f1f5f9', text: '#94a3b8', strike: true };
 }
 
-export function DonorCard({ donor }: { donor: DonorCardData }) {
+export function DonorCard({ donor, onPress }: { donor: DonorCardData; onPress?: () => void }) {
   const displayName = donor.isAnonymous ? 'Anonymous Donor' : donor.fullName;
   const initials = getInitials(donor.fullName);
   const sinceYear = getSinceYear(donor.createdAt);
@@ -104,8 +112,20 @@ export function DonorCard({ donor }: { donor: DonorCardData }) {
     Linking.openURL(`https://wa.me/${phone}?text=${message}`);
   };
 
+  const handleShare = () => {
+    const shareText = `${displayName} • ${donor.bloodGroup}\n${donor.upazilaName}${donor.unionName ? ` (${donor.unionName})` : ''}, ${donor.districtName}\nDonations: ${donor.totalDonations} • Lives saved: ${donor.totalUnits ?? 0}\n— Trinomul Blood Bank`;
+    Share.share({ message: shareText, url: `${API_BASE_URL}/donors?donor=${donor.id}`, title: 'Donor Profile' }).catch(() => {});
+  };
+
+  const prefersWhatsApp = donor.preferredContact === 'whatsapp';
+  const avgResponseMin = (donor.responseCount ?? 0) > 0 && (donor.responseTotalMs ?? 0) > 0
+    ? Math.round((donor.responseTotalMs! / donor.responseCount!) / 60000)
+    : null;
+  const donationTypeLabel = donor.donationType === 'platelets' ? 'Platelets' : donor.donationType === 'plasma' ? 'Plasma' : 'Whole Blood';
+  const notWholeBloodButOthers = !donor.eligibleWholeBlood && (donor.eligiblePlatelets || donor.eligiblePlasma);
+
   return (
-    <View style={styles.card}>
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]} disabled={!onPress}>
       <View style={styles.header}>
         <View>
           {donor.avatarUrl && !donor.isAnonymous ? (
@@ -161,7 +181,7 @@ export function DonorCard({ donor }: { donor: DonorCardData }) {
               tintColor="#94a3b8"
             />
             <Text style={styles.location} numberOfLines={1}>
-              {donor.upazilaName}, {donor.districtName}
+              {donor.upazilaName}{donor.unionName ? ` (${donor.unionName})` : ''}, {donor.districtName}
             </Text>
             {typeof donor.distanceKm === 'number' && (
               <View style={styles.distanceBadge}>
@@ -180,17 +200,17 @@ export function DonorCard({ donor }: { donor: DonorCardData }) {
       <View style={styles.typeBadgesRow}>
         <View style={[styles.typeBadge, { backgroundColor: wb.bg }]}>
           <Text style={[styles.typeBadgeText, { color: wb.text, textDecorationLine: wb.strike ? 'line-through' : 'none' }]}>
-            Whole Blood
+            🩸 Whole Blood
           </Text>
         </View>
         <View style={[styles.typeBadge, { backgroundColor: pl.bg }]}>
           <Text style={[styles.typeBadgeText, { color: pl.text, textDecorationLine: pl.strike ? 'line-through' : 'none' }]}>
-            Platelets
+            🔴 Platelets
           </Text>
         </View>
         <View style={[styles.typeBadge, { backgroundColor: pm.bg }]}>
           <Text style={[styles.typeBadgeText, { color: pm.text, textDecorationLine: pm.strike ? 'line-through' : 'none' }]}>
-            Plasma
+            💉 Plasma
           </Text>
         </View>
         {donor.hbStatus && (
@@ -200,7 +220,7 @@ export function DonorCard({ donor }: { donor: DonorCardData }) {
             <Text style={[styles.typeBadgeText, {
               color: donor.hbStatus === 'eligible' ? '#15803d' : donor.hbStatus === 'low_hb' ? '#dc2626' : '#ca8a04',
             }]}>
-              {donor.hbStatus === 'eligible' ? 'Hb OK' : donor.hbStatus === 'low_hb' ? 'Low Hb' : 'Hb?'}
+              {donor.hbStatus === 'eligible' ? 'Hb Verified' : donor.hbStatus === 'low_hb' ? 'Low Hb - Deferred' : 'Hb Not Tested'}
             </Text>
           </View>
         )}
@@ -208,11 +228,24 @@ export function DonorCard({ donor }: { donor: DonorCardData }) {
 
       {donor.badges && donor.badges.length > 0 && (
         <View style={styles.achievementBadges}>
-          {donor.badges.slice(0, 4).map((badge, i) => (
+          {donor.badges.map((badge, i) => (
             <View key={i} style={styles.achievementBadge}>
               <Text style={styles.achievementText}>{badge}</Text>
             </View>
           ))}
+        </View>
+      )}
+
+      {notWholeBloodButOthers && (
+        <View style={styles.infoBanner}>
+          <SymbolView
+            name={{ ios: 'info.circle.fill', android: 'info', web: 'info' } as never}
+            size={11}
+            tintColor="#2563eb"
+          />
+          <Text style={styles.infoBannerText}>
+            Not eligible for whole blood — can donate {donor.eligiblePlatelets ? 'Platelets' : ''}{donor.eligiblePlatelets && donor.eligiblePlasma ? ', ' : ''}{donor.eligiblePlasma ? 'Plasma' : ''}
+          </Text>
         </View>
       )}
 
@@ -224,7 +257,7 @@ export function DonorCard({ donor }: { donor: DonorCardData }) {
             tintColor="#d97706"
           />
           <Text style={styles.cooldownText}>
-            {Strings.eligibleFrom}: {new Date(donor.nextEligibleDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+            Cooling Down ({donationTypeLabel}) — {Strings.eligibleFrom}: {new Date(donor.nextEligibleDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
           </Text>
         </View>
       )}
@@ -261,25 +294,57 @@ export function DonorCard({ donor }: { donor: DonorCardData }) {
               <Text style={styles.statText}>{donor.totalUnits} lives</Text>
             </View>
           )}
+          {avgResponseMin !== null && avgResponseMin > 0 && (
+            <Text style={styles.sinceText}>~{avgResponseMin}m resp</Text>
+          )}
           {sinceYear && (
             <Text style={styles.sinceText}>{Strings.donorSince} {sinceYear}</Text>
           )}
         </View>
         {!donor.isAnonymous && (
           <View style={styles.actionButtons}>
-            <Pressable onPress={handleCall} style={({ pressed }) => [styles.callBtn, pressed && styles.pressed]}>
+            {prefersWhatsApp ? (
+              <>
+                <Pressable onPress={handleWhatsApp} style={({ pressed }) => [styles.whatsappBtn, pressed && styles.pressed]} hitSlop={6}>
+                  <SymbolView
+                    name={{ ios: 'message.fill', android: 'chat', web: 'message_circle' } as never}
+                    size={14}
+                    tintColor="#25D366"
+                  />
+                </Pressable>
+                <Pressable onPress={handleCall} style={({ pressed }) => [styles.callBtn, pressed && styles.pressed]}>
+                  <SymbolView
+                    name={{ ios: 'phone.fill', android: 'call', web: 'phone' } as never}
+                    size={12}
+                    tintColor={Brand.red}
+                  />
+                  <Text style={styles.callBtnText}>{Strings.contact}</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Pressable onPress={handleCall} style={({ pressed }) => [styles.callBtn, pressed && styles.pressed]}>
+                  <SymbolView
+                    name={{ ios: 'phone.fill', android: 'call', web: 'phone' } as never}
+                    size={12}
+                    tintColor={Brand.red}
+                  />
+                  <Text style={styles.callBtnText}>{Strings.contact}</Text>
+                </Pressable>
+                <Pressable onPress={handleWhatsApp} style={({ pressed }) => [styles.whatsappBtn, pressed && styles.pressed]} hitSlop={6}>
+                  <SymbolView
+                    name={{ ios: 'message.fill', android: 'chat', web: 'message_circle' } as never}
+                    size={14}
+                    tintColor="#25D366"
+                  />
+                </Pressable>
+              </>
+            )}
+            <Pressable onPress={handleShare} style={({ pressed }) => [styles.shareBtn, pressed && styles.pressed]} hitSlop={6}>
               <SymbolView
-                name={{ ios: 'phone.fill', android: 'call', web: 'phone' } as never}
-                size={12}
-                tintColor={Brand.red}
-              />
-              <Text style={styles.callBtnText}>{Strings.contact}</Text>
-            </Pressable>
-            <Pressable onPress={handleWhatsApp} style={({ pressed }) => [styles.whatsappBtn, pressed && styles.pressed]} hitSlop={6}>
-              <SymbolView
-                name={{ ios: 'message.fill', android: 'chat', web: 'message_circle' } as never}
-                size={14}
-                tintColor="#25D366"
+                name={{ ios: 'square.and.arrow.up', android: 'share', web: 'share_2' } as never}
+                size={13}
+                tintColor="#64748b"
               />
             </Pressable>
             <QRShareButton
@@ -290,7 +355,7 @@ export function DonorCard({ donor }: { donor: DonorCardData }) {
           </View>
         )}
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -533,6 +598,32 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  shareBtn: {
+    borderWidth: 1.5,
+    borderColor: '#cbd5e1',
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#bfdbfe',
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  infoBannerText: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: '#2563eb',
+    flex: 1,
   },
   pressed: {
     opacity: 0.7,

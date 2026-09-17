@@ -17,11 +17,12 @@ import {
   Zap,
   Heart,
   Check,
-  Chrome,
+
   Share,
   Plus,
   X,
 } from 'lucide-react';
+import { Chrome } from "@/components/ui/brand-icons";
 
 type DeviceType = 'ios' | 'android' | 'windows' | 'mac' | 'linux' | 'unknown';
 

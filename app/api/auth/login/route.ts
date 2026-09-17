@@ -22,7 +22,7 @@ export async function POST(req: Request) {
       try {
         // serverLogin handles verification + sets session cookie
         const result = await serverLogin(loginId, pwd, false);
-        return NextResponse.json({ user: result.user });
+        return NextResponse.json({ user: result.user, token: result.token });
       } catch (err: any) {
         return NextResponse.json({ error: err.message || "Login failed" }, { status: 401 });
       }
@@ -85,7 +85,7 @@ export async function POST(req: Request) {
 
     // Auto-login after signup
     // Set a session for the new user
-    await createSession({ sub: String(id), email, role: "donor" }, false);
+    const token = await createSession({ sub: String(id), email, role: "donor" }, false);
 
     if (signupRateKey) await incrementRateLimit(signupRateKey, 60 * 60 * 1000);
 
@@ -97,6 +97,7 @@ export async function POST(req: Request) {
         full_name_en: fullNameEn,
         full_name_bn: fullNameBn || null,
       },
+      token,
     });
   } catch (err: any) {
     if (err?.message?.startsWith("Too many requests")) {

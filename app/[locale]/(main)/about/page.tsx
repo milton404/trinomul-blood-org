@@ -1,7 +1,8 @@
 'use client';
 
 import { useTranslations, useLocale } from 'next-intl';
-import { Heart, Users, MapPin, Calendar, Target, Phone, Mail, Facebook, Globe, Clock, HandHeart, Shield } from 'lucide-react';
+import { Heart, Users, MapPin, Calendar, Target, Phone, Mail, Globe, Clock, HandHeart, Shield } from 'lucide-react';
+import { Facebook } from "@/components/ui/brand-icons";
 import Navbar from '@/components/common/Navbar';
 import Footer from '@/components/common/Footer';
 

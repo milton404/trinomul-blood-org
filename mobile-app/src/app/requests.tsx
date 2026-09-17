@@ -15,8 +15,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BloodDrop } from '@/components/blood-drop';
 import { RequestCard, type RequestCardData } from '@/components/request-card';
+import { SelectDropdown } from '@/components/select-dropdown';
 import { Brand } from '@/constants/brand';
-import { BLOOD_GROUPS } from '@/constants/data';
+import { BLOOD_GROUPS, DISTRICTS, getUpazilasByDistrict } from '@/constants/data';
+import { getUnionsByUpazila } from '@/constants/unions';
 import { Strings } from '@/constants/strings';
 import { BottomTabInset, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -24,6 +26,7 @@ import { fetchRequests, type FetchedRequest } from '@/lib/api';
 
 const ALL_CHIP = 'All';
 const BG_CHIPS = [ALL_CHIP, ...BLOOD_GROUPS];
+const DISTRICT_OPTIONS = DISTRICTS.map((d) => ({ value: d.id, label: d.name }));
 const URGENCY_CHIPS: { value: string; label: string }[] = [
   { value: 'all', label: Strings.allUrgency },
   { value: 'critical', label: Strings.critical },
@@ -36,6 +39,9 @@ export default function RequestsScreen() {
   const theme = useTheme();
   const [selectedGroup, setSelectedGroup] = useState<string>(ALL_CHIP);
   const [selectedUrgency, setSelectedUrgency] = useState<string>('all');
+  const [selectedDistrict, setSelectedDistrict] = useState('');
+  const [selectedUpazila, setSelectedUpazila] = useState('');
+  const [selectedUnion, setSelectedUnion] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
   const [allRequests, setAllRequests] = useState<FetchedRequest[]>([]);
@@ -56,12 +62,36 @@ export default function RequestsScreen() {
     return () => { cancelled = true; };
   }, []);
 
+  const upazilaOptions = selectedDistrict
+    ? getUpazilasByDistrict(selectedDistrict).map((u) => ({ value: u.id, label: u.name }))
+    : [];
+  const unionOptions = selectedUpazila
+    ? getUnionsByUpazila(selectedUpazila).map((u) => ({ value: u.id, label: u.name_en }))
+    : [];
+
+  const handleDistrictChange = (val: string) => {
+    setSelectedDistrict(val);
+    setSelectedUpazila('');
+    setSelectedUnion('');
+  };
+  const handleUpazilaChange = (val: string) => {
+    setSelectedUpazila(val);
+    setSelectedUnion('');
+  };
+
+  const selectedUnionName = selectedUnion
+    ? getUnionsByUpazila(selectedUpazila).find((u) => u.id === selectedUnion)?.name_en ?? null
+    : null;
+
   const filteredRequests = useMemo<RequestCardData[]>(() => {
     const q = searchQuery.trim().toLowerCase();
 
     return allRequests.filter((r) => {
       const matchesGroup = selectedGroup === ALL_CHIP || r.bloodGroup === selectedGroup;
       const matchesUrgency = selectedUrgency === 'all' || r.urgencyLevel === selectedUrgency;
+      const matchesDistrict = !selectedDistrict || r.districtId === selectedDistrict;
+      const matchesUpazila = !selectedUpazila || r.upazilaId === selectedUpazila;
+      const matchesUnion = !selectedUnionName || r.unionName === selectedUnionName;
 
       let matchesSearch = true;
       if (q) {
@@ -71,7 +101,7 @@ export default function RequestsScreen() {
         matchesSearch = patient.includes(q) || hospital.includes(q) || area.includes(q);
       }
 
-      return matchesGroup && matchesUrgency && matchesSearch;
+      return matchesGroup && matchesUrgency && matchesDistrict && matchesUpazila && matchesUnion && matchesSearch;
     }).map((r) => ({
       id: r.id,
       patientName: r.patientName,
@@ -94,7 +124,7 @@ export default function RequestsScreen() {
       alternativeNumber: r.alternativeNumber,
       isLastChance: r.isLastChance,
     }));
-  }, [allRequests, selectedGroup, selectedUrgency, searchQuery]);
+  }, [allRequests, selectedGroup, selectedUrgency, selectedDistrict, selectedUpazila, selectedUnionName, searchQuery]);
 
   const renderBgChip = (chip: string) => {
     const isActive = chip === selectedGroup;
@@ -123,7 +153,7 @@ export default function RequestsScreen() {
   };
 
   const renderRequest = ({ item }: { item: RequestCardData }) => (
-    <RequestCard request={item} />
+    <RequestCard request={item} onPress={() => router.push({ pathname: '/request-details', params: { id: String(item.id) } } as never)} />
   );
 
   return (
@@ -166,6 +196,44 @@ export default function RequestsScreen() {
           contentContainerStyle={styles.chipsRow}>
           {URGENCY_CHIPS.map(renderUrgencyChip)}
         </ScrollView>
+
+        <View style={styles.locationFilterRow}>
+          <View style={{ flex: 1 }}>
+            <SelectDropdown
+              value={selectedDistrict}
+              options={DISTRICT_OPTIONS}
+              onChange={handleDistrictChange}
+              placeholder={Strings.filterByDistrict}
+              label={Strings.district}
+              searchable
+              searchPlaceholder="Search district…"
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <SelectDropdown
+              value={selectedUpazila}
+              options={upazilaOptions}
+              onChange={handleUpazilaChange}
+              placeholder={Strings.filterByUpazila}
+              label={Strings.upazila}
+              disabled={!selectedDistrict}
+              searchable
+              searchPlaceholder="Search upazila…"
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <SelectDropdown
+              value={selectedUnion}
+              options={unionOptions}
+              onChange={setSelectedUnion}
+              placeholder={Strings.filterByUnion}
+              label={Strings.unionLabel}
+              disabled={!selectedUpazila}
+              searchable
+              searchPlaceholder="Search union…"
+            />
+          </View>
+        </View>
 
         <View style={styles.searchInputWrap}>
           <SymbolView
@@ -314,6 +382,10 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
+  },
+  locationFilterRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
   },
   chipsRow: {
     gap: 8,

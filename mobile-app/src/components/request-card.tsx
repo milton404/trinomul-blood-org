@@ -1,6 +1,6 @@
 import { SymbolView } from 'expo-symbols';
 import * as Linking from 'expo-linking';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Share, StyleSheet, Text, View } from 'react-native';
 
 import { Brand } from '@/constants/brand';
 import { Strings } from '@/constants/strings';
@@ -81,7 +81,7 @@ function formatNeededTime(time: string | null | undefined): string {
   }
 }
 
-export function RequestCard({ request }: { request: RequestCardData }) {
+export function RequestCard({ request, onPress }: { request: RequestCardData; onPress?: () => void }) {
   const urgency = URGENCY_CONFIG[request.urgencyLevel] ?? URGENCY_CONFIG.normal;
   const whenLabel = WHEN_NEEDED_LABELS[request.whenNeeded] ?? request.whenNeeded;
   const statusLabel = STATUS_LABELS[request.status] ?? request.status;
@@ -111,8 +111,21 @@ export function RequestCard({ request }: { request: RequestCardData }) {
     Linking.openURL(`https://wa.me/${phone}?text=${message}`);
   };
 
+  const handleShare = () => {
+    const lines = [
+      `Blood Request - ${request.bloodGroup}`,
+      `Patient: ${request.patientName}`,
+      `Hospital: ${request.hospitalName}`,
+      `Location: ${request.upazilaName}, ${request.districtName}`,
+      `Units: ${request.unitsNeeded}`,
+      request.contactNumber ? `Contact: ${request.contactNumber}` : '',
+      request.trackingCode ? `Tracking: ${request.trackingCode}` : '',
+    ].filter(Boolean);
+    Share.share({ message: lines.join('\n') });
+  };
+
   return (
-    <View style={styles.card}>
+    <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && styles.pressed]} disabled={!onPress}>
       <View style={[styles.urgencyBar, { backgroundColor: barColor }]} />
 
       <View style={styles.cardBody}>
@@ -233,7 +246,7 @@ export function RequestCard({ request }: { request: RequestCardData }) {
               <Text style={styles.altBtnText}>Alt</Text>
             </Pressable>
           )}
-          <Pressable style={({ pressed }) => [styles.shareBtn, pressed && styles.pressed]} hitSlop={6}>
+          <Pressable onPress={handleShare} style={({ pressed }) => [styles.shareBtn, pressed && styles.pressed]} hitSlop={6}>
             <SymbolView
               name={{ ios: 'square.and.arrow.up', android: 'share', web: 'share_2' } as never}
               size={13}
@@ -242,7 +255,7 @@ export function RequestCard({ request }: { request: RequestCardData }) {
           </Pressable>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 

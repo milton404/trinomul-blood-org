@@ -96,7 +96,7 @@ export async function serverLogin(
    *  which admin scope is expected. 'any' means any admin (full, district,
    *  or super) is accepted — the default for backwards compatibility. */
   expectedAdminScope: "full" | "district" | "any" = "any",
-): Promise<{ user: AuthUser; redirectTo: string }> {
+): Promise<{ user: AuthUser; redirectTo: string; token: string }> {
   const trimmedIdentifier = identifier.trim();
   const key = `login:${trimmedIdentifier.toLowerCase()}`;
   const usePg = isSupabaseAvailable();
@@ -221,14 +221,14 @@ export async function serverLogin(
     email: profile.email,
     role: profile.role,
   };
-  await createSession(payload, remember);
+  const token = await createSession(payload, remember);
 
   const redirectTo =
     profile.role === "super_admin" || profile.role === "admin"
       ? "/admin/dashboard"
       : "/profile";
 
-  return { user: profileToUser(profile), redirectTo };
+  return { user: profileToUser(profile), redirectTo, token };
 }
 
 /**
@@ -249,7 +249,7 @@ export async function serverRegister(input: {
   district?: string;
   upazila?: string;
   address?: string;
-}): Promise<{ user: AuthUser; redirectTo: string }> {
+}): Promise<{ user: AuthUser; redirectTo: string; token: string }> {
   const normalizedEmail = input.email.trim().toLowerCase();
   const key = `register:${normalizedEmail}`;
   const usePg = isSupabaseAvailable();
@@ -358,7 +358,7 @@ export async function serverRegister(input: {
     email: normalizedEmail,
     role: input.role,
   };
-  await createSession(payload, false);
+  const token = await createSession(payload, false);
 
   return {
     user: {
@@ -369,6 +369,7 @@ export async function serverRegister(input: {
       full_name_bn: input.fullName,
     },
     redirectTo: "/profile",
+    token,
   };
 }
 

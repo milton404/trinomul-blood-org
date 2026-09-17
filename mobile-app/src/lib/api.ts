@@ -1,21 +1,57 @@
 import { API_BASE_URL, API_TIMEOUT_MS } from '@/constants/config';
-import { MOCK_DONORS } from '@/constants/mock-donors';
-import { MOCK_REQUESTS } from '@/constants/mock-requests';
+
 import type { DonorCardData } from '@/components/donor-card';
 import type { RequestCardData } from '@/components/request-card';
 import { DISTRICTS, UPAZILAS } from '@/constants/data';
 import { saveCache, loadCache, CACHE_KEYS } from '@/lib/local-db';
+import * as SecureStore from 'expo-secure-store';
+
+const AUTH_TOKEN_KEY = 'bb_auth_token';
+
+/** Store the JWT token securely (after login/signup). */
+async function setAuthToken(token: string): Promise<void> {
+  await SecureStore.setItemAsync(AUTH_TOKEN_KEY, token);
+}
+
+/** Read the stored JWT token (if any). */
+async function getAuthToken(): Promise<string | null> {
+  try {
+    return await SecureStore.getItemAsync(AUTH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** Remove the stored JWT token (on logout). */
+async function clearAuthToken(): Promise<void> {
+  try {
+    await SecureStore.deleteItemAsync(AUTH_TOKEN_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+/** Build fetch headers, including the Bearer token when available. */
+async function authHeaders(extra: Record<string, string> = {}): Promise<Record<string, string>> {
+  const token = await getAuthToken();
+  const headers: Record<string, string> = { Accept: 'application/json', ...extra };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  return headers;
+}
 
 export interface FetchedDonor extends DonorCardData {
   lat: number | null;
   lng: number | null;
   districtId: string;
+  upazilaId: string;
 }
 
 export interface FetchedRequest extends RequestCardData {
   lat: number | null;
   lng: number | null;
   districtId: string;
+  upazilaId: string;
+  unionName: string | null;
 }
 
 export type ApiSource = 'api' | 'cache' | 'mock';
@@ -61,17 +97,24 @@ export async function fetchDonors(): Promise<ApiResult<FetchedDonor>> {
         bloodGroup: d.blood_group || '',
         districtName: d.district || '',
         upazilaName: d.upazila || '',
+        unionName: d.union_name ?? null,
         phone: d.phone || '',
         totalDonations: d.total_donations ?? 0,
         isActive: d.is_active === true || d.is_active === 1,
         isVerified: d.is_verified === true || d.is_verified === 1,
+        verificationStatus: d.verification_status ?? null,
+        isEligible: d.is_eligible === true || d.is_eligible === 1,
         eligibleTypesCount: d.eligible_types_count ?? 0,
         nextEligibleDate: d.next_eligible_date ?? null,
+        donationType: d.donation_type ?? d.last_donation_type ?? null,
+        lastDonationDate: d.last_donation_date ?? d.donation_last_date ?? null,
+        preferredContact: d.preferred_contact ?? null,
         createdAt: d.created_at ?? '',
         distanceKm: null,
         lat: d.lat ?? null,
         lng: d.lng ?? null,
         districtId: d.district_id || districtIdFromName(d.district || ''),
+        upazilaId: d.upazila_id || upazilaIdFromName(d.upazila || ''),
         eligibleWholeBlood: d.eligible_whole_blood === true || d.eligible_whole_blood === 1,
         eligiblePlatelets: d.eligible_platelets === true || d.eligible_platelets === 1,
         eligiblePlasma: d.eligible_plasma === true || d.eligible_plasma === 1,
@@ -82,6 +125,8 @@ export async function fetchDonors(): Promise<ApiResult<FetchedDonor>> {
         lastActiveAt: d.last_active_at ?? null,
         isAnonymous: d.is_anonymous === true || d.is_anonymous === 1,
         avatarUrl: d.avatar_url ?? null,
+        responseCount: d.response_count ?? 0,
+        responseTotalMs: d.response_total_ms ?? 0,
       }));
 
     if (data.length === 0) throw new Error('No donors');
@@ -92,37 +137,7 @@ export async function fetchDonors(): Promise<ApiResult<FetchedDonor>> {
     if (cached && cached.data.length > 0) {
       return { data: cached.data, source: 'cache' };
     }
-    return {
-      data: MOCK_DONORS.map((d) => ({
-        id: d.id,
-        fullName: d.fullName,
-        bloodGroup: d.bloodGroup,
-        districtName: d.districtName,
-        upazilaName: d.upazilaName,
-        phone: d.phone,
-        totalDonations: d.totalDonations,
-        isActive: d.isActive,
-        isVerified: d.isVerified,
-        eligibleTypesCount: d.eligibleTypesCount,
-        nextEligibleDate: d.nextEligibleDate,
-        createdAt: d.createdAt,
-        distanceKm: null,
-        lat: d.lat,
-        lng: d.lng,
-        districtId: d.districtId,
-        eligibleWholeBlood: d.eligibleTypesCount > 0,
-        eligiblePlatelets: d.eligibleTypesCount > 1,
-        eligiblePlasma: d.eligibleTypesCount > 2,
-        badges: d.totalDonations >= 5 ? ['Frequent'] : [],
-        totalReferrals: 0,
-        totalUnits: d.totalDonations,
-        hbStatus: null,
-        lastActiveAt: null,
-        isAnonymous: false,
-        avatarUrl: null,
-      })),
-      source: 'mock',
-    };
+    return { data: [], source: 'mock' };
   }
 }
 
@@ -154,6 +169,8 @@ export async function fetchRequests(): Promise<ApiResult<FetchedRequest>> {
       lat: r.lat ?? null,
       lng: r.lng ?? null,
       districtId: districtIdFromName(r.district || ''),
+      upazilaId: upazilaIdFromName(r.upazila || ''),
+      unionName: r.union_name ?? null,
       trackingCode: r.tracking_code ?? null,
       neededTime: r.needed_time ?? null,
       alternativeNumber: r.alternative_number ?? null,
@@ -168,35 +185,7 @@ export async function fetchRequests(): Promise<ApiResult<FetchedRequest>> {
     if (cached && cached.data.length > 0) {
       return { data: cached.data, source: 'cache' };
     }
-    return {
-      data: MOCK_REQUESTS.map((r) => ({
-        id: r.id,
-        patientName: r.patientName,
-        bloodGroup: r.bloodGroup,
-        hospitalName: r.hospitalName,
-        hospitalAddress: r.hospitalAddress,
-        districtName: r.districtName,
-        upazilaName: r.upazilaName,
-        urgencyLevel: r.urgencyLevel,
-        whenNeeded: r.whenNeeded,
-        neededDate: r.neededDate,
-        unitsNeeded: r.unitsNeeded,
-        reason: r.reason,
-        contactNumber: r.contactNumber,
-        whatsappNumber: r.whatsappNumber,
-        status: r.status,
-        createdAt: r.createdAt,
-        distanceKm: null,
-        lat: r.lat,
-        lng: r.lng,
-        districtId: r.districtId,
-        trackingCode: null,
-        neededTime: null,
-        alternativeNumber: null,
-        isLastChance: false,
-      })),
-      source: 'mock',
-    };
+    return { data: [], source: 'mock' };
   }
 }
 
@@ -232,13 +221,21 @@ function upazilaNameFromId(id: string): string {
   return match ? match.name : id;
 }
 
+function upazilaIdFromName(name: string): string {
+  if (!name) return '';
+  const lower = name.toLowerCase();
+  const match = UPAZILAS.find((u) => u.id === lower || u.name.toLowerCase() === lower);
+  return match ? match.id : '';
+}
+
 export async function submitRequest(data: SubmitRequestData): Promise<SubmitRequestResult> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), 15000);
   try {
+    const headers = await authHeaders({ 'Content-Type': 'application/json' });
     const res = await fetch(`${API_BASE_URL}/api/requests`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers,
       signal: controller.signal,
       body: JSON.stringify({
         patientName: data.patientName,
@@ -259,11 +256,14 @@ export async function submitRequest(data: SubmitRequestData): Promise<SubmitRequ
       }),
     });
     clearTimeout(timer);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.error || `HTTP ${res.status}`);
+    }
     const json = await res.json();
     return {
       id: json.id ?? 0,
-      trackingCode: json.trackingCode ?? null,
+      trackingCode: json.trackingCode ?? json.tracking_code ?? null,
     };
   } catch (err) {
     clearTimeout(timer);
@@ -439,7 +439,9 @@ export async function login(data: LoginData): Promise<{ user: AuthUser }> {
       const json = await res.json().catch(() => ({}));
       throw new Error(json.error || `HTTP ${res.status}`);
     }
-    return await res.json();
+    const json = await res.json();
+    if (json.token) await setAuthToken(json.token);
+    return { user: json.user };
   } catch (err) {
     clearTimeout(timer);
     throw err;
@@ -468,7 +470,9 @@ export async function signup(data: SignupData): Promise<{ user: AuthUser }> {
       const json = await res.json().catch(() => ({}));
       throw new Error(json.error || `HTTP ${res.status}`);
     }
-    return await res.json();
+    const json = await res.json();
+    if (json.token) await setAuthToken(json.token);
+    return { user: json.user };
   } catch (err) {
     clearTimeout(timer);
     throw err;
@@ -477,7 +481,8 @@ export async function signup(data: SignupData): Promise<{ user: AuthUser }> {
 
 export async function fetchCurrentUser(): Promise<{ user: AuthUser | null }> {
   try {
-    const res = await fetchWithTimeout(`${API_BASE_URL}/api/auth/me`);
+    const headers = await authHeaders();
+    const res = await fetch(`${API_BASE_URL}/api/auth/me`, { headers });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return await res.json();
   } catch {
@@ -485,14 +490,178 @@ export async function fetchCurrentUser(): Promise<{ user: AuthUser | null }> {
   }
 }
 
+/** Update the signed-in user's own profile (allow-listed fields, server-enforced). */
+export async function updateMyProfile(data: Partial<AuthUser>): Promise<{ user: AuthUser | null }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  try {
+    const headers = await authHeaders({ 'Content-Type': 'application/json' });
+    const res = await fetch(`${API_BASE_URL}/api/profile`, {
+      method: 'PATCH',
+      headers,
+      signal: controller.signal,
+      body: JSON.stringify(data),
+    });
+    clearTimeout(timer);
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      throw new Error(json.error || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
+}
+
+/** Toggle donor availability (profiles.is_active). */
+export async function setDonorAvailability(isActive: boolean): Promise<{ user: AuthUser | null }> {
+  return updateMyProfile({ is_active: isActive ? 1 : 0 } as Partial<AuthUser>);
+}
+
+/** Request a password-reset email. Returns devToken in development only. */
+export async function requestPasswordReset(identifier: string): Promise<{ sent: boolean; devToken?: string }> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/auth/password-reset`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({ identifier }),
+    });
+    clearTimeout(timer);
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      throw new Error(json.error || `HTTP ${res.status}`);
+    }
+    return await res.json();
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
+}
+
+/** Complete a password reset with the emailed token. */
+export async function resetPassword(token: string, newPassword: string): Promise<void> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/auth/password-reset`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      signal: controller.signal,
+      body: JSON.stringify({ token, newPassword }),
+    });
+    clearTimeout(timer);
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      throw new Error(json.error || `HTTP ${res.status}`);
+    }
+  } catch (err) {
+    clearTimeout(timer);
+    throw err;
+  }
+}
+
+export interface DonationRecord {
+  id: number;
+  bloodGroup: string;
+  units: number;
+  hospitalName: string | null;
+  donationDate: string;
+  donationType: string;
+  recipientType: string | null;
+  requestId: number | null;
+  notes: string | null;
+}
+
+/** Donation history of the signed-in donor (own records only). */
+export async function fetchMyDonations(): Promise<DonationRecord[]> {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_BASE_URL}/api/donations`, { headers });
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.error || `HTTP ${res.status}`);
+  }
+  const json = await res.json();
+  if (!Array.isArray(json)) return [];
+  return json.map((d: any) => ({
+    id: d.id ?? 0,
+    bloodGroup: d.blood_group || '',
+    units: d.units ?? 1,
+    hospitalName: d.hospital_name ?? null,
+    donationDate: d.donation_date ?? '',
+    donationType: d.donation_type || 'whole_blood',
+    recipientType: d.recipient_type ?? null,
+    requestId: d.request_id ?? null,
+    notes: d.notes ?? null,
+  }));
+}
+
+export interface NotificationItem {
+  id: number;
+  type: string;
+  content: string | null;
+  postId: number | null;
+  isRead: boolean;
+  createdAt: string;
+  actorName: string | null;
+  actorAvatarUrl: string | null;
+}
+
+/** In-app notifications of the signed-in user. */
+export async function fetchMyNotifications(): Promise<NotificationItem[]> {
+  const headers = await authHeaders();
+  const res = await fetch(`${API_BASE_URL}/api/notifications`, { headers });
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.error || `HTTP ${res.status}`);
+  }
+  const json = await res.json();
+  if (!Array.isArray(json)) return [];
+  return json.map((n: any) => ({
+    id: n.id ?? 0,
+    type: n.type || 'system',
+    content: n.content ?? null,
+    postId: n.post_id ?? null,
+    isRead: n.is_read === true || n.is_read === 1,
+    createdAt: n.created_at ?? '',
+    actorName: n.actor_name ?? null,
+    actorAvatarUrl: n.actor_avatar_url ?? null,
+  }));
+}
+
+export async function markNotificationRead(id: number): Promise<void> {
+  const headers = await authHeaders({ 'Content-Type': 'application/json' });
+  const res = await fetch(`${API_BASE_URL}/api/notifications`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ id }),
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  const headers = await authHeaders({ 'Content-Type': 'application/json' });
+  const res = await fetch(`${API_BASE_URL}/api/notifications`, {
+    method: 'PUT',
+    headers,
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+}
+
 export async function logout(): Promise<void> {
   try {
+    const headers = await authHeaders({ 'Content-Type': 'application/json' });
     await fetch(`${API_BASE_URL}/api/auth/logout`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
     });
   } catch {
     // ignore
+  } finally {
+    await clearAuthToken();
   }
 }
 
@@ -529,29 +698,45 @@ export interface CommentData {
 
 export async function fetchFeed(filter: string = 'all', limit: number = 20, offset: number = 0): Promise<{ posts: FeedPost[]; source: ApiSource }> {
   try {
-    const res = await fetchWithTimeout(`${API_BASE_URL}/api/feed?filter=${filter}&limit=${limit}&offset=${offset}`);
+    const headers = await authHeaders();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+    const res = await fetch(`${API_BASE_URL}/api/feed?filter=${filter}&limit=${limit}&offset=${offset}`, {
+      headers,
+      signal: controller.signal,
+    });
+    clearTimeout(timer);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
-    const posts: FeedPost[] = Array.isArray(json) ? json.map((p: any) => ({
-      id: p.id ?? p.postId ?? 0,
-      postId: p.postId ?? p.id ?? 0,
-      kind: p.kind || 'post',
-      authorId: p.authorId ?? 0,
-      authorName: p.authorName || 'Unknown',
-      authorRole: p.authorRole || 'donor',
-      content: p.content || '',
-      images: Array.isArray(p.images) ? p.images : [],
-      postType: p.postType || 'general',
-      relatedRequestId: p.relatedRequestId ?? null,
-      pinned: p.pinned === true || p.pinned === 1,
-      isPublic: p.isPublic !== false,
-      likeCount: p.likeCount ?? 0,
-      commentCount: p.commentCount ?? 0,
-      shareCount: p.shareCount ?? 0,
-      likedByMe: p.likedByMe === true || p.likedByMe === 1,
-      createdAt: p.created_at || p.createdAt || '',
-      authorAvatarUrl: p.authorAvatarUrl ?? null,
-    })) : [];
+    const rawPosts: any[] = Array.isArray(json) ? json : Array.isArray(json.items) ? json.items : Array.isArray(json.posts) ? json.posts : [];
+    const posts: FeedPost[] = rawPosts.map((p: any) => {
+      const isRequest = p.kind === 'request';
+      const rawId = isRequest ? (p.requestId ?? p.id) : (p.id ?? p.postId);
+      const numericId = typeof rawId === 'string' ? Number(rawId.replace(/\D/g, '')) || 0 : Number(rawId ?? 0);
+      const content = isRequest
+        ? `${p.urgency === 'critical' ? '🚨 EMERGENCY' : '🩸 Blood Request'}: ${p.bloodGroup || ''} • ${p.units || 1} unit(s) needed\n${p.hospitalName || ''}${p.reason ? '\n' + p.reason : ''}`
+        : (p.content || '');
+      return {
+        id: isRequest ? numericId + 1000000 : numericId,
+        postId: numericId,
+        kind: p.kind || 'post',
+        authorId: Number(p.authorId ?? p.authorId ?? 0),
+        authorName: p.authorName || 'Unknown',
+        authorRole: p.authorRole || 'donor',
+        content,
+        images: Array.isArray(p.images) ? p.images : [],
+        postType: p.postType || (isRequest ? 'request' : 'general'),
+        relatedRequestId: p.relatedRequestId ?? (isRequest ? numericId : null),
+        pinned: p.pinned === true || p.pinned === 1,
+        isPublic: p.isPublic !== false,
+        likeCount: Number(p.likeCount ?? 0),
+        commentCount: Number(p.commentCount ?? 0),
+        shareCount: Number(p.shareCount ?? 0),
+        likedByMe: p.likedByMe === true || p.likedByMe === 1,
+        createdAt: p.created_at || p.createdAt || '',
+        authorAvatarUrl: p.authorAvatarUrl ?? null,
+      };
+    });
     if (posts.length > 0) await saveCache(CACHE_KEYS.feedAll, posts);
     return { posts, source: 'api' };
   } catch {
@@ -567,9 +752,10 @@ export async function createPost(data: { content: string; images?: string[]; pos
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
   try {
+    const headers = await authHeaders({ 'Content-Type': 'application/json' });
     const res = await fetch(`${API_BASE_URL}/api/feed`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      headers,
       signal: controller.signal,
       body: JSON.stringify({
         content: data.content,
@@ -594,9 +780,10 @@ export async function toggleLike(postId: number): Promise<any> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
   try {
+    const headers = await authHeaders({ 'Content-Type': 'application/json' });
     const res = await fetch(`${API_BASE_URL}/api/feed/like`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       signal: controller.signal,
       body: JSON.stringify({ postId }),
     });
@@ -613,9 +800,10 @@ export async function addComment(postId: number, content: string): Promise<{ id:
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
   try {
+    const headers = await authHeaders({ 'Content-Type': 'application/json' });
     const res = await fetch(`${API_BASE_URL}/api/feed/comment`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       signal: controller.signal,
       body: JSON.stringify({ postId, content }),
     });
@@ -654,9 +842,10 @@ export async function sharePost(postId: number): Promise<any> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
   try {
+    const headers = await authHeaders({ 'Content-Type': 'application/json' });
     const res = await fetch(`${API_BASE_URL}/api/feed/share`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       signal: controller.signal,
       body: JSON.stringify({ postId }),
     });
@@ -673,9 +862,10 @@ export async function deletePost(postId: number): Promise<boolean> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
   try {
+    const headers = await authHeaders({ 'Content-Type': 'application/json' });
     const res = await fetch(`${API_BASE_URL}/api/feed/${postId}`, {
       method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       signal: controller.signal,
     });
     clearTimeout(timer);
@@ -740,4 +930,171 @@ export async function uploadImageToCloudinary(fileUri: string, useCase: 'avatar'
     secureUrl: uploadData.secure_url || '',
     publicId: uploadData.public_id || '',
   };
+}
+export interface DonorDetail {
+  id: number;
+  fullName: string;
+  bloodGroup: string;
+  phone: string;
+  whatsappNumber: string | null;
+  district: string;
+  upazila: string;
+  address: string | null;
+  totalDonations: number;
+  totalUnits: number;
+  totalReferrals: number;
+  isActive: boolean;
+  isVerified: boolean;
+  verificationStatus: string | null;
+  eligibleTypesCount: number;
+  eligibleWholeBlood: boolean;
+  eligiblePlatelets: boolean;
+  eligiblePlasma: boolean;
+  nextEligibleDate: string | null;
+  lastDonationDate: string | null;
+  lastDonationType: string | null;
+  hbLevel: number | null;
+  lastHbTestDate: string | null;
+  hbStatus: string | null;
+  sex: string | null;
+  weightKg: number | null;
+  dateOfBirth: string | null;
+  occupation: string | null;
+  preferredContact: string | null;
+  hasChronicDisease: boolean;
+  diseaseDetails: string | null;
+  createdAt: string;
+  lastActiveAt: string | null;
+  avatarUrl: string | null;
+  badges: string[];
+  lat: number | null;
+  lng: number | null;
+}
+
+export async function fetchDonorById(id: number): Promise<DonorDetail> {
+  const res = await fetchWithTimeout(`${API_BASE_URL}/api/donors/${id}`);
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.error || `HTTP ${res.status}`);
+  }
+  const d = await res.json();
+  return {
+    id: d.id ?? 0,
+    fullName: d.full_name_en || d.full_name_bn || 'Unknown Donor',
+    bloodGroup: d.blood_group || '',
+    phone: d.phone || '',
+    whatsappNumber: d.whatsapp_number ?? null,
+    district: d.district || '',
+    upazila: d.upazila || '',
+    address: d.address ?? null,
+    totalDonations: d.total_donations ?? 0,
+    totalUnits: d.total_units ?? 0,
+    totalReferrals: d.total_referrals ?? 0,
+    isActive: d.is_active === true || d.is_active === 1,
+    isVerified: d.is_verified === true || d.is_verified === 1,
+    verificationStatus: d.verification_status ?? null,
+    eligibleTypesCount: d.eligible_types_count ?? 0,
+    eligibleWholeBlood: d.eligible_whole_blood === true || d.eligible_whole_blood === 1,
+    eligiblePlatelets: d.eligible_platelets === true || d.eligible_platelets === 1,
+    eligiblePlasma: d.eligible_plasma === true || d.eligible_plasma === 1,
+    nextEligibleDate: d.next_eligible_date ?? null,
+    lastDonationDate: d.last_donation_date ?? null,
+    lastDonationType: d.last_donation_type ?? null,
+    hbLevel: d.hb_level ?? null,
+    lastHbTestDate: d.last_hb_test_date ?? null,
+    hbStatus: d.hb_status ?? null,
+    sex: d.sex ?? null,
+    weightKg: d.weight_kg ?? null,
+    dateOfBirth: d.date_of_birth ?? null,
+    occupation: d.occupation ?? null,
+    preferredContact: d.preferred_contact ?? null,
+    hasChronicDisease: d.has_chronic_disease === true || d.has_chronic_disease === 1,
+    diseaseDetails: d.disease_details ?? null,
+    createdAt: d.created_at ?? '',
+    lastActiveAt: d.last_active_at ?? null,
+    avatarUrl: d.avatar_url ?? null,
+    badges: Array.isArray(d.badges) ? d.badges : [],
+    lat: d.lat ?? null,
+    lng: d.lng ?? null,
+  };
+}
+
+export interface RequestDetail {
+  id: number;
+  patientName: string;
+  patientAge: number | null;
+  bloodGroup: string;
+  unitsNeeded: number;
+  donatedUnits: number;
+  urgencyLevel: string;
+  whenNeeded: string;
+  neededDate: string | null;
+  neededTime: string | null;
+  district: string;
+  upazila: string;
+  hospitalName: string;
+  hospitalAddress: string | null;
+  contactNumber: string;
+  alternativeNumber: string | null;
+  whatsappNumber: string | null;
+  reason: string | null;
+  patientHbLevel: number | null;
+  status: string;
+  currentStatus: string;
+  trackingCode: string | null;
+  donorId: number | null;
+  createdAt: string;
+  donatedAt: string | null;
+  fulfilledAt: string | null;
+  lat: number | null;
+  lng: number | null;
+  viewCount: number;
+}
+
+async function fetchRequestFromUrl(url: string): Promise<RequestDetail> {
+  const res = await fetchWithTimeout(url);
+  if (!res.ok) {
+    const json = await res.json().catch(() => ({}));
+    throw new Error(json.error || `HTTP ${res.status}`);
+  }
+  const r = await res.json();
+  return {
+    id: r.id ?? 0,
+    patientName: r.patient_name || '',
+    patientAge: r.patient_age ?? null,
+    bloodGroup: r.blood_group || '',
+    unitsNeeded: r.units_needed ?? 1,
+    donatedUnits: r.donated_units ?? 0,
+    urgencyLevel: r.urgency_level || 'normal',
+    whenNeeded: r.when_needed || 'today',
+    neededDate: r.needed_date ?? null,
+    neededTime: r.needed_time ?? null,
+    district: r.district || '',
+    upazila: r.upazila || '',
+    hospitalName: r.hospital_name || '',
+    hospitalAddress: r.hospital_address ?? null,
+    contactNumber: r.contact_number || r.phone || '',
+    alternativeNumber: r.alternative_number ?? null,
+    whatsappNumber: r.whatsapp_number ?? null,
+    reason: r.reason ?? null,
+    patientHbLevel: r.patient_hb_level ?? null,
+    status: r.status || 'active',
+    currentStatus: r.current_status || 'submitted',
+    trackingCode: r.tracking_code ?? null,
+    donorId: r.donor_id ?? null,
+    createdAt: r.created_at ?? '',
+    donatedAt: r.donated_at ?? null,
+    fulfilledAt: r.fulfilled_at ?? null,
+    lat: r.lat ?? null,
+    lng: r.lng ?? null,
+    viewCount: r.view_count ?? 0,
+  };
+}
+
+export async function fetchRequestById(id: number): Promise<RequestDetail> {
+  return fetchRequestFromUrl(`${API_BASE_URL}/api/requests/${id}`);
+}
+
+export async function fetchRequestByTrackingCode(code: string): Promise<RequestDetail> {
+  return fetchRequestFromUrl(`${API_BASE_URL}/api/requests/track?code=${encodeURIComponent(code)}`);
 }

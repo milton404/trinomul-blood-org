@@ -1,23 +1,34 @@
 {
   "expo": {
-    "name": "mobile-app",
-    "slug": "mobile-app",
+    "name": "Trinomul Blood Bank",
+    "slug": "trinomul-blood-bank",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobileapp",
+    "scheme": "trinomul",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "org.trinomul.bloodbank",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Your location is used to find blood donors and requests near you.",
+        "NSCameraUsageDescription": "The camera is used to scan QR codes on blood request cards."
+      }
     },
     "android": {
+      "package": "org.trinomul.bloodbank",
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#dc2626",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "CAMERA"
+      ]
     },
     "web": {
       "output": "static",
@@ -28,15 +39,30 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#dc2626",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Your location is used to find blood donors and requests near you."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "The camera is used to scan QR codes on blood request cards."
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": false
+    },
+    "extra": {
+      "apiUrl": "https://trinomul.vercel.app"
     }
   }
 }

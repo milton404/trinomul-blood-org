@@ -9,6 +9,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -28,10 +29,13 @@ import {
   fetchCurrentUser,
   logout,
   submitDonorRegistration,
+  requestPasswordReset,
+  resetPassword,
+  setDonorAvailability,
   type AuthUser,
 } from '@/lib/api';
 
-type Tab = 'login' | 'signup' | 'register' | 'profile';
+type Tab = 'login' | 'signup' | 'register' | 'profile' | 'forgot';
 
 const BG_OPTIONS = BLOOD_GROUPS.map((bg) => ({ value: bg, label: bg }));
 const DISTRICT_OPTIONS = DISTRICTS.map((d) => ({ value: d.id, label: d.name }));
@@ -53,6 +57,16 @@ export default function ProfileScreen() {
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loginLoading, setLoginLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotStep, setForgotStep] = useState<1 | 2>(1);
+  const [forgotToken, setForgotToken] = useState('');
+  const [forgotNewPassword, setForgotNewPassword] = useState('');
+  const [forgotMessage, setForgotMessage] = useState<string | null>(null);
+  const [forgotError, setForgotError] = useState<string | null>(null);
+  const [forgotLoading, setForgotLoading] = useState(false);
+
+  const [availabilityUpdating, setAvailabilityUpdating] = useState(false);
 
   const [signupEmail, setSignupEmail] = useState('');
   const [signupPassword, setSignupPassword] = useState('');
@@ -163,6 +177,63 @@ export default function ProfileScreen() {
     setTab('login');
     setLoginEmail('');
     setLoginPassword('');
+  };
+
+  const handleRequestReset = async () => {
+    if (!forgotEmail.trim()) {
+      setForgotError('Please enter your email or phone');
+      return;
+    }
+    setForgotLoading(true);
+    setForgotError(null);
+    try {
+      const result = await requestPasswordReset(forgotEmail.trim());
+      setForgotStep(2);
+      if (result.devToken) setForgotToken(result.devToken);
+      setForgotMessage(Strings.resetSentHint);
+    } catch (err: any) {
+      setForgotError(err?.message || Strings.submitError);
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleCompleteReset = async () => {
+    if (!forgotToken.trim() || forgotNewPassword.length < 6) {
+      setForgotError('Paste the reset token and use at least 6 characters');
+      return;
+    }
+    setForgotLoading(true);
+    setForgotError(null);
+    try {
+      await resetPassword(forgotToken.trim(), forgotNewPassword);
+      setForgotMessage(Strings.resetSuccessHint);
+      setForgotToken('');
+      setForgotNewPassword('');
+      setTimeout(() => {
+        setTab('login');
+        setForgotStep(1);
+        setForgotEmail('');
+        setForgotMessage(null);
+      }, 1500);
+    } catch (err: any) {
+      setForgotError(err?.message || Strings.submitError);
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleToggleAvailability = async (next: boolean) => {
+    if (!user || availabilityUpdating) return;
+    setAvailabilityUpdating(true);
+    try {
+      const result = await setDonorAvailability(next);
+      if (result.user) setUser({ ...user, is_active: result.user.is_active });
+    } catch {
+      // keep previous state on failure
+    } finally {
+      setAvailabilityUpdating(false);
+    }
   };
 
   const handleBecomeDonor = async () => {
@@ -293,7 +364,13 @@ export default function ProfileScreen() {
         keyboardShouldPersistTaps="handled">
 
         {tab === 'profile' && user && (
-          <ProfileView user={user} onLogout={handleLogout} onCopyPhone={copyPhone} />
+          <ProfileView
+            user={user}
+            onLogout={handleLogout}
+            onCopyPhone={copyPhone}
+            onToggleAvailability={handleToggleAvailability}
+            availabilityUpdating={availabilityUpdating}
+          />
         )}
 
         {tab === 'login' && !user && (
@@ -352,10 +429,103 @@ export default function ProfileScreen() {
               )}
             </Pressable>
 
+            <Pressable onPress={() => setTab('forgot')} style={styles.forgotLink} hitSlop={6}>
+              <Text style={styles.forgotLinkText}>{Strings.forgotPassword}</Text>
+            </Pressable>
+
             <View style={styles.switchRow}>
               <Text style={styles.switchText}>{Strings.dontHaveAccount}</Text>
               <Pressable onPress={() => setTab('signup')}>
                 <Text style={styles.switchLink}>{Strings.signup}</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+
+        {tab === 'forgot' && !user && (
+          <View style={styles.formCard}>
+            <Text style={styles.formTitle}>{Strings.forgotPasswordTitle}</Text>
+            <Text style={styles.formSubtitle}>{Strings.forgotPasswordSubtitle}</Text>
+
+            {forgotStep === 1 && (
+              <View style={styles.field}>
+                <Text style={styles.label}>{Strings.email}</Text>
+                <TextInput
+                  value={forgotEmail}
+                  onChangeText={setForgotEmail}
+                  placeholder="e.g. abdul@email.com"
+                  placeholderTextColor="#94a3b8"
+                  style={styles.input}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
+            )}
+
+            {forgotStep === 2 && (
+              <>
+                <View style={styles.successNote}>
+                  <Text style={styles.successNoteTitle}>{Strings.resetSent}</Text>
+                  <Text style={styles.successNoteText}>{forgotMessage}</Text>
+                </View>
+                <View style={styles.field}>
+                  <Text style={styles.label}>{Strings.resetToken}</Text>
+                  <TextInput
+                    value={forgotToken}
+                    onChangeText={setForgotToken}
+                    placeholder={Strings.resetTokenPlaceholder}
+                    placeholderTextColor="#94a3b8"
+                    style={styles.input}
+                    autoCapitalize="none"
+                  />
+                </View>
+                <View style={styles.field}>
+                  <Text style={styles.label}>{Strings.newPassword}</Text>
+                  <TextInput
+                    value={forgotNewPassword}
+                    onChangeText={setForgotNewPassword}
+                    placeholder="At least 6 characters"
+                    placeholderTextColor="#94a3b8"
+                    style={styles.input}
+                    secureTextEntry
+                  />
+                </View>
+              </>
+            )}
+
+            {forgotError && (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>{forgotError}</Text>
+              </View>
+            )}
+
+            {forgotStep === 1 ? (
+              <Pressable
+                onPress={handleRequestReset}
+                disabled={forgotLoading}
+                style={({ pressed }) => [styles.submitBtn, pressed && styles.pressed]}>
+                {forgotLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.submitBtnText}>{Strings.sendResetLink}</Text>
+                )}
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={handleCompleteReset}
+                disabled={forgotLoading}
+                style={({ pressed }) => [styles.submitBtn, pressed && styles.pressed]}>
+                {forgotLoading ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.submitBtnText}>{Strings.completeReset}</Text>
+                )}
+              </Pressable>
+            )}
+
+            <View style={styles.switchRow}>
+              <Pressable onPress={() => { setTab('login'); setForgotStep(1); setForgotMessage(null); setForgotError(null); }}>
+                <Text style={styles.switchLink}>{Strings.backToLogin}</Text>
               </Pressable>
             </View>
           </View>
@@ -495,8 +665,26 @@ export default function ProfileScreen() {
   );
 }
 
-function ProfileView({ user, onLogout, onCopyPhone }: { user: AuthUser; onLogout: () => void; onCopyPhone: () => void }) {
+function ProfileView({
+  user,
+  onLogout,
+  onCopyPhone,
+  onToggleAvailability,
+  availabilityUpdating,
+}: {
+  user: AuthUser;
+  onLogout: () => void;
+  onCopyPhone: () => void;
+  onToggleAvailability: (next: boolean) => void;
+  availabilityUpdating: boolean;
+}) {
   const initials = (user.full_name_en || user.email).split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('');
+  const isAvailable = user.is_active === 1;
+
+  const quickLinks = [
+    { key: 'donations', label: Strings.myDonations, href: '/donations', icon: { ios: 'drop.circle', android: 'bloodtype', web: 'water_drop' } },
+    { key: 'notifications', label: Strings.notificationsNav, href: '/notifications', icon: { ios: 'bell.fill', android: 'notifications', web: 'notifications' } },
+  ] as const;
 
   const infoRows = [
     { label: 'Email', value: user.email },
@@ -529,6 +717,36 @@ function ProfileView({ user, onLogout, onCopyPhone }: { user: AuthUser; onLogout
           <Text style={styles.bloodGroupBadgeText}>{user.blood_group}</Text>
         </View>
       )}
+
+      {user.blood_group && (
+        <View style={styles.availabilityRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.availabilityTitle}>{Strings.availabilityTitle}</Text>
+            <Text style={[styles.availabilityState, { color: isAvailable ? '#16a34a' : '#64748b' }]}>
+              {isAvailable ? Strings.availabilityOn : Strings.availabilityOff}
+            </Text>
+          </View>
+          <Switch
+            value={isAvailable}
+            onValueChange={onToggleAvailability}
+            disabled={availabilityUpdating}
+            trackColor={{ false: '#cbd5e1', true: '#16a34a' }}
+            thumbColor="#fff"
+          />
+        </View>
+      )}
+
+      <View style={styles.quickLinksRow}>
+        {quickLinks.map((link) => (
+          <Pressable
+            key={link.key}
+            onPress={() => router.push(link.href as never)}
+            style={({ pressed }) => [styles.quickLinkBtn, pressed && styles.pressed]}>
+            <SymbolView name={link.icon as never} size={20} tintColor={Brand.red} />
+            <Text style={styles.quickLinkText}>{link.label}</Text>
+          </Pressable>
+        ))}
+      </View>
 
       <View style={styles.infoGrid}>
         {infoRows.map((row, i) => (
@@ -956,6 +1174,75 @@ const styles = StyleSheet.create({
   },
   tabBtnTextActive: {
     color: '#fff',
+  },
+
+  forgotLink: {
+    alignItems: 'center',
+    paddingVertical: Spacing.one,
+  },
+  forgotLinkText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Brand.red,
+  },
+  successNote: {
+    backgroundColor: '#f0fdf4',
+    borderWidth: 1,
+    borderColor: '#bbf7d0',
+    borderRadius: 12,
+    padding: Spacing.three,
+    gap: 4,
+  },
+  successNoteTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#15803d',
+  },
+  successNoteText: {
+    fontSize: 13,
+    color: '#166534',
+    lineHeight: 19,
+  },
+  availabilityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+    borderRadius: 14,
+    padding: Spacing.three,
+    gap: Spacing.two,
+  },
+  availabilityTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#0f172a',
+  },
+  availabilityState: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  quickLinksRow: {
+    flexDirection: 'row',
+    gap: Spacing.two,
+  },
+  quickLinkBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: '#fef2f2',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  quickLinkText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Brand.red,
   },
 
   formCard: {

@@ -1,3 +1,4 @@
+import { router } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -16,7 +17,8 @@ import { BloodDrop } from '@/components/blood-drop';
 import { DonorCard, type DonorCardData } from '@/components/donor-card';
 import { SelectDropdown } from '@/components/select-dropdown';
 import { Brand } from '@/constants/brand';
-import { BLOOD_GROUPS, DISTRICTS } from '@/constants/data';
+import { BLOOD_GROUPS, DISTRICTS, getUpazilasByDistrict } from '@/constants/data';
+import { getUnionsByUpazila } from '@/constants/unions';
 import { Strings } from '@/constants/strings';
 import { BottomTabInset, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -33,6 +35,8 @@ export default function DonorsScreen() {
   const theme = useTheme();
   const [selectedGroup, setSelectedGroup] = useState<string>(ALL_CHIP);
   const [selectedDistrict, setSelectedDistrict] = useState('');
+  const [selectedUpazila, setSelectedUpazila] = useState('');
+  const [selectedUnion, setSelectedUnion] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortByProximity, setSortByProximity] = useState(false);
 
@@ -42,6 +46,27 @@ export default function DonorsScreen() {
   const [isCached, setIsCached] = useState(false);
 
   const { location, isLocating, error: locationError, requestLocation } = useUserLocation();
+
+  const upazilaOptions = selectedDistrict
+    ? getUpazilasByDistrict(selectedDistrict).map((u) => ({ value: u.id, label: u.name }))
+    : [];
+  const unionOptions = selectedUpazila
+    ? getUnionsByUpazila(selectedUpazila).map((u) => ({ value: u.id, label: u.name_en }))
+    : [];
+
+  const handleDistrictChange = (val: string) => {
+    setSelectedDistrict(val);
+    setSelectedUpazila('');
+    setSelectedUnion('');
+  };
+  const handleUpazilaChange = (val: string) => {
+    setSelectedUpazila(val);
+    setSelectedUnion('');
+  };
+
+  const selectedUnionName = selectedUnion
+    ? getUnionsByUpazila(selectedUpazila).find((u) => u.id === selectedUnion)?.name_en ?? null
+    : null;
 
   useEffect(() => {
     let cancelled = false;
@@ -72,6 +97,8 @@ export default function DonorsScreen() {
     const results: DonorCardData[] = allDonors.filter((d) => {
       const matchesGroup = selectedGroup === ALL_CHIP || d.bloodGroup === selectedGroup;
       const matchesDistrict = !selectedDistrict || d.districtId === selectedDistrict;
+      const matchesUpazila = !selectedUpazila || d.upazilaId === selectedUpazila;
+      const matchesUnion = !selectedUnionName || d.unionName === selectedUnionName;
 
       let matchesSearch = true;
       if (q) {
@@ -85,7 +112,7 @@ export default function DonorsScreen() {
           (qDigits.length >= 3 && phone.includes(qDigits));
       }
 
-      return matchesGroup && matchesDistrict && matchesSearch;
+      return matchesGroup && matchesDistrict && matchesUpazila && matchesUnion && matchesSearch;
     }).map((d) => {
       let distanceKm: number | null = null;
       if (useProximity && location && d.lat != null && d.lng != null) {
@@ -123,7 +150,7 @@ export default function DonorsScreen() {
     }
 
     return results;
-  }, [allDonors, selectedGroup, selectedDistrict, searchQuery, sortByProximity, location]);
+  }, [allDonors, selectedGroup, selectedDistrict, selectedUpazila, selectedUnionName, searchQuery, sortByProximity, location]);
 
   const renderChip = (chip: string) => {
     const isActive = chip === selectedGroup;
@@ -139,7 +166,7 @@ export default function DonorsScreen() {
   };
 
   const renderDonor = ({ item }: { item: DonorCardData }) => (
-    <DonorCard donor={item} />
+    <DonorCard donor={item} onPress={() => router.push({ pathname: '/donor-details', params: { id: String(item.id) } } as never)} />
   );
 
   return (
@@ -170,7 +197,7 @@ export default function DonorsScreen() {
             <SelectDropdown
               value={selectedDistrict}
               options={DISTRICT_OPTIONS}
-              onChange={setSelectedDistrict}
+              onChange={handleDistrictChange}
               placeholder={Strings.filterByDistrict}
               label={Strings.district}
               searchable
@@ -197,6 +224,33 @@ export default function DonorsScreen() {
               {isLocating ? Strings.locating : sortByProximity ? Strings.nearMeActive : Strings.nearMe}
             </Text>
           </Pressable>
+        </View>
+
+        <View style={styles.filterRow}>
+          <View style={{ flex: 1 }}>
+            <SelectDropdown
+              value={selectedUpazila}
+              options={upazilaOptions}
+              onChange={handleUpazilaChange}
+              placeholder={Strings.filterByUpazila}
+              label={Strings.upazila}
+              disabled={!selectedDistrict}
+              searchable
+              searchPlaceholder="Search upazila…"
+            />
+          </View>
+          <View style={{ flex: 1 }}>
+            <SelectDropdown
+              value={selectedUnion}
+              options={unionOptions}
+              onChange={setSelectedUnion}
+              placeholder={Strings.filterByUnion}
+              label={Strings.unionLabel}
+              disabled={!selectedUpazila}
+              searchable
+              searchPlaceholder="Search union…"
+            />
+          </View>
         </View>
 
         <View style={styles.searchInputWrap}>

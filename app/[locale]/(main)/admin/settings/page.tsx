@@ -10,8 +10,8 @@ import {
   Save,
   Loader2,
   Shield,
-  Facebook,
 } from "lucide-react";
+import { Facebook } from "@/components/ui/brand-icons";
 import { toast } from "sonner";
 import { serverGetSiteSettings, serverUpdateSiteSettings } from "@/lib/db-actions";
 

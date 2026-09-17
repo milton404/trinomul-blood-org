@@ -2,7 +2,7 @@
 
 import { useTranslations, useLocale } from "next-intl";
 import { Link } from "@/i18n/routing";
-import { Facebook } from "lucide-react";
+import { Facebook } from "@/components/ui/brand-icons";
 
 export default function Footer() {
   const t = useTranslations("common");

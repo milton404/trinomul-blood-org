@@ -31,25 +31,32 @@ export default function ScannerScreen() {
     setScanned(true);
     setScanResult(code);
 
-    // Parse QR code content
-    // Format: /donors?donor=123 or /track/REQ-AB12CD
-    if (code.includes('/donors?donor=')) {
-      const donorId = code.split('donor=')[1]?.split('&')[0];
-      if (donorId) {
-        router.push('/donors' as never);
+    const trimmed = code.trim();
+
+    if (trimmed.includes('/donors?donor=') || trimmed.includes('donor=')) {
+      const donorId = trimmed.split('donor=')[1]?.split(/[&\s]/)[0];
+      if (donorId && /^\d+$/.test(donorId)) {
+        router.push({ pathname: '/donor-details', params: { id: donorId } } as never);
+        return;
       }
-    } else if (code.includes('/track/')) {
-      const trackingCode = code.split('/track/')[1]?.split('?')[0];
+    }
+
+    if (trimmed.includes('/track/') || /^(TRB|REQ)-/i.test(trimmed)) {
+      const trackingCode = trimmed.includes('/track/')
+        ? trimmed.split('/track/')[1]?.split(/[?\s]/)[0]
+        : trimmed;
       if (trackingCode) {
-        router.push('/requests' as never);
+        router.push({ pathname: '/request-details', params: { code: trackingCode.toUpperCase() } } as never);
+        return;
       }
-    } else if (code.startsWith('http')) {
-      // Handle any URL
-      Alert.alert('QR Code Scanned', code, [
+    }
+
+    if (trimmed.startsWith('http')) {
+      Alert.alert('QR Code Scanned', trimmed, [
         { text: 'OK', onPress: () => setScanned(false) },
       ]);
     } else {
-      Alert.alert('QR Code Scanned', code, [
+      Alert.alert('Unrecognized Code', trimmed, [
         { text: 'OK', onPress: () => setScanned(false) },
       ]);
     }

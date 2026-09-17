@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Phone, Mail, Facebook, MapPin, Clock, Send, Loader2 } from 'lucide-react';
+import { Phone, Mail, MapPin, Clock, Send, Loader2 } from 'lucide-react';
+import { Facebook } from "@/components/ui/brand-icons";
 import { toast } from 'sonner';
 import Navbar from '@/components/common/Navbar';
 import Footer from '@/components/common/Footer';
