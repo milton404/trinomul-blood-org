@@ -47,6 +47,7 @@ import RequestShareImage from "./RequestShareImage";
 import BengaliShareImage from "./BengaliShareImage";
 
 import { useClientSide } from "@/lib/hooks/useClientSide";
+import { useAuthStore } from "@/store/authStore";
 
 const QR_GRADIENTS: { stops: [number, number, number][] }[] = [
   { stops: [[16, 185, 129], [20, 184, 166], [220, 38, 38]] },     // emerald → teal → red
@@ -196,6 +197,7 @@ export default function RequestCard({ request }: RequestCardProps) {
   const locale = useLocale();
   const isBn = locale === "bn";
   const isClient = useClientSide();
+  const { user } = useAuthStore();
   const [showRecordModal, setShowRecordModal] = useState(false);
   const [donorSearch, setDonorSearch] = useState("");
   const [donors, setDonors] = useState<any[]>([]);
@@ -997,7 +999,7 @@ whatsapp_number: request.whatsapp_number || null,
                 <Navigation className="w-3 h-3" />
                 <span className="leading-none">{tMap("get_directions")}</span>
               </a>
-            ) : !request.canNavigate && (hasCoords || hospitalText) ? (
+            ) : !user && !request.canNavigate && (hasCoords || hospitalText) ? (
               <a
                 href={`/${locale}/login`}
                 className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-amber-200 bg-amber-50 text-[11px] font-semibold text-amber-700 hover:text-amber-800 hover:bg-amber-100 hover:border-amber-300 transition-colors"

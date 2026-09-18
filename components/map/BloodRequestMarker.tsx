@@ -5,6 +5,7 @@ import { Marker, Popup, Tooltip } from "react-leaflet";
 import L from "leaflet";
 import { useTranslations, useLocale } from "next-intl";
 import { formatWhenNeededDynamic } from "@/lib/utils/when-needed";
+import { useAuthStore } from "@/store/authStore";
 
 export interface BloodRequestMarkerData {
   id?: number;
@@ -69,6 +70,7 @@ export default function BloodRequestMarker({
 }) {
   const t = useTranslations("map");
   const locale = useLocale();
+  const { user } = useAuthStore();
   const markerRef = useRef<L.Marker | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -231,7 +233,7 @@ export default function BloodRequestMarker({
               >
                 🗺️ {t("get_directions")}
               </a>
-            ) : (
+            ) : !user ? (
               <a
                 href={`/${locale}/login`}
                 className="flex-1 text-center text-[10px] sm:text-[11px] font-bold py-1.5 rounded-md bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-200 transition-all"
@@ -239,7 +241,7 @@ export default function BloodRequestMarker({
               >
                 🔒 {locale === "bn" ? "যাচাই" : "Verify"}
               </a>
-            )}
+            ) : null}
           </div>
         </div>
       </Popup>
