@@ -23,6 +23,8 @@ export interface BloodRequestMarkerData {
   created_at?: string;
   contact_number?: string;
   phone?: string;
+  /** Set server-side by the privacy gate — only verified donors/admins get true. */
+  canNavigate?: boolean;
 }
 
 // Blood-request pins use red/orange to convey urgency — easy to spot on the map.
@@ -91,7 +93,10 @@ export default function BloodRequestMarker({
   }, [request.blood_group]);
 
   const phone = request.contact_number || request.phone;
-  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${request.lat},${request.lng}`;
+  const canNavigate = request.canNavigate !== false;
+  const directionsUrl = canNavigate
+    ? `https://www.google.com/maps/dir/?api=1&destination=${request.lat},${request.lng}`
+    : null;
   const locationLabel = [request.upazila, request.district]
     .filter(Boolean)
     .join(", ");
@@ -133,36 +138,38 @@ export default function BloodRequestMarker({
         mouseout: handleMouseLeave,
       }}
     >
-      <Tooltip
-        direction="top"
-        offset={[0, -30]}
-        opacity={1}
-        permanent
-        className="direction-tooltip"
-      >
-        <a
-          href={directionsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={(e) => e.stopPropagation()}
-          className="inline-flex items-center gap-0.5 px-2 py-1 text-[10px] font-bold rounded-full text-white hover:opacity-90 transition-colors whitespace-nowrap"
-          title="Navigate with Google Maps"
-          style={{ pointerEvents: "auto", background: "#4285F4" }}
+      {canNavigate && (
+        <Tooltip
+          direction="top"
+          offset={[0, -30]}
+          opacity={1}
+          permanent
+          className="direction-tooltip"
         >
-          <svg
-            width="10"
-            height="10"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+          <a
+            href={directionsUrl!}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="inline-flex items-center gap-0.5 px-2 py-1 text-[10px] font-bold rounded-full text-white hover:opacity-90 transition-colors whitespace-nowrap"
+            title="Navigate with Google Maps"
+            style={{ pointerEvents: "auto", background: "#4285F4" }}
           >
-            <polygon points="3 11 22 2 13 21 11 13 3 11" />
-          </svg>
-        </a>
-      </Tooltip>
+            <svg
+              width="10"
+              height="10"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polygon points="3 11 22 2 13 21 11 13 3 11" />
+            </svg>
+          </a>
+        </Tooltip>
+      )}
       <Popup className="custom-popup" autoPan={false}>
         <div
           onMouseEnter={handlePopupMouseEnter}
@@ -215,14 +222,24 @@ export default function BloodRequestMarker({
                 📞 {t("call_now")}
               </a>
             )}
-            <a
-              href={directionsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex-1 text-center text-[10px] sm:text-[11px] font-bold py-1.5 rounded-md bg-blue-100 text-blue-800 hover:bg-blue-200 border border-blue-200 transition-all"
-            >
-              🗺️ {t("get_directions")}
-            </a>
+            {canNavigate ? (
+              <a
+                href={directionsUrl!}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 text-center text-[10px] sm:text-[11px] font-bold py-1.5 rounded-md bg-blue-100 text-blue-800 hover:bg-blue-200 border border-blue-200 transition-all"
+              >
+                🗺️ {t("get_directions")}
+              </a>
+            ) : (
+              <a
+                href={`/${locale}/login`}
+                className="flex-1 text-center text-[10px] sm:text-[11px] font-bold py-1.5 rounded-md bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-200 transition-all"
+                title={locale === "bn" ? "যাচাইকৃত দাতা হিসেবে লগইন করুন" : "Log in as a verified donor to navigate"}
+              >
+                🔒 {locale === "bn" ? "যাচাই" : "Verify"}
+              </a>
+            )}
           </div>
         </div>
       </Popup>

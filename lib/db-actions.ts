@@ -144,6 +144,8 @@ import {
   districtMatchValues,
 } from "./auth/permissions";
 import { getSession } from "./auth/session";
+import { getApprovedDonorView } from "./auth/approved-donor";
+import { coarsenRequestCoords, coarsenRequestCoordsOrNull } from "./privacy/request-coords";
 import {
   checkRateLimit,
   recordFailedAttempt,
@@ -806,8 +808,12 @@ export async function serverSetAdminAssignment(
 
 // Blood Request actions
 export async function serverGetActiveBloodRequests(limit?: number) {
-  if (isSupabaseAvailable()) return getActiveBloodRequestsPg(limit);
-  return getActiveBloodRequests(limit);
+  const rows = isSupabaseAvailable()
+    ? await getActiveBloodRequestsPg(limit)
+    : getActiveBloodRequests(limit);
+  // Privacy gate: exact coords only for verified donors / admins.
+  const { canSeeExactCoords } = await getApprovedDonorView();
+  return rows.map((r: any) => coarsenRequestCoords(r, canSeeExactCoords));
 }
 
 export async function serverGetAllBloodRequests() {
@@ -1510,13 +1516,21 @@ export async function serverGetStatusLogs(requestId: number) {
 }
 
 export async function serverGetBloodRequestByTrackingCode(code: string) {
-  if (isSupabaseAvailable()) return getBloodRequestByTrackingCodePg(code);
-  return getBloodRequestByTrackingCode(code);
+  const req = isSupabaseAvailable()
+    ? await getBloodRequestByTrackingCodePg(code)
+    : getBloodRequestByTrackingCode(code);
+  // Privacy gate: exact coords only for verified donors / admins.
+  const { canSeeExactCoords } = await getApprovedDonorView();
+  return coarsenRequestCoordsOrNull(req as any, canSeeExactCoords);
 }
 
 export async function serverGetBloodRequestById(id: number) {
-  if (isSupabaseAvailable()) return getBloodRequestByIdPg(id);
-  return getBloodRequestById(id);
+  const req = isSupabaseAvailable()
+    ? await getBloodRequestByIdPg(id)
+    : getBloodRequestById(id);
+  // Privacy gate: exact coords only for verified donors / admins.
+  const { canSeeExactCoords } = await getApprovedDonorView();
+  return coarsenRequestCoordsOrNull(req as any, canSeeExactCoords);
 }
 
 /**

@@ -10,6 +10,8 @@ import {
   createBloodRequestPg,
   getBloodRequestByIdPg,
 } from "@/lib/pg/requests";
+import { getApprovedDonorView } from "@/lib/auth/approved-donor";
+import { coarsenRequestCoords } from "@/lib/privacy/request-coords";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +23,14 @@ export async function GET() {
     const requests = isSupabaseAvailable()
       ? await getVisibleBloodRequestsPg()
       : getVisibleBloodRequests();
-    return NextResponse.json(requests);
+
+    // Privacy gate: exact hospital coords only for verified donors / admins.
+    // Everyone else gets the upazila centroid + canNavigate=false.
+    const { canSeeExactCoords } = await getApprovedDonorView();
+    const shaped = requests.map((r: any) =>
+      coarsenRequestCoords(r, canSeeExactCoords),
+    );
+    return NextResponse.json(shaped);
   } catch (err: any) {
     if (err?.message?.startsWith("Too many requests")) {
       return NextResponse.json({ error: err.message }, { status: 429 });

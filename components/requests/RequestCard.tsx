@@ -24,6 +24,7 @@ import {
   Check,
   Share2,
   Download,
+  Shield,
 
   Link2,
   Eye,
@@ -154,6 +155,8 @@ interface RequestCardProps {
     view_count?: number | null;
     patient_hb_level?: number | null;
     donated_units?: number | null;
+    /** Set server-side by the privacy gate — only verified donors/admins get true. */
+    canNavigate?: boolean;
   };
 }
 
@@ -984,7 +987,7 @@ whatsapp_number: request.whatsapp_number || null,
               </span>
             )}
 
-            {directionsUrl && (
+            {directionsUrl && request.canNavigate ? (
               <a
                 href={directionsUrl!}
                 target="_blank"
@@ -994,7 +997,16 @@ whatsapp_number: request.whatsapp_number || null,
                 <Navigation className="w-3 h-3" />
                 <span className="leading-none">{tMap("get_directions")}</span>
               </a>
-            )}
+            ) : !request.canNavigate && (hasCoords || hospitalText) ? (
+              <a
+                href={`/${locale}/login`}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-md border border-amber-200 bg-amber-50 text-[11px] font-semibold text-amber-700 hover:text-amber-800 hover:bg-amber-100 hover:border-amber-300 transition-colors"
+                title={isBn ? "যাচাইকৃত দাতা হিসেবে লগইন করুন" : "Log in as a verified donor to navigate"}
+              >
+                <Shield className="w-3 h-3" />
+                <span className="leading-none">{isBn ? "নেভিগেট করতে যাচাই" : "Verify to navigate"}</span>
+              </a>
+            ) : null}
 
             {trackingUrl && (
               <a
