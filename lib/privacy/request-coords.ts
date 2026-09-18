@@ -36,6 +36,8 @@ export function coarsenRequestCoords<T extends Record<string, any>>(
     ...req,
     lat: centroid ? centroid.lat : null,
     lng: centroid ? centroid.lng : null,
+    hospital_name: null,
+    hospital_address: null,
     canNavigate: false,
   };
 }
