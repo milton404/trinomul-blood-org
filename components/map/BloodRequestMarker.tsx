@@ -5,7 +5,7 @@ import { Marker, Popup, Tooltip } from "react-leaflet";
 import L from "leaflet";
 import { useTranslations, useLocale } from "next-intl";
 import { formatWhenNeededDynamic } from "@/lib/utils/when-needed";
-import { useAuthStore } from "@/store/authStore";
+
 
 export interface BloodRequestMarkerData {
   id?: number;
@@ -70,7 +70,7 @@ export default function BloodRequestMarker({
 }) {
   const t = useTranslations("map");
   const locale = useLocale();
-  const { user } = useAuthStore();
+
   const markerRef = useRef<L.Marker | null>(null);
   const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -96,7 +96,8 @@ export default function BloodRequestMarker({
 
   const phone = request.contact_number || request.phone;
   const canNavigate = request.canNavigate !== false;
-  const directionsUrl = canNavigate
+  const hasCoords = request.lat != null && request.lng != null;
+  const directionsUrl = hasCoords
     ? `https://www.google.com/maps/dir/?api=1&destination=${request.lat},${request.lng}`
     : null;
   const locationLabel = [request.upazila, request.district]
@@ -224,7 +225,7 @@ export default function BloodRequestMarker({
                 📞 {t("call_now")}
               </a>
             )}
-            {canNavigate ? (
+            {directionsUrl ? (
               <a
                 href={directionsUrl!}
                 target="_blank"
@@ -232,14 +233,6 @@ export default function BloodRequestMarker({
                 className="flex-1 text-center text-[10px] sm:text-[11px] font-bold py-1.5 rounded-md bg-blue-100 text-blue-800 hover:bg-blue-200 border border-blue-200 transition-all"
               >
                 🗺️ {t("get_directions")}
-              </a>
-            ) : !user ? (
-              <a
-                href={`/${locale}/login`}
-                className="flex-1 text-center text-[10px] sm:text-[11px] font-bold py-1.5 rounded-md bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-200 transition-all"
-                title={locale === "bn" ? "যাচাইকৃত দাতা হিসেবে লগইন করুন" : "Log in as a verified donor to navigate"}
-              >
-                🔒 {locale === "bn" ? "যাচাই" : "Verify"}
               </a>
             ) : null}
           </div>
