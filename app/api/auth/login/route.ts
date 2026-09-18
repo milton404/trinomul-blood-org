@@ -19,13 +19,13 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Password is required" }, { status: 400 });
       }
 
-      try {
-        // serverLogin handles verification + sets session cookie
-        const result = await serverLogin(loginId, pwd, false);
-        return NextResponse.json({ user: result.user, token: result.token });
-      } catch (err: any) {
-        return NextResponse.json({ error: err.message || "Login failed" }, { status: 401 });
+      // serverLogin returns a result union (never throws) so specific error
+      // messages (wrong password, rate limit) survive to the client.
+      const result = await serverLogin(loginId, pwd, false);
+      if (!result.ok) {
+        return NextResponse.json({ error: result.error }, { status: 401 });
       }
+      return NextResponse.json({ user: result.user, token: result.token });
     }
 
     // Signup path (create new donor account via mobile)

@@ -80,12 +80,19 @@ export default function AdminLoginForm() {
       const expectedAdminScope: "any" | "full" | "district" =
         loginScope === "" ? "any" : loginScope;
 
-      const { user, redirectTo } = await serverLogin(
+      const result = await serverLogin(
         values.identifier,
         values.password,
         rememberMe,
         expectedAdminScope,
       );
+
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
+
+      const { user, redirectTo } = result;
 
       // Reject non-admin roles on the admin login page (belt-and-braces:
       // serverLogin with expectedAdminScope !== 'any' already enforces this).

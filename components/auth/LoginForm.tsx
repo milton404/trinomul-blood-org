@@ -36,6 +36,7 @@ export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string>("");
+  const [formError, setFormError] = useState<string | null>(null);
 
   const {
     register,
@@ -67,13 +68,25 @@ export default function LoginForm() {
 
   const onSubmit = async (values: LoginFormValues) => {
     setIsLoading(true);
+    setFormError(null);
 
     try {
-      const { user, redirectTo } = await serverLogin(
+      const result = await serverLogin(
         values.identifier.trim(),
         values.password,
         rememberMe,
       );
+
+      // serverLogin returns a result union instead of throwing, so the
+      // specific reason (wrong password / rate limit / admin scope) survives
+      // Next.js's Server Action error digestion in production.
+      if (!result.ok) {
+        setFormError(result.error);
+        toast.error(result.error);
+        return;
+      }
+
+      const { user, redirectTo } = result;
 
       // Persist only the identifier for next time (no password).
       if (rememberMe) {
@@ -96,7 +109,9 @@ export default function LoginForm() {
       router.push(redirectParam || redirectTo);
     } catch (error: any) {
       console.error("Login error:", error);
-      toast.error(getErrorMessage(error));
+      const msg = getErrorMessage(error);
+      setFormError(msg);
+      toast.error(msg);
     } finally {
       setIsLoading(false);
     }
@@ -112,6 +127,15 @@ export default function LoginForm() {
         দান বা পরিচালনার কাজ চালিয়ে যান।
       </p>
       <hr className="border-slate-100 mb-6" />
+
+      {formError && (
+        <div
+          role="alert"
+          className="mb-4 rounded-xl border-l-4 border-red-500 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
+        >
+          {formError}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div>

@@ -96,7 +96,10 @@ export async function serverLogin(
    *  which admin scope is expected. 'any' means any admin (full, district,
    *  or super) is accepted — the default for backwards compatibility. */
   expectedAdminScope: "full" | "district" | "any" = "any",
-): Promise<{ user: AuthUser; redirectTo: string; token: string }> {
+): Promise<
+  | { ok: true; user: AuthUser; redirectTo: string; token: string }
+  | { ok: false; error: string }
+> {
   const trimmedIdentifier = identifier.trim();
   const key = `login:${trimmedIdentifier.toLowerCase()}`;
   const usePg = isSupabaseAvailable();
@@ -115,7 +118,7 @@ export async function serverLogin(
     const rl = rlRows[0];
     if (rl?.locked_until && rl.locked_until > now) {
       const waitMin = Math.ceil((rl.locked_until - now) / 60000);
-      throw new Error(`Too many attempts. Please try again in ${waitMin} minute(s).`);
+      return { ok: false, error: `Too many attempts. Please try again in ${waitMin} minute(s).` };
     }
     if (rl && now - rl.first_attempt_at <= 15 * 60 * 1000 && rl.attempt_count >= 5) {
       const lockedUntil = now + 15 * 60 * 1000;
@@ -124,7 +127,7 @@ export async function serverLogin(
         [lockedUntil, key],
       );
       const waitMin = Math.ceil((lockedUntil - now) / 60000);
-      throw new Error(`Too many attempts. Please try again in ${waitMin} minute(s).`);
+      return { ok: false, error: `Too many attempts. Please try again in ${waitMin} minute(s).` };
     }
   } else {
     const limit = await checkRateLimit(key);
@@ -132,9 +135,10 @@ export async function serverLogin(
       const waitMin = Math.ceil(
         ((limit.lockedUntil ?? limit.resetTime) - Date.now()) / 60000,
       );
-      throw new Error(
-        `Too many attempts. Please try again in ${waitMin} minute(s).`,
-      );
+      return {
+        ok: false,
+        error: `Too many attempts. Please try again in ${waitMin} minute(s).`,
+      };
     }
   }
 
@@ -159,14 +163,14 @@ export async function serverLogin(
   if (!profile) {
     if (usePg) await recordFailedAttemptPg(key);
     else await recordFailedAttempt(key);
-    throw new Error("Invalid credentials. Please check and try again.");
+    return { ok: false, error: "Invalid credentials. Please check and try again." };
   }
 
   const ok = await verifyPassword(password, profile.password_hash);
   if (!ok) {
     if (usePg) await recordFailedAttemptPg(key);
     else await recordFailedAttempt(key);
-    throw new Error("Invalid credentials. Please check and try again.");
+    return { ok: false, error: "Invalid credentials. Please check and try again." };
   }
 
   // Migrate legacy plaintext password to a bcrypt hash on next login.
@@ -185,7 +189,7 @@ export async function serverLogin(
   // ── Admin scope enforcement for the admin portal ────────────────────
   if (expectedAdminScope !== "any") {
     if (profile.role !== "super_admin" && profile.role !== "admin") {
-      throw new Error("This account is not authorized for admin login.");
+      return { ok: false, error: "This account is not authorized for admin login." };
     }
     if (expectedAdminScope === "district") {
       if (
@@ -193,9 +197,11 @@ export async function serverLogin(
         profile.role === "admin" &&
         !profile.assigned_district
       ) {
-        throw new Error(
-          "This account is a full admin, not a district (zila) admin. Please select 'Full Admin' to log in.",
-        );
+        return {
+          ok: false,
+          error:
+            "This account is a full admin, not a district (zila) admin. Please select 'Full Admin' to log in.",
+        };
       }
     } else if (expectedAdminScope === "full") {
       if (
@@ -203,9 +209,11 @@ export async function serverLogin(
         profile.role === "admin" &&
         profile.assigned_district
       ) {
-        throw new Error(
-          "This account is a district (zila) admin. Please select 'Zila Admin' to log in.",
-        );
+        return {
+          ok: false,
+          error:
+            "This account is a district (zila) admin. Please select 'Zila Admin' to log in.",
+        };
       }
     }
   }
@@ -228,7 +236,7 @@ export async function serverLogin(
       ? "/admin/dashboard"
       : "/profile";
 
-  return { user: profileToUser(profile), redirectTo, token };
+  return { ok: true, user: profileToUser(profile), redirectTo, token };
 }
 
 /**
