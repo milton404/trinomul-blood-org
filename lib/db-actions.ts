@@ -2820,8 +2820,11 @@ export async function serverGetAllDonorMatches(filters?: {
 
 /** Public feed: active + last-chance + recently-fulfilled (seal window). */
 export async function serverGetVisibleBloodRequests() {
-  if (isSupabaseAvailable()) return getVisibleBloodRequestsPg2();
-  return getVisibleBloodRequests();
+  const rows = isSupabaseAvailable()
+    ? await getVisibleBloodRequestsPg2()
+    : getVisibleBloodRequests();
+  const { canSeeExactCoords } = await getApprovedDonorView();
+  return rows.map((r: any) => coarsenRequestCoords(r, canSeeExactCoords));
 }
 
 /** Per-tab counts for the admin blood-requests page. */

@@ -17,8 +17,9 @@ import { Link } from '@/i18n/routing';
 import {
   serverGetBloodRequestById,
   serverGetBloodRequestByTrackingCode,
+  serverGetVisibleBloodRequests,
 } from '@/lib/db-actions';
-import { fetchRequestsData, fetchDonorsData } from '@/lib/public-reads';
+import { fetchDonorsData } from '@/lib/public-reads';
 import { serverParseSearchQuery } from '@/lib/ai/search-parser';
 import { RANGPUR_DISTRICTS, RANGPUR_UPAZILAS } from '@/lib/constants/rangpur';
 import {
@@ -410,6 +411,7 @@ export default function RequestsPage() {
     distance_km: r._distanceKm ?? null,
     view_count: r.view_count ?? 0,
     donated_units: r.donated_units ?? 0,
+    canNavigate: r.canNavigate,
   });
 
   const closeFocusedRequest = () => {
@@ -515,7 +517,7 @@ export default function RequestsPage() {
     setIsLoading(true);
     try {
       const [requestData, donorData] = await Promise.all([
-        fetchRequestsData().catch(() => []),
+        serverGetVisibleBloodRequests().catch(() => []),
         fetchDonorsData().catch(() => []),
       ]);
       setRequests(requestData);
