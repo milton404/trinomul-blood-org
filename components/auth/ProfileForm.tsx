@@ -89,6 +89,7 @@ const donorSchema = z.object({
   fullNameBn: z.string().min(2, "Name is required"),
   fullNameEn: z.string().min(2, "Name is required"),
   phone: z.string().min(10, "Valid phone number is required"),
+  email: z.string().email("Valid email is required").optional().or(z.literal("")),
   bloodGroup: z.string().min(1, "Blood group is required"),
   sex: z.string().optional(),
   district: z.string().optional(),
@@ -114,6 +115,7 @@ const patientSchema = z.object({
   fullNameBn: z.string().min(2, "Name is required"),
   fullNameEn: z.string().min(2, "Name is required"),
   phone: z.string().min(10, "Valid phone number is required"),
+  email: z.string().email("Valid email is required").optional().or(z.literal("")),
   bloodGroup: z.string().min(1, "Blood group is required"),
   district: z.string().min(1, "District is required"),
   upazila: z.string().optional(),
@@ -127,6 +129,7 @@ const hospitalSchema = z.object({
   hospitalNameBn: z.string().min(2, "Hospital name is required"),
   hospitalNameEn: z.string().min(2, "Hospital name is required"),
   phone: z.string().min(10, "Valid phone number is required"),
+  email: z.string().email("Valid email is required").optional().or(z.literal("")),
   district: z.string().min(1, "District is required"),
   upazila: z.string().optional(),
   union: z.string().optional(),
@@ -330,6 +333,7 @@ export default function ProfileForm() {
           fullNameBn: profile.full_name_bn || "",
           fullNameEn: profile.full_name_en || "",
           phone: profile.phone || "",
+          email: profile.email || "",
           bloodGroup: profile.blood_group || "",
           sex: profile.sex || "",
           district: profile.district || "",
@@ -357,6 +361,7 @@ export default function ProfileForm() {
           fullNameBn: profile.full_name_bn || "",
           fullNameEn: profile.full_name_en || "",
           phone: profile.phone || "",
+          email: profile.email || "",
           bloodGroup: profile.blood_group || "",
           district: profile.district || "",
           upazila: profile.upazila || "",
@@ -372,6 +377,7 @@ export default function ProfileForm() {
           hospitalNameBn: profile.hospital_name_bn || "",
           hospitalNameEn: profile.hospital_name_en || "",
           phone: profile.phone || "",
+          email: profile.email || "",
           district: profile.district || "",
           upazila: profile.upazila || "",
           union: profile.union_name || "",
@@ -560,6 +566,7 @@ export default function ProfileForm() {
         full_name_bn: values.fullNameBn,
         full_name_en: values.fullNameEn,
         phone: values.phone,
+        ...(values.email ? { email: values.email } : {}),
         blood_group: values.bloodGroup,
         sex: values.sex,
         district: values.district,
@@ -602,6 +609,7 @@ export default function ProfileForm() {
         full_name_bn: values.fullNameBn,
         full_name_en: values.fullNameEn,
         phone: values.phone,
+        ...(values.email ? { email: values.email } : {}),
         blood_group: values.bloodGroup,
         district: values.district,
         upazila: values.upazila,
@@ -630,6 +638,7 @@ export default function ProfileForm() {
         hospital_name_bn: values.hospitalNameBn,
         hospital_name_en: values.hospitalNameEn,
         phone: values.phone,
+        ...(values.email ? { email: values.email } : {}),
         district: values.district,
         upazila: values.upazila,
         union_name: values.union || null,
@@ -774,6 +783,21 @@ export default function ProfileForm() {
             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none"
             placeholder="017XXXXXXXX"
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            {t("email")}
+          </label>
+          <input
+            {...donorForm.register("email")}
+            type="email"
+            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none"
+            placeholder="you@example.com"
+          />
+          <p className="text-xs text-slate-400 mt-1">
+            {t("email_login_hint") || "You can also log in with this email"}
+          </p>
         </div>
 
         <div>
@@ -1369,6 +1393,21 @@ export default function ProfileForm() {
 
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1">
+            {t("email")}
+          </label>
+          <input
+            {...patientForm.register("email")}
+            type="email"
+            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none"
+            placeholder="you@example.com"
+          />
+          <p className="text-xs text-slate-400 mt-1">
+            {t("email_login_hint") || "You can also log in with this email"}
+          </p>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
             {t("emergency_contact") || "Emergency Contact"}
           </label>
           <input
@@ -1651,6 +1690,7 @@ export default function ProfileForm() {
       { label: t("hospital_name_bn") || "Name (BN)", value: v.hospitalNameBn || "-" },
       { label: t("hospital_name_en") || "Name (EN)", value: v.hospitalNameEn || "-" },
       { label: tCommon("phone") || "Phone", value: v.phone || "-" },
+      { label: t("email") || "Email", value: v.email || "-" },
       { label: t("license_number") || "License", value: v.licenseNumber || "-" },
       { label: t("website") || "Website", value: v.website || "-" },
       {
@@ -1804,6 +1844,21 @@ export default function ProfileForm() {
             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none"
             placeholder="017XXXXXXXX"
           />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1">
+            {t("email")}
+          </label>
+          <input
+            {...hospitalForm.register("email")}
+            type="email"
+            className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none"
+            placeholder="hospital@example.com"
+          />
+          <p className="text-xs text-slate-400 mt-1">
+            {t("email_login_hint") || "You can also log in with this email"}
+          </p>
         </div>
 
         <div>
@@ -2481,6 +2536,7 @@ export default function ProfileForm() {
       { label: t("full_name_bn") || "Name (BN)", value: v.fullNameBn || "-" },
       { label: t("full_name_en") || "Name (EN)", value: v.fullNameEn || "-" },
       { label: tCommon("phone") || "Phone", value: v.phone || "-" },
+      { label: t("email") || "Email", value: v.email || "-" },
       {
         label: t("emergency_contact") || "Emergency Contact",
         value: v.alternativePhone || "-",
@@ -2853,6 +2909,7 @@ export default function ProfileForm() {
     const fullNameBn = donorForm.watch("fullNameBn");
     const fullNameEn = donorForm.watch("fullNameEn");
     const phone = donorForm.watch("phone");
+    const email = donorForm.watch("email");
     const bloodGroup = donorForm.watch("bloodGroup");
     const sex = donorForm.watch("sex");
     const occupation = donorForm.watch("occupation");
@@ -2879,6 +2936,10 @@ export default function ProfileForm() {
           <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
             <p className="text-[10px] text-slate-500 mb-0.5">{tCommon("phone") || "Phone"}</p>
             <p className="font-semibold text-slate-900 text-sm">{phone || "-"}</p>
+          </div>
+          <div className="bg-slate-50 rounded-xl p-3 border border-slate-200">
+            <p className="text-[10px] text-slate-500 mb-0.5">{t("email") || "Email"}</p>
+            <p className="font-semibold text-slate-900 text-sm break-all">{email || "-"}</p>
           </div>
           <div className="bg-red-50 rounded-xl p-3 border border-red-200">
             <p className="text-[10px] text-red-500 mb-0.5">{t("blood_group") || "Blood"}</p>
@@ -3274,6 +3335,10 @@ export default function ProfileForm() {
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">{tCommon("phone")} *</label>
                       <input {...donorForm.register("phone")} className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none" placeholder="017XXXXXXXX" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-slate-700 mb-1">{t("email")}</label>
+                      <input {...donorForm.register("email")} type="email" className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-red-500 outline-none" placeholder="you@example.com" />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">{t("blood_group")} *</label>

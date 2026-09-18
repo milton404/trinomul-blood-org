@@ -454,6 +454,8 @@
     "full_name_bn": "Full Name (Bengali)",
     "full_name_en": "Full Name (English)",
     "phone": "Phone Number",
+    "email": "Email Address",
+    "email_login_hint": "You can also use this email to log in",
     "blood_group": "Blood Group",
     "select_blood_group": "Select Blood Group",
     "date_of_birth": "Date of Birth",
