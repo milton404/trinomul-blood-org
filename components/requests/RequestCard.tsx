@@ -419,7 +419,7 @@ export default function RequestCard({ request }: RequestCardProps) {
     .filter(Boolean)
     .join(", ")
     .trim();
-  const directionsUrl = request.canNavigate && hospitalText
+  const directionsUrl = hospitalText
     ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(hospitalText)}`
     : hasCoords
       ? `https://www.google.com/maps/dir/?api=1&destination=${request.lat},${request.lng}`
@@ -989,7 +989,7 @@ whatsapp_number: request.whatsapp_number || null,
               </span>
             )}
 
-            {directionsUrl ? (
+            {directionsUrl && request.canNavigate ? (
               <a
                 href={directionsUrl!}
                 target="_blank"

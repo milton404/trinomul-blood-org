@@ -225,7 +225,7 @@ export default function BloodRequestMarker({
                 📞 {t("call_now")}
               </a>
             )}
-            {directionsUrl ? (
+            {canNavigate && directionsUrl ? (
               <a
                 href={directionsUrl!}
                 target="_blank"
