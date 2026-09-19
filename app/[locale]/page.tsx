@@ -99,7 +99,7 @@ export default function HomePage() {
   const [mapDonors, setMapDonors] = useState<any[]>([]);
   const [mapViewMode, setMapViewMode] = useState<DataFilter>("all");
   const [mapBloodGroup, setMapBloodGroup] = useState<BloodGroup | null>(null);
-  const [selectedGroupDonors, setSelectedGroupDonors] = useState<any[]>([]);
+
 
   // Resolve request coords (GPS → upazila/district centroid) so pins render
   // even when the request was created without capturing exact GPS.
@@ -144,6 +144,22 @@ export default function HomePage() {
     if (!selectedUpazila) return [];
     return getUnionsByUpazila(selectedUpazila);
   }, [selectedUpazila]);
+
+  // Donors shown in the blood-group section: all active donors by default,
+  // filtered by the selected blood group when a user clicks one. Without a
+  // group selection we cap to 6 (3 cols x 2 rows on desktop); a group
+  // selection shows every matching donor.
+  const displayDonors = useMemo(() => {
+    const active = (mapDonors || []).filter(
+      (d: any) => d.is_active && d.blood_group,
+    );
+    const filtered = activeBloodGroup
+      ? active.filter(
+          (d: any) => d.blood_group === activeBloodGroup && d.is_eligible,
+        )
+      : active;
+    return activeBloodGroup ? filtered : filtered.slice(0, 6);
+  }, [mapDonors, activeBloodGroup]);
 
   const bloodGroupOptions: SelectOption<string>[] = useMemo(
     () =>
@@ -243,12 +259,14 @@ export default function HomePage() {
     };
 
     const fetchMapDonors = async () => {
+      setIsLoadingDonors(true);
       try {
         const data = await serverGetDonorsWithStats();
         setMapDonors(data || []);
       } catch (error) {
         setMapDonors([]);
       }
+      setIsLoadingDonors(false);
     };
 
     const fetchStats = async () => {
@@ -284,27 +302,8 @@ export default function HomePage() {
     );
   }, [userLocation]);
 
-  const handleBloodGroupClick = async (group: string) => {
-    if (activeBloodGroup === group) {
-      setActiveBloodGroup(null);
-      setSelectedGroupDonors([]);
-      return;
-    }
-
-    setActiveBloodGroup(group);
-    setIsLoadingDonors(true);
-
-    try {
-      const allDonors = await serverGetDonorsWithStats();
-      const filtered = allDonors.filter(
-        (d: any) => d.blood_group === group && d.is_active && d.is_eligible,
-      );
-      setSelectedGroupDonors(filtered);
-    } catch (error) {
-      setSelectedGroupDonors([]);
-    }
-
-    setIsLoadingDonors(false);
+  const handleBloodGroupClick = (group: string) => {
+    setActiveBloodGroup((prev) => (prev === group ? null : group));
   };
 
   /** Called when the map search bar detects a blood group (e.g. "A+ Rangpur"). */
@@ -1030,39 +1029,54 @@ export default function HomePage() {
                 })}
               </div>
 
-              {/* Donor Cards */}
-              {activeBloodGroup && (
-                <div className="mt-8">
-                  <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
-                    <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-600 font-bold text-sm">
-                      {activeBloodGroup}
-                    </span>
-                    <h3 className="text-lg font-semibold text-slate-800">
-                      {selectedGroupDonors.length}{" "}
-                      {selectedGroupDonors.length === 1
-                        ? t("donor_found")
-                        : t("donors_found")}
-                    </h3>
-                  </div>
-
-                  {isLoadingDonors ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                      {Array.from({ length: 4 }).map((_, i) => (
-                        <div
-                          key={i}
-                          className="bg-slate-50 p-6 rounded-2xl border border-slate-200 animate-pulse"
-                        >
-                          <div className="w-16 h-16 bg-slate-200 rounded-full mx-auto mb-3"></div>
-                          <div className="h-4 bg-slate-200 rounded w-3/4 mx-auto mb-2"></div>
-                          <div className="h-3 bg-slate-200 rounded w-1/2 mx-auto"></div>
-                        </div>
-                      ))}
+              {/* Donor Cards — shown by default; click a group to filter */}
+              <div className="mt-8">
+                <div className="flex items-center gap-3 mb-6 pb-4 border-b border-slate-100">
+                  {activeBloodGroup ? (
+                    <>
+                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-red-100 text-red-600 font-bold text-sm">
+                        {activeBloodGroup}
+                      </span>
+                      <h3 className="text-lg font-semibold text-slate-800">
+                        {displayDonors.length}{" "}
+                        {displayDonors.length === 1
+                          ? t("donor_found")
+                          : t("donors_found")}
+                      </h3>
+                    </>
+                  ) : (
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-800">
+                        {t("available_donors_title")}
+                      </h3>
+                      <p className="text-sm text-slate-500 font-medium mt-0.5">
+                        {t("available_donors_subtitle")}
+                      </p>
                     </div>
-                  ) : selectedGroupDonors.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                      {selectedGroupDonors.map((donor, i) => (
+                  )}
+                </div>
+
+                {isLoadingDonors ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="bg-slate-50 p-6 rounded-2xl border border-slate-200 animate-pulse"
+                      >
+                        <div className="w-16 h-16 bg-slate-200 rounded-full mx-auto mb-3"></div>
+                        <div className="h-4 bg-slate-200 rounded w-3/4 mx-auto mb-2"></div>
+                        <div className="h-3 bg-slate-200 rounded w-1/2 mx-auto"></div>
+                      </div>
+                    ))}
+                  </div>
+                ) : displayDonors.length > 0 ? (
+                  <div className="flex overflow-x-auto sm:grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 snap-x snap-mandatory pb-4 sm:pb-0 -mx-4 px-4 sm:mx-0 sm:px-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                    {displayDonors.map((donor, i) => (
+                      <div
+                        key={donor.id || i}
+                        className="min-w-[78%] sm:min-w-0 snap-start shrink-0 sm:shrink"
+                      >
                         <DonorCard
-                          key={donor.id || i}
                           donor={{
                             id: donor.id,
                             full_name: donor.full_name_en || donor.full_name_bn,
@@ -1094,32 +1108,32 @@ export default function HomePage() {
                             response_total_ms: donor.response_total_ms,
                           }}
                         />
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-14 bg-gradient-to-br from-red-50/80 to-orange-50/60 rounded-2xl border border-red-100 border-dashed">
-                      <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 mb-4">
-                        <Droplets className="w-8 h-8 text-red-400" />
                       </div>
-                      <p className="text-slate-700 font-semibold text-lg mb-1">
-                        {t("no_donors_for_group", {
-                          group: activeBloodGroup,
-                        })}
-                      </p>
-                      <p className="text-slate-500 text-sm mt-1 mb-5 font-medium">
-                        {t("try_another_group")}
-                      </p>
-                      <Link
-                        href="/register?role=donor"
-                        className="inline-flex items-center gap-2 bg-green-800 text-white px-6 py-2.5 rounded-full font-semibold hover:bg-green-900 transition-all shadow-md shadow-green-200 hover:shadow-lg hover:shadow-green-200"
-                      >
-                        <UserPlus className="w-4 h-4" />
-                        {t("become_donor_btn")}
-                      </Link>
+                    ))}
+                  </div>
+                ) : activeBloodGroup ? (
+                  <div className="text-center py-14 bg-gradient-to-br from-red-50/80 to-orange-50/60 rounded-2xl border border-red-100 border-dashed">
+                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-100 mb-4">
+                      <Droplets className="w-8 h-8 text-red-400" />
                     </div>
-                  )}
-                </div>
-              )}
+                    <p className="text-slate-700 font-semibold text-lg mb-1">
+                      {t("no_donors_for_group", {
+                        group: activeBloodGroup,
+                      })}
+                    </p>
+                    <p className="text-slate-500 text-sm mt-1 mb-5 font-medium">
+                      {t("try_another_group")}
+                    </p>
+                    <Link
+                      href="/register?role=donor"
+                      className="inline-flex items-center gap-2 bg-green-800 text-white px-6 py-2.5 rounded-full font-semibold hover:bg-green-900 transition-all shadow-md shadow-green-200 hover:shadow-lg hover:shadow-green-200"
+                    >
+                      <UserPlus className="w-4 h-4" />
+                      {t("become_donor_btn")}
+                    </Link>
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
         </section>
