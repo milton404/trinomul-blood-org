@@ -57,7 +57,12 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 function formatPostedAt(iso: string): string {
-  const d = new Date(iso.includes('T') ? iso : iso.replace(' ', 'T') + 'Z');
+  let s = iso.trim();
+  if (s.includes(' ') && !s.includes('T')) s = s.replace(' ', 'T');
+  s = s.replace(/([+-]\d{2})(\d{2})$/, '$1:$2');
+  s = s.replace(/[+-]00$/, 'Z');
+  if (!/[Zz]$|[+-]\d{2}:\d{2}$/.test(s)) s += 'Z';
+  const d = new Date(s);
   if (Number.isNaN(d.getTime())) return '';
   const diffMs = Date.now() - d.getTime();
   const diffMin = Math.floor(diffMs / 60_000);

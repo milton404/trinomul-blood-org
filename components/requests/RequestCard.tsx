@@ -83,7 +83,12 @@ function parseSqliteUtc(iso: string): Date {
   if (!iso) return new Date(NaN);
   let s = String(iso).trim();
   if (s.includes(" ") && !s.includes("T")) s = s.replace(" ", "T");
-  if (!/[Zz]|[+-]\d{2}:?\d{2}$/.test(s)) s = s + "Z";
+  // Postgres emits offsets like "+00" (UTC, no minutes) and "+HHMM"
+  // (no colon). Normalize both so `new Date` parses them: "+0530" → "+05:30",
+  // bare "+00" → "Z". A timestamp with no timezone still gets "Z" (UTC).
+  s = s.replace(/([+-]\d{2})(\d{2})$/, "$1:$2");
+  s = s.replace(/[+-]00$/, "Z");
+  if (!/[Zz]$|[+-]\d{2}:\d{2}$/.test(s)) s = s + "Z";
   return new Date(s);
 }
 
