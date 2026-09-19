@@ -1064,17 +1064,34 @@ export default function HomePage() {
                         <DonorCard
                           key={donor.id || i}
                           donor={{
+                            id: donor.id,
                             full_name: donor.full_name_en || donor.full_name_bn,
                             blood_group: donor.blood_group,
                             district: donor.district,
                             upazila: donor.upazila,
                             total_donations: donor.total_donations || 0,
                             is_active: donor.is_active,
+                            is_eligible: donor.is_eligible,
+                            next_eligible_date: donor.next_eligible_date,
+                            donation_type: donor.donation_type || "whole_blood",
+                            eligible_whole_blood: donor.eligible_whole_blood,
+                            eligible_platelets: donor.eligible_platelets,
+                            eligible_plasma: donor.eligible_plasma,
+                            eligible_types_count: donor.eligible_types_count,
                             badges: donor.badges || [],
                             phone: donor.phone,
                             avatar_url: donor.avatar_url,
+                            total_referrals: donor.total_referrals || 0,
+                            total_units: donor.total_units || 0,
                             hb_status: donor.hb_status,
                             distance_km: donor.distance_km ?? null,
+                            is_verified: donor.is_verified,
+                            verification_status: donor.verification_status,
+                            is_anonymous: donor.is_anonymous,
+                            last_active_at: donor.last_active_at,
+                            created_at: donor.created_at,
+                            response_count: donor.response_count,
+                            response_total_ms: donor.response_total_ms,
                           }}
                         />
                       ))}
