@@ -63,7 +63,9 @@ import {
 import {
   toValidBangladeshCoordinates,
   resolveAreaCentroid,
+
 } from "@/lib/location-coordinates";
+import { reverseGeocodeAndResolve } from "@/lib/reverse-geocode";
 
 /**
  * Resolve a request's coordinates the same way the Requests page does:
@@ -84,7 +86,13 @@ export default function HomePage() {
   const tCommon = useTranslations("common");
   const tMap = useTranslations("map");
   const locale = useLocale();
-  const { location: userLocation } = useUserLocation();
+  const {
+    location: userLocation,
+    source: locationSource,
+    resolvedArea,
+    requestLocation,
+    isLocating,
+  } = useUserLocation();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBloodGroup, setSelectedBloodGroup] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
@@ -144,6 +152,59 @@ export default function HomePage() {
     if (!selectedUpazila) return [];
     return getUnionsByUpazila(selectedUpazila);
   }, [selectedUpazila]);
+
+  // Real-time location: ask for a fresh GPS fix once on mount so the
+  // district/upazila/union dropdowns can auto-select the user's actual area.
+  useEffect(() => {
+    if (!isLocating) requestLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Track the latest manually-chosen district so auto-fill never overrides it.
+  const selectedDistrictRef = useRef(selectedDistrict);
+  selectedDistrictRef.current = selectedDistrict;
+  const autoFilledRef = useRef(false);
+
+  // Auto-select district/upazila/union from the user's location (GPS → cache
+  // → profile) using authoritative reverse-geocoding (Nominatim admin
+  // boundaries). Nearest-centroid snapping is intentionally NOT used as a
+  // fallback — it misassigns border areas (e.g. Saidpur → Thakurgaon), which
+  // is unacceptable for a life-critical blood bank. If the geocoder fails or
+  // returns nothing recognisable, the dropdowns stay on their placeholders.
+  useEffect(() => {
+    if (!userLocation || autoFilledRef.current || selectedDistrictRef.current) return;
+
+    // The hook already reverse-geocodes GPS fixes and caches the resolved
+    // area — reuse it to avoid a duplicate Nominatim request.
+    if (resolvedArea) {
+      autoFilledRef.current = true;
+      if (resolvedArea.districtId) setSelectedDistrict(resolvedArea.districtId);
+      if (resolvedArea.upazilaId) setSelectedUpazila(resolvedArea.upazilaId);
+      if (resolvedArea.unionId) setSelectedUnion(resolvedArea.unionId);
+      return;
+    }
+
+    // For a fresh GPS fix, the hook is still reverse-geocoding — wait for
+    // `resolvedArea` rather than firing a second request. Only reverse-geocode
+    // here for non-GPS sources without a cached area (profile, stale cache).
+    if (locationSource === "gps") return;
+
+    autoFilledRef.current = true;
+    let cancelled = false;
+    (async () => {
+      const r = await reverseGeocodeAndResolve(
+        userLocation.lat,
+        userLocation.lng,
+      ).catch(() => null);
+      if (cancelled || !r) return;
+      if (r.districtId) setSelectedDistrict(r.districtId);
+      if (r.upazilaId) setSelectedUpazila(r.upazilaId);
+      if (r.unionId) setSelectedUnion(r.unionId);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userLocation, resolvedArea, locationSource]);
 
   // Donors shown in the blood-group section: all active donors by default,
   // filtered by the selected blood group when a user clicks one. Without a

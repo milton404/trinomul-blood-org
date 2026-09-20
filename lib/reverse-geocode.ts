@@ -15,6 +15,12 @@
  * UI never breaks — the user always sees something useful.
  */
 
+import {
+  RANGPUR_DISTRICTS,
+  getUpazilasByDistrict,
+  getUnionsByUpazila,
+} from "@/lib/constants/rangpur";
+
 export interface ReverseGeocodeResult {
   /** Full display name, e.g. "Rangpur Sadar, Rangpur, Rangpur Division, Bangladesh" */
   displayName: string;
@@ -124,4 +130,99 @@ export async function reverseGeocode(
  */
 export function formatCoordinates(lat: number, lng: number): string {
   return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+}
+// ── Reverse geocode → app area IDs ───────────────────────────────────
+
+export interface ResolvedLocation {
+  districtId: string | null;
+  upazilaId: string | null;
+  unionId: string | null;
+  label: string;
+}
+
+/** Normalize Nominatim admin names to match our constant IDs by stripping
+ *  the "Upazila"/"District"/"Division" suffixes and collapsing spaces, while
+ *  keeping meaningful parts like "Sadar" and "City". */
+function normalizeName(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .replace(/\b(upazila|district|division|subdistrict|thana)\b/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Turn a Nominatim reverse-geocode result into the app's district/upazila/
+ * union IDs by matching the admin names against the constants. Any field the
+ * geocoder can't cleanly map is left null (never guessed).
+ */
+export function resolveLocationFromGeocode(
+  result: ReverseGeocodeResult,
+): ResolvedLocation {
+  let districtId: string | null = null;
+  let upazilaId: string | null = null;
+  let unionId: string | null = null;
+
+  if (result.district) {
+    const n = normalizeName(result.district);
+    const d = RANGPUR_DISTRICTS.find(
+      (x) => x.id === n || normalizeName(x.name_en) === n || normalizeName(x.name_bn) === n,
+    );
+    if (d) districtId = d.id;
+  }
+
+  if (districtId && result.upazila) {
+    const n = normalizeName(result.upazila);
+    const ups = getUpazilasByDistrict(districtId);
+    const u = ups.find(
+      (x) =>
+        x.id === n ||
+        normalizeName(x.name_en) === n ||
+        normalizeName(x.name_en).includes(n) ||
+        n.includes(normalizeName(x.name_en)),
+    );
+    if (u) upazilaId = u.id;
+  }
+
+  if (upazilaId) {
+    const unionName = result.village || result.town;
+    if (unionName) {
+      const n = normalizeName(unionName);
+      const unions = getUnionsByUpazila(upazilaId);
+      const un = unions.find(
+        (x) =>
+          x.id === n ||
+          normalizeName(x.name_en) === n ||
+          normalizeName(x.name_bn) === n ||
+          normalizeName(x.name_en).includes(n) ||
+          n.includes(normalizeName(x.name_en)),
+      );
+      if (un) unionId = un.id;
+    }
+  }
+
+  const label = [result.town || result.village, result.upazila, result.district]
+    .filter(Boolean)
+    .join(", ");
+
+  return {
+    districtId,
+    upazilaId,
+    unionId,
+    label: label || result.shortName || result.displayName,
+  };
+}
+
+/**
+ * Reverse-geocode a coordinate and resolve it into the app's area IDs.
+ * Returns null when the geocoder fails or returns nothing.
+ */
+export async function reverseGeocodeAndResolve(
+  lat: number,
+  lng: number,
+): Promise<ResolvedLocation | null> {
+  const result = await reverseGeocode(lat, lng);
+  if (!result) return null;
+  return resolveLocationFromGeocode(result);
 }

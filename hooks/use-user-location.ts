@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { reverseGeocode } from "@/lib/reverse-geocode";
+import {
+  reverseGeocode,
+  resolveLocationFromGeocode,
+  type ResolvedLocation,
+} from "@/lib/reverse-geocode";
 import { serverGetMyProfileLocation } from "@/lib/db-actions";
 
 export interface UserLocation {
@@ -35,6 +39,7 @@ export function haversineKm(
 
 interface CachedLocation extends UserLocation {
   placeName?: string;
+  area?: ResolvedLocation | null;
   ts?: number;
 }
 
@@ -53,6 +58,7 @@ export function useUserLocation() {
   const [location, setLocation] = useState<UserLocation | null>(null);
   const [source, setSource] = useState<LocationSource | null>(null);
   const [placeName, setPlaceName] = useState<string | null>(null);
+  const [resolvedArea, setResolvedArea] = useState<ResolvedLocation | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mountedRef = useRef(true);
@@ -64,14 +70,22 @@ export function useUserLocation() {
     };
   }, []);
 
-  const persist = useCallback((loc: UserLocation, name?: string | null) => {
-    try {
-      const payload: CachedLocation = { ...loc, placeName: name ?? undefined, ts: Date.now() };
-      localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
-    } catch {
-      // storage unavailable — ignore
-    }
-  }, []);
+  const persist = useCallback(
+    (loc: UserLocation, name?: string | null, area?: ResolvedLocation | null) => {
+      try {
+        const payload: CachedLocation = {
+          ...loc,
+          placeName: name ?? undefined,
+          area: area ?? undefined,
+          ts: Date.now(),
+        };
+        localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+      } catch {
+        // storage unavailable — ignore
+      }
+    },
+    [],
+  );
 
   // Load cached GPS fix on mount.
   useEffect(() => {
@@ -83,6 +97,7 @@ export function useUserLocation() {
         setLocation({ lat: parsed.lat, lng: parsed.lng });
         setSource("cache");
         if (parsed.placeName) setPlaceName(parsed.placeName);
+        if (parsed.area) setResolvedArea(parsed.area);
       }
     } catch {
       // corrupted cache — ignore
@@ -122,12 +137,16 @@ export function useUserLocation() {
       setSource("gps");
       setError(null);
       persist(loc, placeNameRef.current);
-      // Reverse-geocode in the background to name the place.
+      // Reverse-geocode in the background to name the place and resolve the
+      // district/upazila/union so callers (e.g. the homepage) can auto-select
+      // filters without a second Nominatim request.
       try {
         const geo = await reverseGeocode(loc.lat, loc.lng);
-        if (mountedRef.current && geo?.shortName) {
-          setPlaceName(geo.shortName);
-          persist(loc, geo.shortName);
+        if (mountedRef.current && geo) {
+          if (geo.shortName) setPlaceName(geo.shortName);
+          const area = resolveLocationFromGeocode(geo);
+          setResolvedArea(area);
+          persist(loc, geo.shortName, area);
         }
       } catch {
         // naming is best-effort
@@ -186,6 +205,7 @@ export function useUserLocation() {
     setLocation(null);
     setSource(null);
     setPlaceName(null);
+    setResolvedArea(null);
     setError(null);
     try {
       localStorage.removeItem(CACHE_KEY);
@@ -198,6 +218,7 @@ export function useUserLocation() {
     location,
     source,
     placeName,
+    resolvedArea,
     isLocating,
     error,
     requestLocation,
