@@ -26,6 +26,7 @@ import {
   X,
   ChevronRight,
   SlidersHorizontal,
+  BadgeCheck,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import ModernSelect, { type SelectOption } from "@/components/ui/ModernSelect";
@@ -85,7 +86,16 @@ function DonorsContent() {
   // AI search state — chips of what the AI understood + loading animation
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [aiChips, setAiChips] = useState<
-    { type: "bloodGroup" | "district" | "upazila"; label: string; value: string }[]
+    {
+      type:
+        | "bloodGroup"
+        | "district"
+        | "upazila"
+        | "donationType"
+        | "status";
+      label: string;
+      value: string;
+    }[]
   >([]);
   const [lastAiQuery, setLastAiQuery] = useState("");
 
@@ -190,6 +200,8 @@ function DonorsContent() {
     const upa = searchParams.get("upazila");
     const un = searchParams.get("union");
     const q = searchParams.get("q");
+    const type = searchParams.get("type");
+    const status = searchParams.get("status");
     if (bg && bg !== "All") setSelectedGroup(bg);
     if (dist) {
       setSelectedDistrict(resolveDistrictId(dist));
@@ -206,6 +218,12 @@ function DonorsContent() {
     }
     if (un) setSelectedUnion(un);
     if (q) setSearchQuery(q);
+    if (type && ["whole_blood", "platelets", "plasma"].includes(type)) {
+      setFilterDonationType(type as "whole_blood" | "platelets" | "plasma");
+    }
+    if (status && ["available", "active", "hb_eligible", "frequent"].includes(status)) {
+      setFilterStatus(status as "available" | "active" | "hb_eligible" | "frequent");
+    }
 
     const hasFilters = bg || dist || upa || q;
     if (!hasFilters) {
@@ -312,6 +330,40 @@ function DonorsContent() {
           chips.push({ type: "upazila", label: upa.name_en, value: upa.id });
         }
       }
+      if (result.donation_type) {
+        setFilterDonationType(result.donation_type);
+        chips.push({
+          type: "donationType",
+          label:
+            result.donation_type === "whole_blood"
+              ? isBn ? "সম্পূর্ণ রক্ত" : "Whole Blood"
+              : result.donation_type === "platelets"
+                ? isBn ? "প্লাটিলেট" : "Platelets"
+                : isBn ? "প্লাজমা" : "Plasma",
+          value: result.donation_type,
+        });
+      }
+      if (result.status) {
+        setFilterStatus(result.status);
+        const statusLabels: Record<string, string> = isBn
+          ? {
+              available: "এখন উপলব্ধ",
+              active: "সক্রিয়",
+              hb_eligible: "Hb যোগ্য",
+              frequent: "নিয়মিত (৫+)",
+            }
+          : {
+              available: "Available Now",
+              active: "Active",
+              hb_eligible: "Hb Eligible",
+              frequent: "Frequent (5+)",
+            };
+        chips.push({
+          type: "status",
+          label: statusLabels[result.status] || result.status,
+          value: result.status,
+        });
+      }
       setAiChips(chips);
 
       // Put the corrected remaining words back into the search bar.
@@ -338,6 +390,8 @@ function DonorsContent() {
       setSelectedUpazila(""); setSelectedUnion("");
     }
     if (chip.type === "upazila") setSelectedUpazila(""); setSelectedUnion("");
+    if (chip.type === "donationType") setFilterDonationType("all");
+    if (chip.type === "status") setFilterStatus("all");
   };
 
   const filteredDonors = useMemo(() => {
@@ -681,11 +735,17 @@ function DonorsContent() {
                       ? "border-red-200 bg-red-50 text-red-700"
                       : chip.type === "district"
                         ? "border-indigo-200 bg-indigo-50 text-indigo-700"
-                        : "border-sky-200 bg-sky-50 text-sky-700"
+                        : chip.type === "donationType"
+                          ? "border-blue-200 bg-blue-50 text-blue-700"
+                          : chip.type === "status"
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            : "border-sky-200 bg-sky-50 text-sky-700"
                   }`}
                 >
-                  {chip.type === "bloodGroup" ? (
+                  {chip.type === "bloodGroup" || chip.type === "donationType" ? (
                     <Droplets className="w-3 h-3" />
+                  ) : chip.type === "status" ? (
+                    <BadgeCheck className="w-3 h-3" />
                   ) : (
                     <MapPin className="w-3 h-3" />
                   )}
@@ -705,6 +765,8 @@ function DonorsContent() {
                   setSelectedGroup("All");
                   setSelectedDistrict("");
                   setSelectedUpazila(""); setSelectedUnion("");
+                  setFilterDonationType("all");
+                  setFilterStatus("all");
                 }}
                 className="text-[10px] text-slate-400 hover:text-slate-600 underline underline-offset-2 ml-1 transition-colors"
               >

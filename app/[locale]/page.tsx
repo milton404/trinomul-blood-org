@@ -330,6 +330,8 @@ export default function HomePage() {
     let finalBloodGroup = selectedBloodGroup;
     let finalDistrict = selectedDistrict;
     let finalUpazila = selectedUpazila;
+    let finalDonationType = "";
+    let finalStatus = "";
     let finalKeywords = "";
 
     // If user typed a natural-language query, let AI fill in the gaps only
@@ -359,6 +361,8 @@ export default function HomePage() {
           // AI's upazila belongs to a different district than dropdown — skip it
         }
         finalKeywords = parsed.keywords || "";
+        finalDonationType = parsed.donation_type || "";
+        finalStatus = parsed.status || "";
       } catch (err) {
         console.warn("[Home search] AI parse failed, using raw query:", err);
         setAiStatus("fallback");
@@ -370,10 +374,12 @@ export default function HomePage() {
     if (finalDistrict) params.set("district", finalDistrict);
     if (finalUpazila) params.set("upazila", finalUpazila);
     if (selectedUnion) params.set("union", selectedUnion);
+    if (finalDonationType && finalDonationType !== "all") params.set("type", finalDonationType);
+    if (finalStatus && finalStatus !== "all") params.set("status", finalStatus);
 
     // Build the q param: use AI-extracted keywords (names, phones, etc.)
     // Only fall back to raw query if AI didn't extract any structured fields
-    const parsedSomething = finalBloodGroup || finalDistrict || finalUpazila;
+    const parsedSomething = finalBloodGroup || finalDistrict || finalUpazila || finalDonationType || finalStatus;
     const qText = finalKeywords || (parsedSomething ? "" : searchQuery.trim());
     if (qText) params.set("q", qText);
 

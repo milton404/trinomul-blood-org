@@ -10,14 +10,37 @@ import {
 
 // ── Types ───────────────────────────────────────────────────────────
 
+export type DonationTypeFilter = "all" | "whole_blood" | "platelets" | "plasma";
+export type DonorStatusFilter =
+  | "all"
+  | "available"
+  | "active"
+  | "hb_eligible"
+  | "frequent";
+
 export interface ParsedSearchQuery {
   blood_group: string | null;     // e.g. "A+", "O-"
   district_id: string | null;     // e.g. "rangpur"
   upazila_id: string | null;      // e.g. "rangpur_sadar"
+  donation_type: DonationTypeFilter | null; // whole_blood | platelets | plasma
+  status: DonorStatusFilter | null;         // available | active | hb_eligible | frequent
   keywords: string;               // remaining text (name / phone / hospital)
   confidence: "high" | "medium" | "low";
   ai_used: boolean;               // true if LLM successfully parsed
 }
+
+const DONATION_TYPE_VALUES: DonationTypeFilter[] = [
+  "whole_blood",
+  "platelets",
+  "plasma",
+];
+
+const STATUS_VALUES: DonorStatusFilter[] = [
+  "available",
+  "active",
+  "hb_eligible",
+  "frequent",
+];
 
 // ── Blood group normalization ───────────────────────────────────────
 
@@ -68,6 +91,40 @@ function normalizeBloodGroup(input: string): string | null {
     const bg = `${letter}${isPos ? "+" : "-"}`;
     if (BLOOD_GROUPS.includes(bg)) return bg;
   }
+  return null;
+}
+
+// ── Donation type detection (English + Bangla + Banglish) ──────────
+
+const WHOLE_BLOOD_RE =
+  /(?:whole|full|entire)\s*blood|সম্পূর্ণ\s*রক্ত|স?ম্পূর্ণ\s*রক্ত|ফুল\s*ব্লা?ড/i;
+const PLATELETS_RE = /platelets?|প্লাটিলেট|প্লে?টলেট|প্লে?টিলেট/i;
+const PLASMA_RE = /plasma|প্লাজমা/i;
+
+function detectDonationType(
+  text: string,
+): { value: DonationTypeFilter; pattern: RegExp } | null {
+  if (WHOLE_BLOOD_RE.test(text)) return { value: "whole_blood", pattern: WHOLE_BLOOD_RE };
+  if (PLATELETS_RE.test(text)) return { value: "platelets", pattern: PLATELETS_RE };
+  if (PLASMA_RE.test(text)) return { value: "plasma", pattern: PLASMA_RE };
+  return null;
+}
+
+// ── Donor status detection (English + Bangla + Banglish) ───────────
+
+const FREQUENT_RE = /frequent|regular|নিয়মিত\s*(?:রক্ত)?দাতা|নিয়মিত|৫\+|5\+/i;
+const HB_ELIGIBLE_RE =
+  /\bhb\b|hemoglobin|haemoglobin|হেমোগ্লোবিন|হিমোগ্লোবিন|রক্তের\s*হিমো?গ্লোবিন/i;
+const ACTIVE_RE = /active|সক্রিয়|সক্রিয়\s*দাতা/i;
+const AVAILABLE_RE = /available|উপলব্ধ|এখন\s*উপলব্ধ/i;
+
+function detectStatus(
+  text: string,
+): { value: DonorStatusFilter; pattern: RegExp } | null {
+  if (FREQUENT_RE.test(text)) return { value: "frequent", pattern: FREQUENT_RE };
+  if (HB_ELIGIBLE_RE.test(text)) return { value: "hb_eligible", pattern: HB_ELIGIBLE_RE };
+  if (ACTIVE_RE.test(text)) return { value: "active", pattern: ACTIVE_RE };
+  if (AVAILABLE_RE.test(text)) return { value: "available", pattern: AVAILABLE_RE };
   return null;
 }
 
@@ -306,6 +363,8 @@ function ruleBasedParse(rawQuery: string): ParsedSearchQuery {
   let blood_group: string | null = null;
   let district_id: string | null = null;
   let upazila_id: string | null = null;
+  let donation_type: DonationTypeFilter | null = null;
+  let status: DonorStatusFilter | null = null;
   let keywords = text;
 
   // Blood group
@@ -369,6 +428,20 @@ function ruleBasedParse(rawQuery: string): ParsedSearchQuery {
     }
   }
 
+  // Donation type (whole blood / platelets / plasma)
+  const typeMatch = detectDonationType(keywords);
+  if (typeMatch) {
+    donation_type = typeMatch.value;
+    keywords = keywords.replace(typeMatch.pattern, " ");
+  }
+
+  // Donor status (available / active / hb_eligible / frequent)
+  const statusMatch = detectStatus(keywords);
+  if (statusMatch) {
+    status = statusMatch.value;
+    keywords = keywords.replace(statusMatch.pattern, " ");
+  }
+
   // Clean up keywords: collapse spaces, remove filler words
   // English + Bengali + Banglish filler words that aren't names/places
   keywords = keywords
@@ -397,12 +470,18 @@ function ruleBasedParse(rawQuery: string): ParsedSearchQuery {
   }
 
   const confidence =
-    blood_group || district_id || upazila_id ? "high" : keywords.length > 0 ? "medium" : "low";
+    blood_group || district_id || upazila_id || donation_type || status
+      ? "high"
+      : keywords.length > 0
+        ? "medium"
+        : "low";
 
   return {
     blood_group,
     district_id,
     upazila_id,
+    donation_type,
+    status,
     keywords,
     confidence,
     ai_used: false,
@@ -411,17 +490,51 @@ function ruleBasedParse(rawQuery: string): ParsedSearchQuery {
 
 // ── LLM-based parser ───────────────────────────────────────────────
 
+// ── LLM-based parser ───────────────────────────────────────────────
+
+// Build the system prompt dynamically from the same constants the app uses,
+// so the AI can only ever emit IDs that actually exist in our data (never
+// hallucinate a place / group / type / status).
+const SEARCH_SYSTEM_PROMPT = [
+  "You parse natural-language blood-donor search queries into structured filters.",
+  "The query may be in English, Bengali (Bangla), or Banglish (Bengali written in Latin letters).",
+  "Return ONLY a JSON object with exactly these keys:",
+  '  "blood_group": one of "A+","A-","B+","B-","AB+","AB-","O+","O-" or null',
+  '  "district_id": one of the district IDs listed below or null',
+  '  "upazila_id": one of the upazila IDs listed below or null',
+  '  "donation_type": one of "whole_blood","platelets","plasma" or null (whole blood/সম্পূর্ণ রক্ত -> whole_blood; platelets/প্লাটিলেট -> platelets; plasma/প্লাজমা -> plasma)',
+  '  "status": one of "available","active","hb_eligible","frequent" or null (available now/এখন উপলব্ধ -> available; active/সক্রিয় -> active; hb eligible/হিমোগ্লোবিন যোগ্য -> hb_eligible; frequent/regular (5+)/নিয়মিত -> frequent)',
+  '  "keywords": remaining free text (name, phone, hospital, address) with filter words stripped; keep misspellings as-is',
+  "",
+  "Rules:",
+  "1. district_id and upazila_id MUST be one of the exact IDs below. Never invent a location.",
+  "2. If the query mentions an upazila, also set its parent district_id.",
+  "3. Map misspelled / Banglish location words to the closest real ID.",
+  "4. Bengali and Banglish spelling variations all map to the same ID (e.g. rongpur, রংপুর -> rangpur).",
+  "5. If unsure about any field, set it to null instead of guessing.",
+  "",
+  "Districts:",
+  ...RANGPUR_DISTRICTS.map((d) => `- ${d.id} (${d.name_en} / ${d.name_bn})`),
+  "",
+  "Upazilas (id — district):",
+  ...RANGPUR_UPAZILAS.map(
+    (u) => `- ${u.id} (${u.name_en} / ${u.name_bn}) — ${u.district_id}`,
+  ),
+].join("\n");
+
 async function aiParse(rawQuery: string): Promise<ParsedSearchQuery | null> {
   const provider = getActiveProvider();
   if (!provider) return null;
 
-
-  const systemPrompt = "";
-
   try {
     const result = await callLLM(
-      `${systemPrompt}\n\nUser query: "${rawQuery}"\n\nJSON:`,
-      { jsonMode: true, temperature: 0.0, maxTokens: 500 },
+      `User query: "${rawQuery}"\n\nJSON:`,
+      {
+        jsonMode: true,
+        temperature: 0.0,
+        maxTokens: 500,
+        systemPrompt: SEARCH_SYSTEM_PROMPT,
+      },
     );
     if (!result) return null;
 
@@ -452,17 +565,42 @@ async function aiParse(rawQuery: string): Promise<ParsedSearchQuery | null> {
       }
     }
 
+    // Validate donation_type
+    let donationType: DonationTypeFilter | null = null;
+    if (
+      parsed.donation_type &&
+      typeof parsed.donation_type === "string" &&
+      DONATION_TYPE_VALUES.includes(parsed.donation_type.toLowerCase() as DonationTypeFilter)
+    ) {
+      donationType = parsed.donation_type.toLowerCase() as DonationTypeFilter;
+    }
+    // Validate status
+    let status: DonorStatusFilter | null = null;
+    if (
+      parsed.status &&
+      typeof parsed.status === "string" &&
+      STATUS_VALUES.includes(parsed.status.toLowerCase() as DonorStatusFilter)
+    ) {
+      status = parsed.status.toLowerCase() as DonorStatusFilter;
+    }
+
     const kw = typeof parsed.keywords === "string" ? parsed.keywords.trim() : "";
 
-    // Merge AI extraction with rule-based blood group detection as safety net
+    // Merge AI extraction with rule-based detection as safety net
     const ruleBg = normalizeBloodGroup(rawQuery);
     if (!bg && ruleBg) bg = ruleBg;
+    const ruleType = detectDonationType(rawQuery);
+    if (!donationType && ruleType) donationType = ruleType.value;
+    const ruleStatus = detectStatus(rawQuery);
+    if (!status && ruleStatus) status = ruleStatus.value;
 
-    const hasStructured = bg || distId || upaId;
+    const hasStructured = bg || distId || upaId || donationType || status;
     return {
       blood_group: bg,
       district_id: distId,
       upazila_id: upaId,
+      donation_type: donationType,
+      status,
       keywords: kw || (hasStructured ? "" : rawQuery.trim()),
       confidence: hasStructured ? "high" : kw ? "medium" : "low",
       ai_used: true,
@@ -489,6 +627,8 @@ export async function serverParseSearchQuery(
       blood_group: null,
       district_id: null,
       upazila_id: null,
+      donation_type: null,
+      status: null,
       keywords: "",
       confidence: "low",
       ai_used: false,
@@ -498,12 +638,15 @@ export async function serverParseSearchQuery(
   // Run rule-based parse FIRST (fast, reliable for common patterns)
   const ruleResult = ruleBasedParse(query);
 
-  // If rule-based parse already found any structured field (blood group, district, upazila)
-  // or a phone number, skip AI (saves time & API cost for obvious queries)
+  // If rule-based parse already found any structured field (blood group,
+  // district, upazila, donation type, status) or a phone number, skip AI
+  // (saves time & API cost for obvious queries)
   const hasStrongRuleResult =
     ruleResult.blood_group ||
     ruleResult.district_id ||
     ruleResult.upazila_id ||
+    ruleResult.donation_type ||
+    ruleResult.status ||
     /\b01[3-9]\d{8}\b/.test(query);
 
   if (hasStrongRuleResult) {
@@ -522,11 +665,17 @@ export async function serverParseSearchQuery(
         // because AI may have consumed the blood group / location words that rule-based missed.
         // Only fall back to ruleResult.keywords if AI didn't extract any structured fields.
         const aiExtractedSomething =
-          aiResult.blood_group || aiResult.district_id || aiResult.upazila_id;
+          aiResult.blood_group ||
+          aiResult.district_id ||
+          aiResult.upazila_id ||
+          aiResult.donation_type ||
+          aiResult.status;
         return {
           blood_group: aiResult.blood_group || ruleResult.blood_group,
           district_id: aiResult.district_id || ruleResult.district_id,
           upazila_id: aiResult.upazila_id || ruleResult.upazila_id,
+          donation_type: aiResult.donation_type || ruleResult.donation_type,
+          status: aiResult.status || ruleResult.status,
           keywords: aiExtractedSomething
             ? aiResult.keywords  // AI consumed the query — use its keywords (may be "")
             : ruleResult.keywords, // AI found nothing structured — keep rule-based keywords
