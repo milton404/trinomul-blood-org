@@ -465,6 +465,44 @@ export default function HomePage() {
     window.location.href = `/${locale}/donors?${params.toString()}`;
   };
 
+  const isBn = locale === "bn";
+  const locUa = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  const locIsAndroid = /android/i.test(locUa);
+  const locIsIOS = /iphone|ipad|ipod/i.test(locUa);
+  const locIsPhone = locIsAndroid || locIsIOS;
+  const locErrGpsOff = locationError?.includes("GPS") || locationError?.includes("off");
+  const locErrPerm = locationError?.includes("permission");
+  const locErrTitle = locErrGpsOff
+    ? (isBn
+        ? locIsPhone ? "আপনার ডিভাইসের জিপিএস বন্ধ আছে।" : "লোকেশন বন্ধ আছে।"
+        : locIsPhone ? "Your device's GPS is off." : "Location is off.")
+    : locErrPerm
+      ? (isBn ? "লোকেশন অনুমতি ব্লক করা হয়েছে।" : "Location permission blocked.")
+      : (isBn ? "লোকেশন পাওয়া যায়নি।" : "Location request failed.");
+  const locErrSteps = locErrGpsOff
+    ? (isBn
+        ? locIsPhone
+          ? "সেটিংস → লোকেশন → অন, অথবা উপরে সোয়াইপ করে লোকেশন চালু করুন"
+          : "ব্রাউজার বা ওএস সেটিংসে লোকেশন চালু করুন"
+        : locIsIOS
+          ? "Settings → Privacy → Location → On"
+          : locIsAndroid
+            ? "Swipe down from top → tap Location, or Settings → Location → On"
+            : "Enable location in your browser or OS settings")
+    : locErrPerm
+      ? (isBn
+          ? locIsPhone
+            ? "সেটিংস থেকে লোকেশন চালু করুন, অথবা উপরে সোয়াইপ করে লোকেশন অন করুন"
+            : "ব্রাউজার সেটিংস → সাইট সেটিংস → লোকেশন → অনুমতি দিন"
+          : locIsIOS
+            ? "Settings → Privacy → Location → On"
+            : locIsAndroid
+              ? "Swipe down from top → tap Location, or Settings → Location → On"
+              : "Browser ⋮ → Settings → Site settings → Location → Allow")
+      : (isBn
+          ? "জিপিএস চালু করে আবার চেষ্টা করুন"
+          : "Make sure GPS is on and try again");
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -576,50 +614,6 @@ export default function HomePage() {
                   </span>
                 </div>
 
-                {/* GPS-off / permission-denied banner with platform-specific steps + retry */}
-                {locationError && !locErrorDismissed && (
-                  <div className="mb-1.5 sm:mb-3 px-2.5 py-1.5 sm:px-3 sm:py-2.5 rounded-lg sm:rounded-xl bg-amber-50 ring-1 ring-amber-200 text-amber-900">
-                    <div className="flex items-start gap-1.5 sm:gap-2">
-                      {isLocating ? (
-                        <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0 mt-0.5 text-amber-600 animate-spin" />
-                      ) : (
-                        <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0 mt-0.5 text-amber-600" />
-                      )}
-                      <div className="flex-1 min-w-0">
-                        {isLocating ? (
-                          <p className="text-[11px] sm:text-[13px] font-semibold leading-tight sm:leading-snug">
-                            {isBn ? "অবস্থান খুঁজছি…" : "Locating…"}
-                          </p>
-                        ) : (
-                          <>
-                            <p className="text-[11px] sm:text-[13px] font-semibold leading-tight sm:leading-snug">{locErrTitle}</p>
-                            <p className="text-[9px] sm:text-[11px] leading-tight sm:leading-snug text-amber-700 mt-0.5">{locErrSteps}</p>
-                          </>
-                        )}
-                      </div>
-                      {!isLocating && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={handleRetryLocation}
-                            className="shrink-0 inline-flex items-center gap-0.5 sm:gap-1 px-2 py-1 sm:px-3 sm:py-1.5 rounded-md sm:rounded-lg bg-amber-600 text-white text-[10px] sm:text-xs font-bold hover:bg-amber-700 active:scale-95 transition-all whitespace-nowrap"
-                          >
-                            <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                            {isBn ? "আবার" : "Retry"}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setLocErrorDismissed(true)}
-                            className="shrink-0 p-0.5 sm:p-1 rounded-md sm:rounded-lg text-amber-500 hover:text-amber-800 hover:bg-amber-100 transition-colors"
-                            aria-label={isBn ? "বন্ধ করুন" : "Dismiss"}
-                          >
-                            <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
 
                 {/* Row 1: 3 filter dropdowns — grid on desktop, stacked on mobile */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2">
@@ -1521,6 +1515,63 @@ export default function HomePage() {
         </section>
       </main>
       <Footer />
+
+      {/* Location error popup modal */}
+      {locationError && !locErrorDismissed && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
+          onClick={() => !isLocating && setLocErrorDismissed(true)}
+        >
+          <div
+            className="relative w-full max-w-sm rounded-2xl bg-white shadow-2xl ring-1 ring-amber-200 overflow-hidden animate-[fadeSlideIn_0.2s_ease-out]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-5 py-5 sm:px-6 sm:py-6">
+              <div className="flex items-start gap-3">
+                {isLocating ? (
+                  <Loader2 className="w-6 h-6 flex-shrink-0 text-amber-600 animate-spin" />
+                ) : (
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                    <MapPin className="w-5 h-5 text-amber-600" />
+                  </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  {isLocating ? (
+                    <p className="text-sm sm:text-base font-semibold text-slate-800">
+                      {isBn ? "অবস্থান খুঁজছি…" : "Locating…"}
+                    </p>
+                  ) : (
+                    <>
+                      <p className="text-sm sm:text-base font-semibold text-slate-800 leading-snug">{locErrTitle}</p>
+                      <p className="text-xs sm:text-[13px] leading-snug text-amber-700 mt-1">{locErrSteps}</p>
+                    </>
+                  )}
+                </div>
+                {!isLocating && (
+                  <button
+                    type="button"
+                    onClick={() => setLocErrorDismissed(true)}
+                    className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                    aria-label={isBn ? "বন্ধ করুন" : "Close"}
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+              {!isLocating && (
+                <button
+                  type="button"
+                  onClick={handleRetryLocation}
+                  className="mt-4 w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-amber-600 text-white text-sm font-bold hover:bg-amber-700 active:scale-[0.98] transition-all"
+                >
+                  <MapPin className="w-4 h-4" />
+                  {isBn ? "আবার চেষ্টা করুন" : "Retry"}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
