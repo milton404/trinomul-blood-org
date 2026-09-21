@@ -3075,7 +3075,7 @@ export default function ProfileForm() {
         <>
           {/* ── Sticky tab bar ── */}
           <div className="sticky top-[60px] z-20 mb-5 -mx-1 px-1">
-            <div className="flex gap-1 p-1 bg-white rounded-2xl shadow-md border border-slate-200 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="grid grid-cols-5 sm:flex gap-1 p-1 bg-white rounded-2xl shadow-md border border-slate-200">
               {([
                 { key: "overview", label: isBn ? "ওভারভিউ" : "Overview", icon: Sparkles },
                 { key: "donations", label: isBn ? "রক্তদান" : "Donations", icon: Droplets },
@@ -3089,14 +3089,14 @@ export default function ProfileForm() {
                   <button
                     key={tab.key}
                     onClick={() => setActiveDonorTab(tab.key)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+                    className={`flex-col items-center justify-center gap-1 py-2 px-1 sm:flex-row sm:gap-1.5 sm:py-2.5 sm:px-2 rounded-xl text-sm font-semibold transition-all ${
                       active
                         ? "bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-sm"
                         : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
                     <Icon className="w-4 h-4 shrink-0" />
-                    <span className="inline text-[11px] sm:text-sm leading-none">{tab.label}</span>
+                    <span className="text-[10px] sm:text-sm leading-none">{tab.label}</span>
                   </button>
                 );
               })}
@@ -3600,7 +3600,7 @@ export default function ProfileForm() {
         <>
           {/* ── Sticky tab bar ── */}
           <div className="sticky top-[60px] z-20 mb-5 -mx-1 px-1">
-            <div className="flex gap-1 p-1 bg-white rounded-2xl shadow-md border border-slate-200 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="grid grid-cols-4 sm:flex gap-1 p-1 bg-white rounded-2xl shadow-md border border-slate-200">
               {([
                 { key: "overview", label: isBn ? "ওভারভিউ" : "Overview", icon: Sparkles },
                 { key: "requests", label: isBn ? "রিকোয়েস্ট" : "Requests", icon: Droplets },
@@ -3613,14 +3613,14 @@ export default function ProfileForm() {
                   <button
                     key={tab.key}
                     onClick={() => setActivePatientTab(tab.key)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+                    className={`flex-col items-center justify-center gap-1 py-2 px-1 sm:flex-row sm:gap-1.5 sm:py-2.5 sm:px-2 rounded-xl text-sm font-semibold transition-all ${
                       active
                         ? "bg-gradient-to-r from-blue-600 to-sky-600 text-white shadow-sm"
                         : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
                     <Icon className="w-4 h-4 shrink-0" />
-                    <span className="inline text-[11px] sm:text-sm leading-none">{tab.label}</span>
+                    <span className="text-[10px] sm:text-sm leading-none">{tab.label}</span>
                   </button>
                 );
               })}
@@ -3682,7 +3682,7 @@ export default function ProfileForm() {
         <>
           {/* ── Sticky tab bar ── */}
           <div className="sticky top-[60px] z-20 mb-5 -mx-1 px-1">
-            <div className="flex gap-1 p-1 bg-white rounded-2xl shadow-md border border-slate-200 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="grid grid-cols-4 sm:flex gap-1 p-1 bg-white rounded-2xl shadow-md border border-slate-200">
               {([
                 { key: "overview", label: isBn ? "ওভারভিউ" : "Overview", icon: Sparkles },
                 { key: "requests", label: isBn ? "রিকোয়েস্ট" : "Requests", icon: Droplets },
@@ -3695,14 +3695,14 @@ export default function ProfileForm() {
                   <button
                     key={tab.key}
                     onClick={() => setActiveHospitalTab(tab.key)}
-                    className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 px-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+                    className={`flex-col items-center justify-center gap-1 py-2 px-1 sm:flex-row sm:gap-1.5 sm:py-2.5 sm:px-2 rounded-xl text-sm font-semibold transition-all ${
                       active
                         ? "bg-gradient-to-r from-teal-600 to-cyan-600 text-white shadow-sm"
                         : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
                     <Icon className="w-4 h-4 shrink-0" />
-                    <span className="inline text-[11px] sm:text-sm leading-none">{tab.label}</span>
+                    <span className="text-[10px] sm:text-sm leading-none">{tab.label}</span>
                   </button>
                 );
               })}

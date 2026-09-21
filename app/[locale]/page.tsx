@@ -94,6 +94,8 @@ export default function HomePage() {
     isLocating,
     error: locationError,
   } = useUserLocation();
+  const [locErrorDismissed, setLocErrorDismissed] = useState(false);
+  useEffect(() => { setLocErrorDismissed(false); }, [locationError]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBloodGroup, setSelectedBloodGroup] = useState("");
   const [selectedDistrict, setSelectedDistrict] = useState("");
@@ -549,7 +551,7 @@ export default function HomePage() {
                 </div>
 
                 {/* GPS-off / permission-denied banner with platform-specific steps + retry */}
-                {locationError && !userLocation && !isLocating && (
+                {locationError && !isLocating && !locErrorDismissed && (
                   <div className="mb-2 sm:mb-3 px-3 py-2.5 rounded-xl bg-amber-50 ring-1 ring-amber-200 text-amber-900">
                     <div className="flex items-start gap-2">
                       <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600" />
@@ -559,11 +561,19 @@ export default function HomePage() {
                       </div>
                       <button
                         type="button"
-                        onClick={() => requestLocation()}
+                        onClick={() => { setLocErrorDismissed(false); requestLocation(); }}
                         className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-[11px] sm:text-xs font-bold hover:bg-amber-700 active:scale-95 transition-all whitespace-nowrap"
                       >
                         <MapPin className="w-3.5 h-3.5" />
                         {isBn ? "আবার চেষ্টা" : "Retry"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setLocErrorDismissed(true)}
+                        className="shrink-0 p-1 rounded-lg text-amber-500 hover:text-amber-800 hover:bg-amber-100 transition-colors"
+                        aria-label={isBn ? "বন্ধ করুন" : "Dismiss"}
+                      >
+                        <X className="w-4 h-4" />
                       </button>
                     </div>
                   </div>
