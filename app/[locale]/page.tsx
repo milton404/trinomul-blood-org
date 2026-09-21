@@ -679,9 +679,7 @@ export default function HomePage() {
                       </div>
                     )}
                     {!searchQuery && !thinking && (
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-5 h-5 rounded-md bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white pointer-events-none shadow-sm">
-                        <Sparkles className="w-3 h-3" />
-                      </span>
+                      <Sparkles className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-violet-500 pointer-events-none" />
                     )}
                     {searchQuery && !thinking && (
                       <button
