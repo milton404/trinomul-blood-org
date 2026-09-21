@@ -525,16 +525,18 @@ export default function HomePage() {
                   ? (isBn
                       ? "সেটিংস → লোকেশন → অন করুন"
                       : isIOS
-                        ? "Settings → Privacy & Security → Location Services → On"
-                        : "Settings → Location → Turn on")
+                        ? "Settings → Privacy → Location → On"
+                        : "Settings → Location → On")
                   : locErrPerm
                     ? (isBn
-                        ? "ব্রাউজার সেটিংস → সাইট সেটিংস → লোকেশন → অনুমতি দিন"
+                        ? "ব্রাউজার সেটিংস → লোকেশন → অনুমতি দিন"
                         : isIOS
-                          ? "Settings → Privacy & Security → Location Services → Browser → While Using"
-                          : "Browser ⋮ → Settings → Site settings → Location → Allow")
+                          ? "Settings → Safari → Location → While Using"
+                          : isAndroid
+                            ? "Chrome ⋮ → Settings → Location → Allow"
+                            : "Browser ⋮ → Settings → Site settings → Location → Allow")
                     : (isBn
-                        ? "জিপিএস চালু নিশ্চিত করে আবার চেষ্টা করুন"
+                        ? "জিপিএস চালু করে আবার চেষ্টা করুন"
                         : "Make sure GPS is on and try again");
                 return (
               <form
@@ -567,22 +569,22 @@ export default function HomePage() {
 
                 {/* GPS-off / permission-denied banner with platform-specific steps + retry */}
                 {locationError && !locErrorDismissed && (
-                  <div className="mb-2 sm:mb-3 px-3 py-2.5 rounded-xl bg-amber-50 ring-1 ring-amber-200 text-amber-900">
-                    <div className="flex items-start gap-2">
+                  <div className="mb-1.5 sm:mb-3 px-2.5 py-1.5 sm:px-3 sm:py-2.5 rounded-lg sm:rounded-xl bg-amber-50 ring-1 ring-amber-200 text-amber-900">
+                    <div className="flex items-start gap-1.5 sm:gap-2">
                       {isLocating ? (
-                        <Loader2 className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600 animate-spin" />
+                        <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0 mt-0.5 text-amber-600 animate-spin" />
                       ) : (
-                        <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600" />
+                        <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0 mt-0.5 text-amber-600" />
                       )}
                       <div className="flex-1 min-w-0">
                         {isLocating ? (
-                          <p className="text-[12px] sm:text-[13px] font-semibold leading-snug">
+                          <p className="text-[11px] sm:text-[13px] font-semibold leading-tight sm:leading-snug">
                             {isBn ? "অবস্থান খুঁজছি…" : "Locating…"}
                           </p>
                         ) : (
                           <>
-                            <p className="text-[12px] sm:text-[13px] font-semibold leading-snug">{locErrTitle}</p>
-                            <p className="text-[10px] sm:text-[11px] leading-snug text-amber-700 mt-0.5">{locErrSteps}</p>
+                            <p className="text-[11px] sm:text-[13px] font-semibold leading-tight sm:leading-snug">{locErrTitle}</p>
+                            <p className="text-[9px] sm:text-[11px] leading-tight sm:leading-snug text-amber-700 mt-0.5">{locErrSteps}</p>
                           </>
                         )}
                       </div>
@@ -591,18 +593,18 @@ export default function HomePage() {
                           <button
                             type="button"
                             onClick={handleRetryLocation}
-                            className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-[11px] sm:text-xs font-bold hover:bg-amber-700 active:scale-95 transition-all whitespace-nowrap"
+                            className="shrink-0 inline-flex items-center gap-0.5 sm:gap-1 px-2 py-1 sm:px-3 sm:py-1.5 rounded-md sm:rounded-lg bg-amber-600 text-white text-[10px] sm:text-xs font-bold hover:bg-amber-700 active:scale-95 transition-all whitespace-nowrap"
                           >
-                            <MapPin className="w-3.5 h-3.5" />
-                            {isBn ? "আবার চেষ্টা" : "Retry"}
+                            <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                            {isBn ? "আবার" : "Retry"}
                           </button>
                           <button
                             type="button"
                             onClick={() => setLocErrorDismissed(true)}
-                            className="shrink-0 p-1 rounded-lg text-amber-500 hover:text-amber-800 hover:bg-amber-100 transition-colors"
+                            className="shrink-0 p-0.5 sm:p-1 rounded-md sm:rounded-lg text-amber-500 hover:text-amber-800 hover:bg-amber-100 transition-colors"
                             aria-label={isBn ? "বন্ধ করুন" : "Dismiss"}
                           >
-                            <X className="w-4 h-4" />
+                            <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                           </button>
                         </>
                       )}
