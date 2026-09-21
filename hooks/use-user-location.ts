@@ -43,6 +43,20 @@ interface CachedLocation extends UserLocation {
   ts?: number;
 }
 
+/** Map a GeolocationPositionError to a specific, actionable message. */
+function locationErrorMessage(err: GeolocationPositionError): string {
+  switch (err.code) {
+    case err.PERMISSION_DENIED:
+      return "Location permission denied. Allow location access to auto-find your area.";
+    case err.POSITION_UNAVAILABLE:
+      return "Your phone's GPS/location is off. Please turn it on, then retry.";
+    case err.TIMEOUT:
+      return "Location request timed out. Make sure GPS is on and try again.";
+    default:
+      return "Unable to retrieve your location. Please check permissions.";
+  }
+}
+
 /**
  * Shared user-location hook.
  *
@@ -190,11 +204,11 @@ export function useUserLocation() {
         if (err.code === err.TIMEOUT || err.code === err.POSITION_UNAVAILABLE) {
           navigator.geolocation.getCurrentPosition(
             (pos) => handleGpsSuccess(pos),
-            () => handleGpsFailure("Unable to retrieve your location. Please check permissions."),
+            (retryErr) => handleGpsFailure(locationErrorMessage(retryErr)),
             { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
           );
         } else {
-          handleGpsFailure("Unable to retrieve your location. Please check permissions.");
+          handleGpsFailure(locationErrorMessage(err));
         }
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },

@@ -678,7 +678,7 @@ function DonorsContent() {
                 locale={locale as "en" | "bn"}
                 searchable
                 clearable
-                className="flex-1 min-w-[45%] sm:min-w-[140px] sm:flex-none"
+                className="flex-1 min-w-[45%] sm:w-auto sm:min-w-[140px] sm:flex-none"
                 label=""
               />
               <ModernSelect
@@ -695,7 +695,7 @@ function DonorsContent() {
                 searchable
                 clearable
                 disabled={!selectedDistrict}
-                className="flex-1 min-w-[45%] sm:min-w-[140px] sm:flex-none"
+                className="flex-1 min-w-[45%] sm:w-auto sm:min-w-[140px] sm:flex-none"
                 label=""
               />
               {availableUnions.length > 0 && (
@@ -712,11 +712,11 @@ function DonorsContent() {
                   locale={locale as "en" | "bn"}
                   searchable
                   clearable
-                  className="flex-1 min-w-[45%] sm:min-w-[140px] sm:flex-none"
+                  className="flex-1 min-w-[45%] sm:w-auto sm:min-w-[140px] sm:flex-none"
                   label=""
                 />
               )}
-              <div className="hidden md:block">{nearMeButton}</div>
+              <div className="hidden md:block flex-shrink-0">{nearMeButton}</div>
             </div>
           </div>
 
