@@ -519,8 +519,8 @@ export default function HomePage() {
                 const isPhone = isAndroid || isIOS;
                 const locErrTitle = locErrGpsOff
                   ? (isBn
-                      ? isPhone ? "আপনার ফোনের জিপিএস বন্ধ আছে।" : "লোকেশন বন্ধ আছে।"
-                      : isPhone ? "Your phone's GPS is off." : "Location is off.")
+                      ? isPhone ? "আপনার ডিভাইসের জিপিএস বন্ধ আছে।" : "লোকেশন বন্ধ আছে।"
+                      : isPhone ? "Your device's GPS is off." : "Location is off.")
                   : locErrPerm
                     ? (isBn ? "লোকেশন অনুমতি ব্লক করা হয়েছে।" : "Location permission blocked.")
                     : (isBn ? "লোকেশন পাওয়া যায়নি।" : "Location request failed.");

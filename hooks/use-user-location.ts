@@ -49,7 +49,7 @@ function locationErrorMessage(err: GeolocationPositionError): string {
     case err.PERMISSION_DENIED:
       return "Location permission denied. Allow location access to auto-find your area.";
     case err.POSITION_UNAVAILABLE:
-      return "Your phone's GPS/location is off. Please turn it on, then retry.";
+      return "Your device's GPS/location is off. Please turn it on, then retry.";
     case err.TIMEOUT:
       return "Location request timed out. Make sure GPS is on and try again.";
     default:
