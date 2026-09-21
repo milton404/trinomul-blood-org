@@ -384,6 +384,109 @@ export default function HomePage() {
     setSelectedUnion("");
   };
 
+  const isBn = locale === "bn";
+  const locUa = typeof navigator !== "undefined" ? navigator.userAgent : "";
+  const locIsAndroid = /android/i.test(locUa);
+  const locIsIOS = /iphone|ipad|ipod/i.test(locUa);
+  const locIsPhone = locIsAndroid || locIsIOS;
+  const locErrGpsOff = locationError?.includes("GPS") || locationError?.includes("off");
+  const locErrPerm = locationError?.includes("permission");
+  const locErrTitle = locErrGpsOff
+    ? (isBn
+        ? locIsPhone ? "আপনার ডিভাইসের জিপিএস বন্ধ আছে।" : "লোকেশন বন্ধ আছে।"
+        : locIsPhone ? "Your device's GPS is off." : "Location is off.")
+    : locErrPerm
+      ? (isBn ? "লোকেশনের অনুমতি দেওয়া হয়নি।" : "Location permission blocked.")
+      : (isBn ? "লোকেশন পাওয়া যায়নি।" : "Location request failed.");
+  const locErrSteps = locErrGpsOff
+    ? (isBn
+        ? locIsPhone
+          ? "সেটিংস → লোকেশন → অন, অথবা উপরে সোয়াইপ করে লোকেশন চালু করুন"
+          : "ব্রাউজার বা ওএস সেটিংসে লোকেশন চালু করুন"
+        : locIsIOS
+          ? "Settings → Privacy → Location → On"
+          : locIsAndroid
+            ? "Swipe down from top → tap Location, or Settings → Location → On"
+            : "Enable location in your browser or OS settings")
+    : locErrPerm
+      ? (isBn
+          ? locIsPhone
+            ? "সেটিংস থেকে লোকেশন চালু করুন, অথবা উপরে সোয়াইপ করে লোকেশন অন করুন"
+            : "ব্রাউজার সেটিংস → সাইট সেটিংস → লোকেশন → অনুমতি দিন"
+          : locIsIOS
+            ? "Settings → Privacy → Location → On"
+            : locIsAndroid
+              ? "Swipe down from top → tap Location, or Settings → Location → On"
+              : "Browser ⋮ → Settings → Site settings → Location → Allow")
+      : (isBn
+          ? "জিপিএস চালু করে আবার চেষ্টা করুন"
+          : "Make sure GPS is on and try again");
+
+  const handleSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSearching(true);
+    setAiStatus("idle");
+
+    const params = new URLSearchParams();
+    // Dropdown selections take priority — they are the user's explicit choice
+    let finalBloodGroup = selectedBloodGroup;
+    let finalDistrict = selectedDistrict;
+    let finalUpazila = selectedUpazila;
+    let finalDonationType = "";
+    let finalStatus = "";
+    let finalKeywords = "";
+
+    // If user typed a natural-language query, let AI fill in the gaps only
+    if (searchQuery.trim()) {
+      setAiStatus("thinking");
+      try {
+        const parsed = await serverParseSearchQuery(searchQuery.trim());
+        if (parsed.ai_used) {
+          setAiStatus("parsed");
+        } else {
+          setAiStatus("fallback");
+        }
+        // Dropdown FILTERS have priority over AI (user explicitly chose them).
+        // AI only fills in what the dropdowns don't have.
+        if (parsed.blood_group && !finalBloodGroup) finalBloodGroup = parsed.blood_group;
+        if (parsed.district_id && !finalDistrict) finalDistrict = parsed.district_id;
+        if (parsed.upazila_id && !finalUpazila) {
+          // Only use AI's upazila if it belongs to the final district
+          const upaBelongsToFinalDistrict = !parsed.district_id || parsed.district_id === finalDistrict;
+          if (upaBelongsToFinalDistrict) {
+            finalUpazila = parsed.upazila_id;
+          }
+        }
+        // If AI gave a district but dropdown already had one, and AI's upazila
+        // belongs to the dropdown's district, still use it (no conflict here)
+        if (parsed.upazila_id && !finalUpazila && parsed.district_id && parsed.district_id !== finalDistrict) {
+          // AI's upazila belongs to a different district than dropdown — skip it
+        }
+        finalKeywords = parsed.keywords || "";
+        finalDonationType = parsed.donation_type || "";
+        finalStatus = parsed.status || "";
+      } catch (err) {
+        console.warn("[Home search] AI parse failed, using raw query:", err);
+        setAiStatus("fallback");
+        finalKeywords = searchQuery.trim();
+      }
+    }
+
+    if (finalBloodGroup) params.set("blood_group", finalBloodGroup);
+    if (finalDistrict) params.set("district", finalDistrict);
+    if (finalUpazila) params.set("upazila", finalUpazila);
+    if (selectedUnion) params.set("union", selectedUnion);
+    if (finalDonationType && finalDonationType !== "all") params.set("type", finalDonationType);
+    if (finalStatus && finalStatus !== "all") params.set("status", finalStatus);
+
+    // Build the q param: use AI-extracted keywords (names, phones, etc.)
+    // Only fall back to raw query if AI didn't extract any structured fields
+    const parsedSomething = finalBloodGroup || finalDistrict || finalUpazila || finalDonationType || finalStatus;
+    const qText = finalKeywords || (parsedSomething ? "" : searchQuery.trim());
+    if (qText) params.set("q", qText);
+
+    window.location.href = `/${locale}/donors?${params.toString()}`;
+  };
 
   return (
     <div className="min-h-screen flex flex-col">
