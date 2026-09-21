@@ -516,20 +516,29 @@ export default function HomePage() {
                     : t("search_btn");
                 const locErrGpsOff = locationError?.includes("GPS") || locationError?.includes("off");
                 const locErrPerm = locationError?.includes("permission");
+                const isPhone = isAndroid || isIOS;
                 const locErrTitle = locErrGpsOff
-                  ? (isBn ? "আপনার ফোনের জিপিএস বন্ধ আছে।" : "Your phone's GPS is off.")
+                  ? (isBn
+                      ? isPhone ? "আপনার ফোনের জিপিএস বন্ধ আছে।" : "লোকেশন বন্ধ আছে।"
+                      : isPhone ? "Your phone's GPS is off." : "Location is off.")
                   : locErrPerm
                     ? (isBn ? "লোকেশন অনুমতি ব্লক করা হয়েছে।" : "Location permission blocked.")
                     : (isBn ? "লোকেশন পাওয়া যায়নি।" : "Location request failed.");
                 const locErrSteps = locErrGpsOff
                   ? (isBn
-                      ? "সেটিংস → লোকেশন → অন, অথবা উপরে সোয়াইপ করে লোকেশন চালু করুন"
+                      ? isPhone
+                        ? "সেটিংস → লোকেশন → অন, অথবা উপরে সোয়াইপ করে লোকেশন চালু করুন"
+                        : "ব্রাউজার বা ওএস সেটিংসে লোকেশন চালু করুন"
                       : isIOS
                         ? "Settings → Privacy → Location → On"
-                        : "Swipe down from top → tap Location, or Settings → Location → On")
+                        : isAndroid
+                          ? "Swipe down from top → tap Location, or Settings → Location → On"
+                          : "Enable location in your browser or OS settings")
                   : locErrPerm
                     ? (isBn
-                        ? "সেটিংস থেকে লোকেশন চালু করুন, অথবা উপরে সোয়াইপ করে লোকেশন অন করুন"
+                        ? isPhone
+                          ? "সেটিংস থেকে লোকেশন চালু করুন, অথবা উপরে সোয়াইপ করে লোকেশন অন করুন"
+                          : "ব্রাউজার সেটিংস → সাইট সেটিংস → লোকেশন → অনুমতি দিন"
                         : isIOS
                           ? "Settings → Privacy → Location → On"
                           : isAndroid
