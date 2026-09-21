@@ -1398,49 +1398,46 @@ export default function HomePage() {
       </main>
       <Footer />
 
-      {/* Location error popup modal */}
+      {/* Location error corner popup — no backdrop, doesn't block the page */}
       {locationError && !locErrorDismissed && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm"
-          onClick={() => !isLocating && setLocErrorDismissed(true)}
+          className="fixed right-3 bottom-24 sm:right-6 sm:bottom-6 z-[100]
+                     w-[calc(100%-1.5rem)] max-w-xs sm:max-w-sm
+                     rounded-xl bg-white ring-1 ring-amber-200
+                     shadow-[0_8px_30px_-6px_rgba(15,23,42,0.25)]
+                     overflow-hidden animate-[fadeSlideIn_0.2s_ease-out]"
         >
-          <div
-            className="relative w-full max-w-sm rounded-2xl bg-white shadow-2xl ring-1 ring-amber-200 overflow-hidden animate-[fadeSlideIn_0.2s_ease-out]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="px-5 py-5 sm:px-6 sm:py-6">
-              <div className="flex items-start gap-3">
-                {isLocating ? (
-                  <Loader2 className="w-6 h-6 flex-shrink-0 text-amber-600 animate-spin" />
-                ) : (
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center">
-                    <MapPin className="w-5 h-5 text-amber-600" />
-                  </div>
-                )}
-                <div className="flex-1 min-w-0">
-                  {isLocating ? (
-                    <p className="text-sm sm:text-base font-semibold text-slate-800">
-                      {isBn ? "অবস্থান খুঁজছি…" : "Locating…"}
-                    </p>
-                  ) : (
-                    <>
-                      <p className="text-sm sm:text-base font-semibold text-slate-800 leading-snug">{locErrTitle}</p>
-                      <p className="text-xs sm:text-[13px] leading-snug text-amber-700 mt-1">{locErrSteps}</p>
-                    </>
-                  )}
+          <div className="px-3.5 py-3 sm:px-5 sm:py-4">
+            <div className="flex items-start gap-2.5 sm:gap-3">
+              {isLocating ? (
+                <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0 text-amber-600 animate-spin" />
+              ) : (
+                <div className="flex-shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-amber-100 flex items-center justify-center">
+                  <MapPin className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600" />
                 </div>
-                {!isLocating && (
-                  <button
-                    type="button"
-                    onClick={() => setLocErrorDismissed(true)}
-                    className="shrink-0 p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-                    aria-label={isBn ? "বন্ধ করুন" : "Close"}
-                  >
-                    <X className="w-5 h-5" />
-                  </button>
+              )}
+              <div className="flex-1 min-w-0">
+                {isLocating ? (
+                  <p className="text-[13px] sm:text-base font-semibold text-slate-800">
+                    {isBn ? "অবস্থান খুঁজছি…" : "Locating…"}
+                  </p>
+                ) : (
+                  <>
+                    <p className="text-[13px] sm:text-base font-semibold text-slate-800 leading-snug">{locErrTitle}</p>
+                    <p className="text-[11px] sm:text-[13px] leading-snug text-amber-700 mt-0.5">{locErrSteps}</p>
+                  </>
                 )}
               </div>
-
+              {!isLocating && (
+                <button
+                  type="button"
+                  onClick={() => setLocErrorDismissed(true)}
+                  className="shrink-0 p-1 rounded-md text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                  aria-label={isBn ? "বন্ধ করুন" : "Close"}
+                >
+                  <X className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
+              )}
             </div>
           </div>
         </div>
