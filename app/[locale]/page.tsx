@@ -384,6 +384,21 @@ export default function HomePage() {
     setSelectedUnion("");
   };
 
+  const handleRetryLocation = async () => {
+    setLocErrorDismissed(false);
+    try {
+      if (navigator.permissions) {
+        const result = await navigator.permissions.query({ name: "geolocation" as PermissionName });
+        if (result.state === "denied") {
+          return;
+        }
+      }
+    } catch {
+      // Permissions API not supported — proceed with retry anyway
+    }
+    requestLocation();
+  };
+
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSearching(true);
@@ -551,30 +566,46 @@ export default function HomePage() {
                 </div>
 
                 {/* GPS-off / permission-denied banner with platform-specific steps + retry */}
-                {locationError && !isLocating && !locErrorDismissed && (
+                {locationError && !locErrorDismissed && (
                   <div className="mb-2 sm:mb-3 px-3 py-2.5 rounded-xl bg-amber-50 ring-1 ring-amber-200 text-amber-900">
                     <div className="flex items-start gap-2">
-                      <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600" />
+                      {isLocating ? (
+                        <Loader2 className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600 animate-spin" />
+                      ) : (
+                        <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600" />
+                      )}
                       <div className="flex-1 min-w-0">
-                        <p className="text-[12px] sm:text-[13px] font-semibold leading-snug">{locErrTitle}</p>
-                        <p className="text-[10px] sm:text-[11px] leading-snug text-amber-700 mt-0.5">{locErrSteps}</p>
+                        {isLocating ? (
+                          <p className="text-[12px] sm:text-[13px] font-semibold leading-snug">
+                            {isBn ? "অবস্থান খুঁজছি…" : "Locating…"}
+                          </p>
+                        ) : (
+                          <>
+                            <p className="text-[12px] sm:text-[13px] font-semibold leading-snug">{locErrTitle}</p>
+                            <p className="text-[10px] sm:text-[11px] leading-snug text-amber-700 mt-0.5">{locErrSteps}</p>
+                          </>
+                        )}
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => { setLocErrorDismissed(false); requestLocation(); }}
-                        className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-[11px] sm:text-xs font-bold hover:bg-amber-700 active:scale-95 transition-all whitespace-nowrap"
-                      >
-                        <MapPin className="w-3.5 h-3.5" />
-                        {isBn ? "আবার চেষ্টা" : "Retry"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setLocErrorDismissed(true)}
-                        className="shrink-0 p-1 rounded-lg text-amber-500 hover:text-amber-800 hover:bg-amber-100 transition-colors"
-                        aria-label={isBn ? "বন্ধ করুন" : "Dismiss"}
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                      {!isLocating && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={handleRetryLocation}
+                            className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-[11px] sm:text-xs font-bold hover:bg-amber-700 active:scale-95 transition-all whitespace-nowrap"
+                          >
+                            <MapPin className="w-3.5 h-3.5" />
+                            {isBn ? "আবার চেষ্টা" : "Retry"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setLocErrorDismissed(true)}
+                            className="shrink-0 p-1 rounded-lg text-amber-500 hover:text-amber-800 hover:bg-amber-100 transition-colors"
+                            aria-label={isBn ? "বন্ধ করুন" : "Dismiss"}
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
                 )}
