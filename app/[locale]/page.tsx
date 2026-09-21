@@ -523,17 +523,17 @@ export default function HomePage() {
                     : (isBn ? "লোকেশন পাওয়া যায়নি।" : "Location request failed.");
                 const locErrSteps = locErrGpsOff
                   ? (isBn
-                      ? "সেটিংস → লোকেশন → অন করুন"
+                      ? "সেটিংস → লোকেশন → অন, অথবা উপরে সোয়াইপ করে লোকেশন চালু করুন"
                       : isIOS
                         ? "Settings → Privacy → Location → On"
-                        : "Settings → Location → On")
+                        : "Swipe down from top → tap Location, or Settings → Location → On")
                   : locErrPerm
                     ? (isBn
-                        ? "ব্রাউজার সেটিংস → লোকেশন → অনুমতি দিন"
+                        ? "সেটিংস থেকে লোকেশন চালু করুন, অথবা উপরে সোয়াইপ করে লোকেশন অন করুন"
                         : isIOS
-                          ? "Settings → Safari → Location → While Using"
+                          ? "Settings → Privacy → Location → On"
                           : isAndroid
-                            ? "Chrome ⋮ → Settings → Location → Allow"
+                            ? "Swipe down from top → tap Location, or Settings → Location → On"
                             : "Browser ⋮ → Settings → Site settings → Location → Allow")
                     : (isBn
                         ? "জিপিএস চালু করে আবার চেষ্টা করুন"
