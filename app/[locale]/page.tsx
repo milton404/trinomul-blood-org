@@ -485,6 +485,9 @@ export default function HomePage() {
                 const hasFilters = !!(selectedBloodGroup || selectedDistrict || selectedUpazila || searchQuery.trim());
                 const thinking = isSearching && aiStatus === "thinking";
                 const isBn = locale === "bn";
+                const ua = typeof navigator !== "undefined" ? navigator.userAgent : "";
+                const isAndroid = /android/i.test(ua);
+                const isIOS = /iphone|ipad|ipod/i.test(ua);
                 const searchPlaceholder = isBn
                   ? "রক্তের গ্রুপ, এলাকা, নাম বা ফোন লিখুন…"
                   : "Type blood group, area, name or phone…";
@@ -494,6 +497,28 @@ export default function HomePage() {
                   : isSearching
                     ? (isBn ? "খুঁজছে…" : "Searching…")
                     : t("search_btn");
+                const locErrGpsOff = locationError?.includes("GPS") || locationError?.includes("off");
+                const locErrPerm = locationError?.includes("permission");
+                const locErrTitle = locErrGpsOff
+                  ? (isBn ? "আপনার ফোনের জিপিএস বন্ধ আছে।" : "Your phone's GPS is off.")
+                  : locErrPerm
+                    ? (isBn ? "লোকেশন অনুমতি ব্লক করা হয়েছে।" : "Location permission blocked.")
+                    : (isBn ? "লোকেশন পাওয়া যায়নি।" : "Location request failed.");
+                const locErrSteps = locErrGpsOff
+                  ? (isBn
+                      ? "সেটিংস → লোকেশন → অন করুন"
+                      : isIOS
+                        ? "Settings → Privacy & Security → Location Services → On"
+                        : "Settings → Location → Turn on")
+                  : locErrPerm
+                    ? (isBn
+                        ? "ব্রাউজার সেটিংস → সাইট সেটিংস → লোকেশন → অনুমতি দিন"
+                        : isIOS
+                          ? "Settings → Privacy & Security → Location Services → Browser → While Using"
+                          : "Browser ⋮ → Settings → Site settings → Location → Allow")
+                    : (isBn
+                        ? "জিপিএস চালু নিশ্চিত করে আবার চেষ্টা করুন"
+                        : "Make sure GPS is on and try again");
                 return (
               <form
                 onSubmit={handleSearch}
@@ -523,27 +548,24 @@ export default function HomePage() {
                   </span>
                 </div>
 
-                {/* GPS-off / permission-denied banner with retry */}
+                {/* GPS-off / permission-denied banner with platform-specific steps + retry */}
                 {locationError && !userLocation && !isLocating && (
-                  <div className="mb-2 sm:mb-3 flex items-center gap-2 px-3 py-2 rounded-xl bg-amber-50 ring-1 ring-amber-200 text-amber-800 text-[11px] sm:text-xs">
-                    <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span className="flex-1 min-w-0 leading-snug">
-                      {isBn
-                        ? (locationError.includes("GPS") || locationError.includes("off"))
-                          ? "আপনার ফোনের জিপিএস/লোকেশন বন্ধ আছে। চালু করে আবার চেষ্টা করুন।"
-                          : locationError.includes("permission")
-                            ? "লোকেশন অনুমতি দেওয়া হয়নি। এলাকা স্বয়ংক্রিয়ভাবে নির্বাচনে অনুমতি দিন।"
-                            : "লোকেশন পাওয়া যায়নি। জিপিএস চালু আছে কিনা দেখে আবার চেষ্টা করুন।"
-                        : locationError}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => requestLocation()}
-                      className="shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-600 text-white text-[10px] sm:text-[11px] font-bold hover:bg-amber-700 active:scale-95 transition-all"
-                    >
-                      <MapPin className="w-3 h-3" />
-                      {isBn ? "চেষ্টা করুন" : "Retry"}
-                    </button>
+                  <div className="mb-2 sm:mb-3 px-3 py-2.5 rounded-xl bg-amber-50 ring-1 ring-amber-200 text-amber-900">
+                    <div className="flex items-start gap-2">
+                      <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-600" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[12px] sm:text-[13px] font-semibold leading-snug">{locErrTitle}</p>
+                        <p className="text-[10px] sm:text-[11px] leading-snug text-amber-700 mt-0.5">{locErrSteps}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => requestLocation()}
+                        className="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-amber-600 text-white text-[11px] sm:text-xs font-bold hover:bg-amber-700 active:scale-95 transition-all whitespace-nowrap"
+                      >
+                        <MapPin className="w-3.5 h-3.5" />
+                        {isBn ? "আবার চেষ্টা" : "Retry"}
+                      </button>
+                    </div>
                   </div>
                 )}
 
