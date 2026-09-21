@@ -84,7 +84,7 @@ export default function BottomNav() {
                   className={`relative flex h-8 w-11 items-center justify-center rounded-full transition-all duration-300 ${
                     active
                       ? "bg-gradient-to-b from-red-500 to-red-600 text-white ring-2 ring-white/70 shadow-[0_6px_20px_-4px_rgba(220,38,38,0.7),0_2px_8px_-2px_rgba(220,38,38,0.45),inset_0_1px_0_rgba(255,255,255,0.5),inset_0_-5px_10px_-6px_rgba(127,29,29,0.65)] animate-[bottom-nav-pop_0.4s_ease-out_both]"
-                      : "text-red-500"
+                      : "text-slate-600"
                   }`}
                 >
                   <Icon
@@ -100,7 +100,7 @@ export default function BottomNav() {
                 </span>
                 <span
                   className={`text-[11px] leading-none transition-colors duration-300 ${
-                    active ? "font-semibold text-red-600" : "font-medium text-red-500/80"
+                    active ? "font-semibold text-red-600" : "font-medium text-slate-500"
                   }`}
                 >
                   {tab.label}
