@@ -477,7 +477,7 @@ export default function HomePage() {
         ? locIsPhone ? "আপনার ডিভাইসের জিপিএস বন্ধ আছে।" : "লোকেশন বন্ধ আছে।"
         : locIsPhone ? "Your device's GPS is off." : "Location is off.")
     : locErrPerm
-      ? (isBn ? "লোকেশন অনুমতি ব্লক করা হয়েছে।" : "Location permission blocked.")
+      ? (isBn ? "লোকেশনের অনুমতি দেওয়া হয়নি।" : "Location permission blocked.")
       : (isBn ? "লোকেশন পাওয়া যায়নি।" : "Location request failed.");
   const locErrSteps = locErrGpsOff
     ? (isBn
@@ -560,7 +560,7 @@ export default function HomePage() {
                       ? isPhone ? "আপনার ডিভাইসের জিপিএস বন্ধ আছে।" : "লোকেশন বন্ধ আছে।"
                       : isPhone ? "Your device's GPS is off." : "Location is off.")
                   : locErrPerm
-                    ? (isBn ? "লোকেশন অনুমতি ব্লক করা হয়েছে।" : "Location permission blocked.")
+                    ? (isBn ? "লোকেশনের অনুমতি দেওয়া হয়নি।" : "Location permission blocked.")
                     : (isBn ? "লোকেশন পাওয়া যায়নি।" : "Location request failed.");
                 const locErrSteps = locErrGpsOff
                   ? (isBn
