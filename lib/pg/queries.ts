@@ -7,6 +7,7 @@ import {
   generateTrackingCode,
 } from "@/lib/db";
 import { resolveLocationCoordinates } from "@/lib/location-coordinates";
+import { RANGPUR_DISTRICTS, RANGPUR_UPAZILAS } from "@/lib/constants/rangpur";
 
 // ── Helpers ───────────────────────────────────────────────────────────
 
@@ -929,6 +930,179 @@ export async function getDonorMatchesForRequestPg(requestId: number) {
     [requestId],
   );
   return rows;
+}
+
+/** Match requests addressed to a specific donor (in-app response flow). */
+export async function getDonorMatchRequestsPg(donorId: number) {
+  const { rows } = await query(
+    `SELECT
+       dm.id AS match_id,
+       dm.request_id,
+       dm.match_rank,
+       dm.notification_method,
+       dm.response_status,
+       dm.responded_at,
+       dm.created_at AS matched_at,
+       br.patient_name,
+       br.patient_age,
+       br.blood_group,
+       br.units_needed,
+       br.urgency_level,
+       br.when_needed,
+       br.needed_date,
+       br.needed_time,
+       br.district,
+       br.upazila,
+       br.hospital_name,
+       br.hospital_address,
+       br.contact_number,
+       br.whatsapp_number,
+       br.reason,
+       br.status AS request_status,
+       br.tracking_code
+     FROM donor_matches dm
+     JOIN blood_requests br ON dm.request_id = br.id
+     WHERE dm.donor_id = $1
+     ORDER BY dm.created_at DESC`,
+    [donorId],
+  );
+  return rows;
+}
+
+/** All active requests a donor is eligible to fulfill (profile inbox). */
+export async function getMatchingRequestsForDonorPg(donorId: number) {
+  const { rows: donorRows } = await query(
+    `SELECT id, blood_group, district, upazila, sex, hb_level,
+            is_active, is_approved, last_donation_date, last_donation_type
+     FROM profiles WHERE id = $1`,
+    [donorId],
+  );
+  const donor = donorRows[0] as any;
+  if (!donor || !donor.blood_group || !donor.district) return [];
+  if (donor.is_active !== true) return [];
+  if (donor.is_approved !== true) return [];
+
+  const hb = donor.hb_level == null ? null : Number(donor.hb_level);
+  if (hb != null) {
+    if (donor.sex === "female" && hb < 12.5) return [];
+    if (donor.sex !== "female" && hb < 13.0) return [];
+  }
+
+  const { rows: perTypeRows } = await query(
+    `SELECT
+       MAX(CASE WHEN donation_type = 'whole_blood' OR donation_type IS NULL THEN donation_date END) as last_wb,
+       MAX(CASE WHEN donation_type = 'platelets' THEN donation_date END) as last_pl,
+       MAX(CASE WHEN donation_type = 'plasma' THEN donation_date END) as last_pm
+     FROM donations WHERE donor_id = $1`,
+    [donorId],
+  );
+  const perType = perTypeRows[0] as any;
+  const now = Date.now();
+  const daysSince = (d: string | null | undefined) =>
+    d ? Math.floor((now - new Date(d).getTime()) / 86400000) : null;
+  const effWb = perType?.last_wb ?? (donor.last_donation_date && (donor.last_donation_type || "whole_blood") === "whole_blood" ? donor.last_donation_date : null);
+  const effPl = perType?.last_pl ?? (donor.last_donation_date && donor.last_donation_type === "platelets" ? donor.last_donation_date : null);
+  const effPm = perType?.last_pm ?? (donor.last_donation_date && donor.last_donation_type === "plasma" ? donor.last_donation_date : null);
+  const wbDays = daysSince(effWb);
+  const plDays = daysSince(effPl);
+  const pmDays = daysSince(effPm);
+  const eligible =
+    wbDays === null || wbDays >= 90 ||
+    plDays === null || plDays >= 14 ||
+    pmDays === null || pmDays >= 30;
+  if (!eligible) return [];
+
+  const patientGroups = Object.keys(COMPATIBLE_DONORS)
+    .filter((p) => p !== "ANY" && COMPATIBLE_DONORS[p].includes(donor.blood_group));
+  if (patientGroups.length === 0) return [];
+
+  const districtValues = new Set<string>([donor.district]);
+  const entry = RANGPUR_DISTRICTS.find(
+    (d) =>
+      d.id.toLowerCase() === String(donor.district).toLowerCase() ||
+      d.name_en.toLowerCase() === String(donor.district).toLowerCase() ||
+      d.name_bn === donor.district,
+  );
+  if (entry) {
+    districtValues.add(entry.id);
+    districtValues.add(entry.name_en);
+    districtValues.add(entry.name_bn);
+  }
+  const districtList = [...districtValues];
+
+  // Upazila match values — scope to the donor's own upazila (all unions within
+  // it). Falls back to district-wide when the donor has no upazila set.
+  let upazilaList: string[] = [];
+  if (donor.upazila) {
+    const upazilaValues = new Set<string>([donor.upazila]);
+    const upazilaEntry = RANGPUR_UPAZILAS.find(
+      (u) =>
+        u.id.toLowerCase() === String(donor.upazila).toLowerCase() ||
+        u.name_en.toLowerCase() === String(donor.upazila).toLowerCase() ||
+        u.name_bn === donor.upazila,
+    );
+    if (upazilaEntry) {
+      upazilaValues.add(upazilaEntry.id);
+      upazilaValues.add(upazilaEntry.name_en);
+      upazilaValues.add(upazilaEntry.name_bn);
+    }
+    upazilaList = [...upazilaValues];
+  }
+
+  const params: any[] = [donorId];
+  const bgIdx = patientGroups.map((_, i) => `$${params.length + i + 1}`);
+  params.push(...patientGroups);
+  const distIdx = districtList.map((_, i) => `$${params.length + i + 1}`);
+  params.push(...districtList);
+  const upazilaIdx = upazilaList.map((_, i) => `$${params.length + i + 1}`);
+  params.push(...upazilaList);
+  const upazilaClause = upazilaList.length
+    ? ` AND (br.urgency_level = 'critical' OR br.upazila IN (${upazilaIdx.join(",")}))`
+    : "";
+
+  const { rows } = await query(
+    `SELECT
+       br.id AS request_id,
+       br.patient_name, br.patient_age, br.blood_group, br.units_needed,
+       br.urgency_level, br.when_needed, br.needed_date, br.needed_time,
+       br.district, br.upazila, br.hospital_name, br.hospital_address,
+       br.contact_number, br.whatsapp_number, br.reason, br.tracking_code,
+       br.status AS request_status, br.created_at,
+       dm.id AS match_id, dm.match_rank, dm.notification_method,
+       COALESCE(dm.response_status, 'pending') AS response_status,
+       dm.responded_at, dm.created_at AS matched_at
+     FROM blood_requests br
+     LEFT JOIN donor_matches dm ON dm.request_id = br.id AND dm.donor_id = $1
+     WHERE br.blood_group IN (${bgIdx.join(",")})
+       AND br.status = 'active'
+       AND br.district IN (${distIdx.join(",")})${upazilaClause}
+     ORDER BY
+       CASE br.urgency_level WHEN 'critical' THEN 0 WHEN 'urgent' THEN 1 ELSE 2 END,
+       br.created_at DESC`,
+    params,
+  );
+  return rows;
+}
+
+/** Upsert a donor match response (inserts a self_matched row if none exists). */
+export async function upsertDonorMatchResponsePg(
+  requestId: number,
+  donorId: number,
+  responseStatus: "accepted" | "declined",
+): Promise<number> {
+  const { rows } = await query(
+    "SELECT id FROM donor_matches WHERE request_id = $1 AND donor_id = $2",
+    [requestId, donorId],
+  );
+  if (rows[0]) {
+    return updateDonorMatchResponsePg(requestId, donorId, responseStatus);
+  }
+  await query(
+    `INSERT INTO donor_matches (request_id, donor_id, match_rank, match_score, notification_method, response_status, responded_at)
+     VALUES ($1, $2, 0, 0, 'self_matched', $3, NOW())`,
+    [requestId, donorId, responseStatus],
+  );
+  return 1;
 }
 
 export async function getAllDonorMatchesPg(filters?: {

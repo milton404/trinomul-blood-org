@@ -6,6 +6,7 @@ import {
   resolveLocationCoordinates,
 } from "@/lib/location-coordinates";
 import { rankDonorCandidates } from "@/lib/donor-ranking";
+import { RANGPUR_DISTRICTS, RANGPUR_UPAZILAS } from "@/lib/constants/rangpur";
 
 // Use relative path for server-only module
 const DB_PATH = path.resolve("data/bloodbank.db");
@@ -2726,6 +2727,194 @@ export function getDonorMatchesForRequest(requestId: number) {
        ORDER BY dm.match_rank ASC`,
     )
     .all(requestId);
+}
+
+/**
+ * Match requests addressed to a specific donor, joined with the request so
+ * the donor can accept/decline them in-app. Newest match first.
+ */
+export function getDonorMatchRequests(donorId: number) {
+  const db = getDb();
+  return db
+    .prepare(
+      `SELECT
+         dm.id AS match_id,
+         dm.request_id,
+         dm.match_rank,
+         dm.notification_method,
+         dm.response_status,
+         dm.responded_at,
+         dm.created_at AS matched_at,
+         br.patient_name,
+         br.patient_age,
+         br.blood_group,
+         br.units_needed,
+         br.urgency_level,
+         br.when_needed,
+         br.needed_date,
+         br.needed_time,
+         br.district,
+         br.upazila,
+         br.hospital_name,
+         br.hospital_address,
+         br.contact_number,
+         br.whatsapp_number,
+         br.reason,
+         br.status AS request_status,
+         br.tracking_code
+       FROM donor_matches dm
+       JOIN blood_requests br ON dm.request_id = br.id
+       WHERE dm.donor_id = ?
+       ORDER BY dm.created_at DESC`,
+    )
+    .all(donorId);
+}
+
+/**
+ * All ACTIVE blood requests a specific donor is eligible to fulfill —
+ * compatible blood group, eligible (active/approved/Hb/cooldown), and in the
+ * donor's own district (same upazila prioritized). Decoupled from the email
+ * notification cap: every matching donor sees these in their profile, whether
+ * or not they were emailed. LEFT JOINs donor_matches so a prior
+ * accept/decline is surfaced (defaults to 'pending' when no row exists).
+ */
+export function getMatchingRequestsForDonor(donorId: number) {
+  const db = getDb();
+  const donor = db
+    .prepare(
+      `SELECT id, blood_group, district, upazila, sex, hb_level,
+              is_active, is_approved, last_donation_date, last_donation_type
+       FROM profiles WHERE id = ?`,
+    )
+    .get(donorId) as any;
+  if (!donor || !donor.blood_group || !donor.district) return [];
+  if (donor.is_active !== 1 && donor.is_active !== true) return [];
+  if (donor.is_approved !== 1 && donor.is_approved !== true) return [];
+
+  // Hb gate (mirrors findMatchingDonors).
+  const hb = donor.hb_level == null ? null : Number(donor.hb_level);
+  if (hb != null) {
+    if (donor.sex === "female" && hb < 12.5) return [];
+    if (donor.sex !== "female" && hb < 13.0) return [];
+  }
+
+  // Donation cooldown (mirrors findMatchingDonors eligibility CASE).
+  const perType = db
+    .prepare(
+      `SELECT
+         MAX(CASE WHEN donation_type = 'whole_blood' OR donation_type IS NULL THEN donation_date END) as last_wb,
+         MAX(CASE WHEN donation_type = 'platelets' THEN donation_date END) as last_pl,
+         MAX(CASE WHEN donation_type = 'plasma' THEN donation_date END) as last_pm
+       FROM donations WHERE donor_id = ?`,
+    )
+    .get(donorId) as any;
+  const now = Date.now();
+  const daysSince = (d: string | null | undefined) =>
+    d ? Math.floor((now - new Date(d.includes("T") ? d : d.replace(" ", "T") + "Z").getTime()) / 86400000) : null;
+  const effWb = perType?.last_wb ?? (donor.last_donation_date && (donor.last_donation_type || "whole_blood") === "whole_blood" ? donor.last_donation_date : null);
+  const effPl = perType?.last_pl ?? (donor.last_donation_date && donor.last_donation_type === "platelets" ? donor.last_donation_date : null);
+  const effPm = perType?.last_pm ?? (donor.last_donation_date && donor.last_donation_type === "plasma" ? donor.last_donation_date : null);
+  const wbDays = daysSince(effWb);
+  const plDays = daysSince(effPl);
+  const pmDays = daysSince(effPm);
+  const eligible =
+    wbDays === null || wbDays >= 90 ||
+    plDays === null || plDays >= 14 ||
+    pmDays === null || pmDays >= 30;
+  if (!eligible) return [];
+
+  // Compatible patient blood groups (inverse of COMPATIBLE_DONORS).
+  const patientGroups = Object.keys(COMPATIBLE_DONORS)
+    .filter((p) => p !== "ANY" && COMPATIBLE_DONORS[p].includes(donor.blood_group));
+  if (patientGroups.length === 0) return [];
+
+  // District match values (id / name_en / name_bn) — requests may store any form.
+  const districtValues = new Set<string>([donor.district]);
+  const entry = RANGPUR_DISTRICTS.find(
+    (d) =>
+      d.id.toLowerCase() === String(donor.district).toLowerCase() ||
+      d.name_en.toLowerCase() === String(donor.district).toLowerCase() ||
+      d.name_bn === donor.district,
+  );
+  if (entry) {
+    districtValues.add(entry.id);
+    districtValues.add(entry.name_en);
+    districtValues.add(entry.name_bn);
+  }
+  const districtList = [...districtValues];
+
+  // Upazila match values — scope to the donor's own upazila (all unions within
+  // it). Falls back to district-wide when the donor has no upazila set.
+  let upazilaList: string[] = [];
+  if (donor.upazila) {
+    const upazilaValues = new Set<string>([donor.upazila]);
+    const upazilaEntry = RANGPUR_UPAZILAS.find(
+      (u) =>
+        u.id.toLowerCase() === String(donor.upazila).toLowerCase() ||
+        u.name_en.toLowerCase() === String(donor.upazila).toLowerCase() ||
+        u.name_bn === donor.upazila,
+    );
+    if (upazilaEntry) {
+      upazilaValues.add(upazilaEntry.id);
+      upazilaValues.add(upazilaEntry.name_en);
+      upazilaValues.add(upazilaEntry.name_bn);
+    }
+    upazilaList = [...upazilaValues];
+  }
+
+  const bgPlace = patientGroups.map(() => "?").join(",");
+  const distPlace = districtList.map(() => "?").join(",");
+  const upazilaPlace = upazilaList.map(() => "?").join(",");
+  const upazilaClause = upazilaList.length
+    ? ` AND (br.urgency_level = 'critical' OR br.upazila IN (${upazilaPlace}))`
+    : "";
+  return db
+    .prepare(
+      `SELECT
+         br.id AS request_id,
+         br.patient_name, br.patient_age, br.blood_group, br.units_needed,
+         br.urgency_level, br.when_needed, br.needed_date, br.needed_time,
+         br.district, br.upazila, br.hospital_name, br.hospital_address,
+         br.contact_number, br.whatsapp_number, br.reason, br.tracking_code,
+         br.status AS request_status, br.created_at,
+         dm.id AS match_id, dm.match_rank, dm.notification_method,
+         COALESCE(dm.response_status, 'pending') AS response_status,
+         dm.responded_at, dm.created_at AS matched_at
+       FROM blood_requests br
+       LEFT JOIN donor_matches dm ON dm.request_id = br.id AND dm.donor_id = ?
+       WHERE br.blood_group IN (${bgPlace})
+         AND br.status = 'active'
+         AND br.district IN (${distPlace})${upazilaClause}
+       ORDER BY
+         CASE br.urgency_level WHEN 'critical' THEN 0 WHEN 'urgent' THEN 1 ELSE 2 END,
+         br.created_at DESC`,
+    )
+    .all(donorId, ...patientGroups, ...districtList, ...upazilaList);
+}
+
+/**
+ * Upsert a donor's response for a request. If a donor_matches row exists
+ * (donor was emailed/matched by the engine) this is a normal update; if not
+ * (donor self-matched via the profile tab) a new 'self_matched' row is
+ * inserted so the response is recorded.
+ */
+export function upsertDonorMatchResponse(
+  requestId: number,
+  donorId: number,
+  responseStatus: "accepted" | "declined",
+): number {
+  const db = getDb();
+  const existing = db
+    .prepare("SELECT id FROM donor_matches WHERE request_id = ? AND donor_id = ?")
+    .get(requestId, donorId) as { id: number } | undefined;
+  if (existing) {
+    return updateDonorMatchResponse(requestId, donorId, responseStatus);
+  }
+  db.prepare(
+    `INSERT INTO donor_matches (request_id, donor_id, match_rank, match_score, notification_method, response_status, responded_at)
+     VALUES (?, ?, 0, 0, 'self_matched', ?, datetime('now'))`,
+  ).run(requestId, donorId, responseStatus);
+  return 1;
 }
 
 // ── Request Status Log ────────────────────────────────────────────────

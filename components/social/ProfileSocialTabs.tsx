@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useLocale } from "next-intl";
-import { Bell, FileText, Bookmark, Heart, MessageCircle, Loader2, CheckCheck } from "lucide-react";
+import { Bell, FileText, Bookmark, Heart, MessageCircle, Loader2, CheckCheck, Droplets, PhoneCall, MapPin, Clock, CheckCircle2, XCircle } from "lucide-react";
 import { Link } from "@/i18n/routing";
 import { formatTimeAgo } from "@/lib/format-time";
 import { useAuthStore } from "@/store/authStore";
@@ -13,9 +13,11 @@ import {
   serverMarkNotificationRead,
   serverGetMyPosts,
   serverGetSavedPosts,
+  serverGetMyMatchRequests,
+  serverRespondToMatchRequest,
 } from "@/lib/db-actions";
 
-type Tab = "notifications" | "posts" | "saved";
+type Tab = "notifications" | "posts" | "saved" | "requests";
 
 function initialsOf(name: string): string {
   return (name || "").split(" ").map((p) => p[0]).filter(Boolean).slice(0, 2).join("").toUpperCase() || "U";
@@ -28,12 +30,15 @@ export default function ProfileSocialTabs() {
   const currentUser = user ? { id: Number(user.id), role: user.role || role || "" } : null;
   const isAdmin = role === "admin" || role === "super_admin";
 
+  const isDonor = role === "donor";
   const [tab, setTab] = useState<Tab>("notifications");
   const [loading, setLoading] = useState(false);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [myPosts, setMyPosts] = useState<any[]>([]);
   const [savedPosts, setSavedPosts] = useState<any[]>([]);
+  const [matchRequests, setMatchRequests] = useState<any[]>([]);
   const [busy, setBusy] = useState(false);
+  const [respondingId, setRespondingId] = useState<number | null>(null);
 
   const loadNotifications = useCallback(async () => {
     setLoading(true);
@@ -62,13 +67,41 @@ export default function ProfileSocialTabs() {
     setLoading(false);
   }, []);
 
+  const loadMatchRequests = useCallback(async () => {
+    setLoading(true);
+    try {
+      const rows = (await serverGetMyMatchRequests()) as any[];
+      setMatchRequests(rows || []);
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, []);
+
   useEffect(() => {
     if (tab === "notifications") loadNotifications();
     else if (tab === "posts") loadMyPosts();
-    else loadSaved();
-  }, [tab, loadNotifications, loadMyPosts, loadSaved]);
+    else if (tab === "saved") loadSaved();
+    else if (tab === "requests") loadMatchRequests();
+  }, [tab, loadNotifications, loadMyPosts, loadSaved, loadMatchRequests]);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
+  const pendingMatchCount = matchRequests.filter(
+    (m) => m.response_status === "pending" && m.request_status === "active",
+  ).length;
+
+  const handleRespond = async (requestId: number, status: "accepted" | "declined") => {
+    setRespondingId(requestId);
+    try {
+      await serverRespondToMatchRequest(requestId, status);
+      setMatchRequests((prev) =>
+        prev.map((m) =>
+          m.request_id === requestId
+            ? { ...m, response_status: status, responded_at: new Date().toISOString() }
+            : m,
+        ),
+      );
+    } catch { /* ignore */ }
+    setRespondingId(null);
+  };
 
   const handleMarkAllRead = async () => {
     setBusy(true);
@@ -88,6 +121,9 @@ export default function ProfileSocialTabs() {
 
   const TABS: { key: Tab; icon: typeof Bell; label: string }[] = [
     { key: "notifications", icon: Bell, label: isBn ? "নোটিফিকেশন" : "Notifications" },
+    ...(isDonor
+      ? [{ key: "requests" as Tab, icon: Droplets, label: isBn ? "রক্তের অনুরোধ" : "Requests" }]
+      : []),
     { key: "posts", icon: FileText, label: isBn ? "আমার পোস্ট" : "My Posts" },
     { key: "saved", icon: Bookmark, label: isBn ? "সংরক্ষিত" : "Saved" },
   ];
@@ -95,9 +131,11 @@ export default function ProfileSocialTabs() {
   const emptyText = (k: Tab) =>
     k === "notifications"
       ? isBn ? "কোনো নোটিফিকেশন নেই" : "No notifications yet"
-      : k === "posts"
-        ? isBn ? "আপনার কোনো পোস্ট নেই" : "You haven't posted anything yet"
-        : isBn ? "কোনো সংরক্ষিত পোস্ট নেই" : "No saved posts yet";
+      : k === "requests"
+        ? isBn ? "আপনাকে কোনো রক্তের অনুরোধ করা হয়নি" : "No blood requests matched to you yet"
+        : k === "posts"
+          ? isBn ? "আপনার কোনো পোস্ট নেই" : "You haven't posted anything yet"
+          : isBn ? "কোনো সংরক্ষিত পোস্ট নেই" : "No saved posts yet";
 
   return (
     <div className="mt-8 bg-white rounded-2xl border border-slate-200 overflow-hidden">
@@ -118,6 +156,11 @@ export default function ProfileSocialTabs() {
               {key === "notifications" && unreadCount > 0 && (
                 <span className="ml-0.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[9px] font-bold">
                   {unreadCount}
+                </span>
+              )}
+              {key === "requests" && pendingMatchCount > 0 && (
+                <span className="ml-0.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-red-600 text-white text-[9px] font-bold">
+                  {pendingMatchCount}
                 </span>
               )}
               {active && <span className="absolute bottom-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-red-600 rounded-full" />}
@@ -199,6 +242,138 @@ export default function ProfileSocialTabs() {
                 );
               })}
             </ul>
+          )
+        ) : tab === "requests" ? (
+          matchRequests.length === 0 ? (
+            <p className="py-12 text-center text-sm text-slate-400">{emptyText("requests")}</p>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {matchRequests.map((m) => {
+                const isPending = m.response_status === "pending";
+                const isActive = m.request_status === "active";
+                const canRespond = isPending && isActive;
+                const urgencyLabel =
+                  m.urgency_level === "critical"
+                    ? isBn ? "জরুরি" : "Critical"
+                    : m.urgency_level === "urgent"
+                      ? isBn ? "তাড়াতাড়ি" : "Urgent"
+                      : isBn ? "সাধারণ" : "Normal";
+                const urgencyCls =
+                  m.urgency_level === "critical"
+                    ? "bg-red-600 text-white"
+                    : m.urgency_level === "urgent"
+                      ? "bg-orange-500 text-white"
+                      : "bg-slate-100 text-slate-600";
+                const statusLabel =
+                  m.request_status === "fulfilled"
+                    ? isBn ? "পূর্ণ হয়েছে" : "Fulfilled"
+                    : m.request_status === "expired"
+                      ? isBn ? "মেয়াদ শেষ" : "Expired"
+                      : m.request_status === "cancelled"
+                        ? isBn ? "বাতিল" : "Cancelled"
+                        : null;
+                const whenText = [m.needed_date, m.needed_time].filter(Boolean).join(" ") ||
+                  (m.when_needed === "now" ? (isBn ? "এখনই" : "Now") : m.when_needed || "");
+
+                return (
+                  <div key={m.request_id} className="px-4 py-4">
+                    <div className="flex items-start justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-red-600 text-white text-xs font-bold">
+                          <Droplets className="w-3.5 h-3.5" />
+                          {m.blood_group}
+                        </span>
+                        <span className={`px-2 py-1 rounded-md text-[11px] font-semibold ${urgencyCls}`}>
+                          {urgencyLabel}
+                        </span>
+                        {m.match_rank > 0 && (
+                          <span className="px-2 py-1 rounded-md bg-slate-100 text-slate-500 text-[11px] font-semibold">
+                            {isBn ? `ম্যাচ #${m.match_rank}` : `Match #${m.match_rank}`}
+                          </span>
+                        )}
+                      </div>
+                      {statusLabel && (
+                        <span className="text-[11px] font-semibold text-slate-400">{statusLabel}</span>
+                      )}
+                    </div>
+
+                    <p className="text-sm font-semibold text-slate-900">
+                      {m.patient_name}
+                      <span className="font-normal text-slate-500">
+                        {" "}{isBn ? "প্রয়োজন" : "needs"} {m.units_needed || 1} {isBn ? "ইউনিট" : "unit(s)"}
+                      </span>
+                    </p>
+
+                    {m.hospital_name && (
+                      <p className="text-xs text-slate-600 mt-1 flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                        <span className="truncate">
+                          {m.hospital_name}
+                          {m.hospital_address ? `, ${m.hospital_address}` : ""}
+                          {m.upazila || m.district ? ` — ${[m.upazila, m.district].filter(Boolean).join(", ")}` : ""}
+                        </span>
+                      </p>
+                    )}
+
+                    {whenText && (
+                      <p className="text-xs text-slate-600 mt-1 flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                        {whenText}
+                      </p>
+                    )}
+
+                    {m.contact_number && (
+                      <a
+                        href={`tel:${m.contact_number}`}
+                        className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-red-600 hover:text-red-700"
+                      >
+                        <PhoneCall className="w-3.5 h-3.5" />
+                        {m.contact_number}
+                      </a>
+                    )}
+
+                    <div className="mt-3">
+                      {canRespond ? (
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleRespond(m.request_id, "accepted")}
+                            disabled={respondingId === m.request_id}
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-lg bg-green-600 text-white text-sm font-bold hover:bg-green-700 disabled:opacity-50 transition-colors"
+                          >
+                            <CheckCircle2 className="w-4 h-4" />
+                            {isBn ? "গ্রহণ করুন" : "Accept"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRespond(m.request_id, "declined")}
+                            disabled={respondingId === m.request_id}
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 py-2.5 rounded-lg border border-slate-300 text-slate-600 text-sm font-bold hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                          >
+                            <XCircle className="w-4 h-4" />
+                            {isBn ? "প্রত্যাখ্যান" : "Decline"}
+                          </button>
+                        </div>
+                      ) : m.response_status === "accepted" ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-600">
+                          <CheckCircle2 className="w-4 h-4" />
+                          {isBn ? "আপনি গ্রহণ করেছেন" : "You accepted"}
+                        </span>
+                      ) : m.response_status === "declined" ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-400">
+                          <XCircle className="w-4 h-4" />
+                          {isBn ? "আপনি প্রত্যাখ্যান করেছেন" : "You declined"}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">
+                          {isBn ? "অপেক্ষমান" : "Awaiting response"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )
         ) : tab === "posts" ? (
           myPosts.length === 0 ? (

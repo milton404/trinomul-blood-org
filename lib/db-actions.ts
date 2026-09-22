@@ -41,6 +41,9 @@ import {
   recordDonorMatches,
   updateDonorMatchResponse,
   getDonorMatchesForRequest,
+  getDonorMatchRequests,
+  getMatchingRequestsForDonor,
+  upsertDonorMatchResponse,
   addStatusLog,
   getStatusLogs,
   getBloodRequestByTrackingCode,
@@ -223,6 +226,9 @@ import {
   recordDonorMatchesPg,
   updateDonorMatchResponsePg,
   getDonorMatchesForRequestPg,
+  getDonorMatchRequestsPg,
+  getMatchingRequestsForDonorPg,
+  upsertDonorMatchResponsePg,
   getAllDonorMatchesPg,
   addStatusLogPg,
   getStatusLogsPg,
@@ -1466,6 +1472,33 @@ export async function serverUpdateDonorMatchResponse(
 export async function serverGetDonorMatchesForRequest(requestId: number) {
   if (isSupabaseAvailable()) return getDonorMatchesForRequestPg(requestId);
   return getDonorMatchesForRequest(requestId);
+}
+
+/** Match requests the logged-in donor is eligible to fulfill (in-app inbox).
+ *  Decoupled from the email cap — every eligible donor in the matching area
+ *  sees the request, whether or not they were emailed. */
+export async function serverGetMyMatchRequests() {
+  const me = await getCurrentProfile();
+  if (!me) throw new Error("You must be logged in.");
+  if (me.role !== "donor") return [];
+  return isSupabaseAvailable()
+    ? getMatchingRequestsForDonorPg(me.id)
+    : getMatchingRequestsForDonor(me.id);
+}
+
+/** Accept or decline a match request as the logged-in donor. */
+export async function serverRespondToMatchRequest(
+  requestId: number,
+  responseStatus: "accepted" | "declined",
+) {
+  const me = await getCurrentProfile();
+  if (!me) throw new Error("You must be logged in.");
+  if (me.role !== "donor") {
+    throw new Error("Only donors can respond to requests.");
+  }
+  return isSupabaseAvailable()
+    ? upsertDonorMatchResponsePg(requestId, me.id, responseStatus)
+    : upsertDonorMatchResponse(requestId, me.id, responseStatus);
 }
 
 // ── Request Status Log ────────────────────────────────────────────────
