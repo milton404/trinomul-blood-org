@@ -18,7 +18,10 @@ describe("getMatchingRequestsForDonor", () => {
 
   it("returns rows with the expected shape for a real donor", () => {
     // Donor id=1 is the verified owner donor (backfilled 2026-09-18).
-    const rows = getMatchingRequestsForDonor(1);
+    const rows = getMatchingRequestsForDonor(1) as Array<{
+      response_status: string;
+      request_status: string;
+    }>;
     expect(Array.isArray(rows)).toBe(true);
     for (const r of rows) {
       expect(r).toHaveProperty("request_id");
