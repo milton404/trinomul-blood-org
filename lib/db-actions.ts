@@ -1487,6 +1487,20 @@ export async function serverGetDistrictStats() {
   return getDistrictStats();
 }
 
+/** Consolidated analytics data — one server action round-trip instead of 5.
+ *  Fetches stats, monthly, daily, weekly, and district data in parallel. */
+export async function serverGetAnalyticsData() {
+  const usePg = isSupabaseAvailable();
+  const [stats, monthly, daily, weekly, district] = await Promise.all([
+    usePg ? getAnalyticsStatsPg().catch(() => null) : Promise.resolve(getAnalyticsStats()),
+    usePg ? getMonthlyStatsPg().catch(() => []) : Promise.resolve(getMonthlyStats()),
+    usePg ? getDailyStatsPg(30).catch(() => []) : Promise.resolve(getDailyStats(30)),
+    usePg ? getWeeklyStatsPg(12).catch(() => []) : Promise.resolve(getWeeklyStats(12)),
+    usePg ? getDistrictStatsPg().catch(() => []) : Promise.resolve(getDistrictStats()),
+  ]);
+  return { stats, monthly, daily, weekly, district };
+}
+
 // ── Smart Donor Matching ──────────────────────────────────────────────
 
 export async function serverFindMatchingDonors(

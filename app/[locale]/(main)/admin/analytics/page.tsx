@@ -3,11 +3,7 @@
 import { useState, useEffect } from "react";
 import { StatsBarSkeleton, CardGridSkeleton } from "@/components/ui/Skeleton";
 import {
-  serverGetAnalyticsStats,
-  serverGetMonthlyStats,
-  serverGetDailyStats,
-  serverGetWeeklyStats,
-  serverGetDistrictStats,
+  serverGetAnalyticsData,
 } from "@/lib/db-actions";
 import { useTranslations, useLocale } from "next-intl";
 import {
@@ -123,55 +119,50 @@ export default function AdminAnalyticsPage() {
     setIsLoading(true);
 
     try {
-      const data = await serverGetAnalyticsStats();
+      const { stats: data, monthly: monthlyData, daily: dailyData, weekly: weeklyData, district: distData } = await serverGetAnalyticsData();
 
-      setStats({
-        totalUsers: data.totalUsers,
-        totalDonors: data.totalDonors,
-        totalPatients: data.totalPatients,
-        totalHospitals: data.totalHospitals,
-        activeRequests: data.activeRequests,
-        totalRequests: data.totalRequests,
-        fulfilledRequests: data.fulfilledRequests,
-        donationsThisMonth: data.donationsThisMonth,
-      });
+      if (data) {
+        setStats({
+          totalUsers: data.totalUsers,
+          totalDonors: data.totalDonors,
+          totalPatients: data.totalPatients,
+          totalHospitals: data.totalHospitals,
+          activeRequests: data.activeRequests,
+          totalRequests: data.totalRequests,
+          fulfilledRequests: data.fulfilledRequests,
+          donationsThisMonth: data.donationsThisMonth,
+        });
 
-      if (data.bloodGroups) {
-        setBloodGroupStats(
-          data.bloodGroups.map(
-            (bg: { blood_group: string; count: number }) => ({
-              blood_group: bg.blood_group,
-              count: bg.count,
-            }),
-          ),
-        );
+        if (data.bloodGroups) {
+          setBloodGroupStats(
+            data.bloodGroups.map(
+              (bg: { blood_group: string; count: number }) => ({
+                blood_group: bg.blood_group,
+                count: bg.count,
+              }),
+            ),
+          );
+        }
+
+        if (data.urgencyLevels) {
+          setUrgencyStats(
+            data.urgencyLevels.map(
+              (ul: { urgency_level: string; count: number }) => ({
+                name:
+                  ul.urgency_level.charAt(0).toUpperCase() +
+                  ul.urgency_level.slice(1),
+                value: ul.count,
+              }),
+            ),
+          );
+        }
+
+        setRecentActivity(data.recentActivity || []);
       }
 
-      if (data.urgencyLevels) {
-        setUrgencyStats(
-          data.urgencyLevels.map(
-            (ul: { urgency_level: string; count: number }) => ({
-              name:
-                ul.urgency_level.charAt(0).toUpperCase() +
-                ul.urgency_level.slice(1),
-              value: ul.count,
-            }),
-          ),
-        );
-      }
-
-      setRecentActivity(data.recentActivity || []);
-
-      const monthlyData = await serverGetMonthlyStats();
       setMonthlyStats(monthlyData);
-
-      const dailyData = await serverGetDailyStats(30);
       setDailyStats(dailyData);
-
-      const weeklyData = await serverGetWeeklyStats(12);
       setWeeklyStats(weeklyData);
-
-      const distData = await serverGetDistrictStats();
       setDistrictData(distData as any);
     } catch (error) {
       console.error("Error fetching analytics:", error);
