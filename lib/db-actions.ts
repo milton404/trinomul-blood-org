@@ -1986,6 +1986,25 @@ export async function serverGetDashboardAISnapshot() {
   }
 }
 
+/** Consolidated dashboard data — one server action round-trip instead of 5.
+ *  Fetches stats, inventory, requests, donations, and pending application
+ *  count in parallel server-side. Returns null when not an admin. */
+export async function serverGetDashboardData() {
+  const ctx = await getAdminContext();
+  if (!ctx) return null;
+  const usePg = isSupabaseAvailable();
+  const [stats, inventory, requests, donations, pendingApplications] = await Promise.all([
+    usePg ? getDashboardStatsPg() : getDashboardStats(),
+    usePg ? getBloodInventoryPg().catch(() => []) : getBloodInventory().catch(() => []),
+    usePg ? getAllBloodRequestsPg().catch(() => []) : getAllBloodRequests().catch(() => []),
+    usePg ? getAllDonationsPg().catch(() => []) : getAllDonations().catch(() => []),
+    usePg
+      ? countDonorApplicationsPg({}).catch(() => 0)
+      : Promise.resolve(dbCountDonorApplications({})),
+  ]);
+  return { stats, inventory, requests, donations, pendingApplications };
+}
+
 export async function serverGenerateAIInsights() {
   const rateKey = await enforceRateLimit(
     "ai-generate-insights",

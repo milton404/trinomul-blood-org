@@ -19,12 +19,8 @@ import {
   Building2, UserCheck, UserPlus, BadgeCheck, Droplet, Trophy,
 } from "lucide-react";
 import {
-  serverGetDashboardStats,
-  serverGetAllBloodRequests,
-  serverGetBloodInventory,
-  serverGetAllDonations,
+  serverGetDashboardData,
   serverGetDashboardAISnapshot,
-  serverGetDonorApplications,
 } from "@/lib/db-actions";
 import { Link } from "@/i18n/routing";
 
@@ -75,35 +71,28 @@ export default function AdminDashboardPage() {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        const dbStats = await serverGetDashboardStats();
+        const data = await serverGetDashboardData();
+        if (!data) return;
+
+        const { stats: dbStats, inventory, requests, donations, pendingApplications } = data;
+
         setStats({
           totalUsers: dbStats.totalUsers,
           totalDonations: dbStats.totalDonations || 0,
           totalRequests: dbStats.totalRequests,
           totalHospitals: dbStats.totalHospitals,
         });
-
-        const inventory = await serverGetBloodInventory();
         setBloodInventory(inventory as any);
+        setPendingApplications(pendingApplications);
 
-        const requests = await serverGetAllBloodRequests() as any[];
-        const urgentCount = requests.filter(
+        const reqArr = requests as any[];
+        const urgentCount = reqArr.filter(
           (r: any) => r.status === 'active' && (r.urgency_level === 'urgent' || r.urgency_level === 'critical')
         ).length;
         setUrgentRequests(urgentCount);
 
-        try {
-          const apps = await serverGetDonorApplications({ limit: 1 });
-          setPendingApplications(apps.total);
-        } catch (err) {
-          console.error("Error fetching donor applications count:", err);
-        }
-
-        // Build monthly chart data from real request + donation records.
-        // Previously donations were fudged as `count * 0.8`; now we aggregate
-        // actual donations by month and merge with request counts.
         const monthlyRequests: Record<string, number> = {};
-        for (const item of requests) {
+        for (const item of reqArr) {
           const date = new Date(item.created_at);
           if (Number.isNaN(date.getTime())) continue;
           const monthYear = date.toLocaleString("default", {
@@ -114,19 +103,14 @@ export default function AdminDashboardPage() {
         }
 
         const monthlyDonations: Record<string, number> = {};
-        try {
-          const donations = (await serverGetAllDonations()) as any[];
-          for (const item of donations) {
-            const date = new Date(item.created_at ?? item.donation_date);
-            if (Number.isNaN(date.getTime())) continue;
-            const monthYear = date.toLocaleString("default", {
-              month: "short",
-              year: "2-digit",
-            });
-            monthlyDonations[monthYear] = (monthlyDonations[monthYear] || 0) + 1;
-          }
-        } catch (err) {
-          console.error("Error fetching donations for chart:", err);
+        for (const item of donations as any[]) {
+          const date = new Date(item.created_at ?? item.donation_date);
+          if (Number.isNaN(date.getTime())) continue;
+          const monthYear = date.toLocaleString("default", {
+            month: "short",
+            year: "2-digit",
+          });
+          monthlyDonations[monthYear] = (monthlyDonations[monthYear] || 0) + 1;
         }
 
         const allMonths = Array.from(
