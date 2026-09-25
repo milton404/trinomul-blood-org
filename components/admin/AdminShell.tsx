@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { usePathname, useRouter } from "@/i18n/routing";
+import { usePathname } from "@/i18n/routing";
 import { useLocale } from "next-intl";
 import { ShieldCheck, Loader2, ScrollText } from "lucide-react";
 import { toast } from "sonner";
@@ -113,11 +113,9 @@ function AdminPolicyGate({ onAccepted }: { onAccepted: () => void }) {
 }
 
 export default function AdminShell({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const pathname = usePathname();
-  const [authChecked, setAuthChecked] = useState(false);
-  const [authed, setAuthed] = useState(false);
+  const [policyChecked, setPolicyChecked] = useState(false);
   const [policyAccepted, setPolicyAccepted] = useState(true);
 
   // Close sidebar on route change (mobile)
@@ -130,37 +128,17 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
   const isLoginPage = cleanPath.includes("/admin/login");
 
   useEffect(() => {
-    if (isLoginPage) {
-      setAuthChecked(true);
-      setAuthed(true);
-      return;
-    }
+    if (isLoginPage) return;
     serverGetMyAdminContext()
       .then((ctx) => {
-        if (!ctx) {
-          router.replace("/admin/login");
-          return;
-        }
-        setAuthed(true);
-        setPolicyAccepted(ctx.policyAccepted);
-        setAuthChecked(true);
+        setPolicyAccepted(!ctx || ctx.policyAccepted);
+        setPolicyChecked(true);
       })
-      .catch(() => {
-        setAuthed(true);
-        setAuthChecked(true);
-      });
-  }, [isLoginPage, router]);
+      .catch(() => setPolicyChecked(true));
+  }, [isLoginPage]);
 
   if (isLoginPage) {
     return <>{children}</>;
-  }
-
-  if (!authChecked || !authed) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <Loader2 className="w-6 h-6 text-slate-400 animate-spin" />
-      </div>
-    );
   }
 
   return (
@@ -173,7 +151,7 @@ export default function AdminShell({ children }: { children: React.ReactNode }) 
         <main className="p-4 lg:p-6">{children}</main>
       </div>
 
-      {authChecked && !policyAccepted && (
+      {policyChecked && !policyAccepted && (
         <AdminPolicyGate onAccepted={() => setPolicyAccepted(true)} />
       )}
     </div>
