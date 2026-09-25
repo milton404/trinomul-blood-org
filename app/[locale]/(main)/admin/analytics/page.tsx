@@ -119,7 +119,7 @@ export default function AdminAnalyticsPage() {
     setIsLoading(true);
 
     try {
-      const { stats: data, monthly: monthlyData, daily: dailyData, weekly: weeklyData, district: distData } = await serverGetAnalyticsData();
+      const { stats: data, monthly: monthlyData, daily: dailyData, weekly: weeklyData, district: distData } = await serverGetAnalyticsData() as any;
 
       if (data) {
         setStats({
