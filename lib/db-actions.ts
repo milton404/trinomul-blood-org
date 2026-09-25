@@ -1149,8 +1149,12 @@ export async function serverGetDonationsByDonorId(donorId: number, _cacheBuster?
 }
 
 export async function serverGetAllDonations() {
-  if (isSupabaseAvailable()) return getAllDonationsPg();
-  return getAllDonations();
+  try {
+    if (isSupabaseAvailable()) return getAllDonationsPg();
+    return getAllDonations();
+  } catch {
+    return [];
+  }
 }
 
 // ── QR-scan donation recording ──────────────────────────────────────────
@@ -1419,8 +1423,12 @@ export async function serverRecordDonationByScan(
 
 // Stats actions
 export async function serverGetDashboardStats() {
-  if (isSupabaseAvailable()) return getDashboardStatsPg();
-  return getDashboardStats();
+  try {
+    if (isSupabaseAvailable()) return getDashboardStatsPg();
+    return getDashboardStats();
+  } catch {
+    return { totalUsers: 0, totalRequests: 0, activeRequests: 0, totalHospitals: 0, totalDonations: 0 };
+  }
 }
 
 export async function serverGetAnalyticsStats() {
@@ -1459,8 +1467,12 @@ export async function serverGetHomepageStats() {
 }
 
 export async function serverGetBloodInventory() {
-  if (isSupabaseAvailable()) return getBloodInventoryPg();
-  return getBloodInventory();
+  try {
+    if (isSupabaseAvailable()) return getBloodInventoryPg();
+    return getBloodInventory();
+  } catch {
+    return [];
+  }
 }
 
 /** Eligible-donor counts per district + blood group (counts only, no
@@ -1958,16 +1970,20 @@ export async function serverGetOrganizations() {
 // ── Phase 4.1: AI-Powered Donor Insights ─────────────────────────────
 
 export async function serverGetDashboardAISnapshot() {
-  const rateKey = await enforceRateLimit(
-    "ai-dashboard-snapshot",
-    5,
-    10 * 60 * 1000,
-    30 * 60 * 1000,
-  );
-  const { getDashboardAISnapshot } = await import("./ai/insights");
-  const result = await getDashboardAISnapshot();
-  if (rateKey) await incrementRateLimit(rateKey, 10 * 60 * 1000);
-  return result;
+  try {
+    const rateKey = await enforceRateLimit(
+      "ai-dashboard-snapshot",
+      5,
+      10 * 60 * 1000,
+      30 * 60 * 1000,
+    );
+    const { getDashboardAISnapshot } = await import("./ai/insights");
+    const result = await getDashboardAISnapshot();
+    if (rateKey) await incrementRateLimit(rateKey, 10 * 60 * 1000);
+    return result;
+  } catch {
+    return { topInsight: null, criticalCount: 0, warningCount: 0, usingAI: false, provider: "rules" as const, summary: "" };
+  }
 }
 
 export async function serverGenerateAIInsights() {
