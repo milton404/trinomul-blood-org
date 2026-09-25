@@ -2008,10 +2008,10 @@ export async function serverGetDashboardData() {
   if (!ctx) return null;
   const usePg = isSupabaseAvailable();
   const [stats, inventory, requests, donations, pendingApplications] = await Promise.all([
-    usePg ? getDashboardStatsPg() : getDashboardStats(),
-    usePg ? getBloodInventoryPg().catch(() => []) : getBloodInventory().catch(() => []),
-    usePg ? getAllBloodRequestsPg().catch(() => []) : getAllBloodRequests().catch(() => []),
-    usePg ? getAllDonationsPg().catch(() => []) : getAllDonations().catch(() => []),
+    usePg ? getDashboardStatsPg() : Promise.resolve(getDashboardStats()),
+    usePg ? getBloodInventoryPg().catch(() => []) : Promise.resolve(getBloodInventory()),
+    usePg ? getAllBloodRequestsPg().catch(() => []) : Promise.resolve(getAllBloodRequests()),
+    usePg ? getAllDonationsPg().catch(() => []) : Promise.resolve(getAllDonations()),
     usePg
       ? countDonorApplicationsPg({}).catch(() => 0)
       : Promise.resolve(dbCountDonorApplications({})),
