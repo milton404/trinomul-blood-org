@@ -1040,7 +1040,7 @@ export async function serverDeleteRequest(id: number) {
 // Donation actions
 export async function serverCreateDonation(donation: Record<string, any>) {
   if (isSupabaseAvailable()) {
-    const { rows } = await pgQuery(
+    const { rows } = await pgQuery<{ id: number }>(
       `INSERT INTO donations (donor_id, request_id, blood_group, units, hospital_name, donation_date, donation_type, recipient_type, referrer_profile_id, referrer_name, referrer_phone)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING id`,

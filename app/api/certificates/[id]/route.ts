@@ -29,7 +29,7 @@ export async function GET(
     return NextResponse.json({ error: "Certificate has been revoked" }, { status: 410 });
   }
 
-  const isOwner = Number(cert.donor_id) === Number(session.userId);
+  const isOwner = Number(cert.donor_id) === Number(session.sub);
   const isAdmin = session.role === "admin" || session.role === "super_admin";
   if (!isOwner && !isAdmin) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
