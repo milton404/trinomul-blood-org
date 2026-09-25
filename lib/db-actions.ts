@@ -2213,7 +2213,8 @@ export async function serverGetRecentActivityLog(
   sinceHours = 24,
   limit = 5,
 ): Promise<any[]> {
-  await requireAdmin();
+  const ctx = await getAdminContext();
+  if (!ctx) return [];
   if (isSupabaseAvailable()) {
     const result = await getActivityLogPg({ action, sinceHours, limit });
     return result.rows;
@@ -2243,7 +2244,8 @@ export async function serverGetRecentAdminActivity(
   sinceHours = 24,
   limit = 10,
 ): Promise<any[]> {
-  const ctx = await requireAdmin();
+  const ctx = await getAdminContext();
+  if (!ctx) return [];
   if (isSupabaseAvailable()) {
     return getRecentAdminActivityPg({
       excludeActorId: ctx.id,
@@ -4068,7 +4070,8 @@ export async function serverAdminGetPosts(opts?: {
   page?: number;
   pageSize?: number;
 }) {
-  await requireAdmin();
+  const ctx = await getAdminContext();
+  if (!ctx) return { items: [], total: 0, hasMore: false };
   if (isSupabaseAvailable()) return adminGetSocialPostsPg(opts || {});
   return adminGetSocialPosts(opts || {});
 }
