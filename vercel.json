@@ -54,6 +54,15 @@
     },
     "app/api/admin/auto-purge/route.ts": {
       "maxDuration": 60
+    },
+    "app/api/cron/donation-reminders/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/certificates/[id]/route.ts": {
+      "maxDuration": 30
+    },
+    "app/api/rewards/redeem/route.ts": {
+      "maxDuration": 15
     }
   },
   "crons": [
@@ -64,6 +73,10 @@
     {
       "path": "/api/admin/auto-purge",
       "schedule": "0 3 * * 1"
+    },
+    {
+      "path": "/api/cron/donation-reminders",
+      "schedule": "0 8 * * *"
     }
   ],
   "headers": [

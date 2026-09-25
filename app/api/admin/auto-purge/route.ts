@@ -15,6 +15,9 @@ export async function GET() {
     orgs_purged: 0,
     stories_purged: 0,
     activity_log_purged: 0,
+    reminders_purged: 0,
+    revoked_certs_purged: 0,
+    cancelled_redemptions_purged: 0,
     errors: [] as string[],
   };
 
@@ -76,6 +79,32 @@ export async function GET() {
       results.stories_purged = rowCount ?? 0;
     }
 
+    // Donation reminders: hard-delete sent/cancelled/superseded rows older than
+    // 90 days. Scheduled (unsent) reminders are NEVER purged. Keeps the reminder
+    // queue bounded while preserving a 90-day audit window of what was sent.
+    const { rowCount: remindersRowCount } = await pgQuery(
+      `DELETE FROM donation_reminders
+       WHERE status IN ('sent', 'cancelled', 'superseded')
+         AND created_at < NOW() - INTERVAL '90 days'`,
+    );
+    results.reminders_purged = remindersRowCount ?? 0;
+
+    // Revoked certificates: keep for 1 year after revocation for audit, then
+    // hard-delete. Active (non-revoked) certificates are NEVER auto-purged.
+    const { rowCount: certsRowCount } = await pgQuery(
+      `DELETE FROM donation_certificates
+       WHERE revoked_at IS NOT NULL AND revoked_at < NOW() - INTERVAL '1 year'`,
+    );
+    results.revoked_certs_purged = certsRowCount ?? 0;
+
+    // Cancelled redemptions: keep for 1 year, then hard-delete.
+    // Fulfilled redemptions are permanent (regulatory/audit) — never purged.
+    const { rowCount: redemRowCount } = await pgQuery(
+      `DELETE FROM reward_redemptions
+       WHERE status = 'cancelled' AND created_at < NOW() - INTERVAL '1 year'`,
+    );
+    results.cancelled_redemptions_purged = redemRowCount ?? 0;
+
     // Activity log: hard-delete rows older than 7 days, regardless of whether
     // any admin saw them. Keeps the super-admin oversight feed fresh and
     // bounds storage growth. Runs weekly via cron `0 3 * * 1`.
@@ -102,7 +131,10 @@ export async function GET() {
         results.requests_purged +
         results.orgs_purged +
         results.stories_purged +
-        results.activity_log_purged,
+        results.activity_log_purged +
+        results.reminders_purged +
+        results.revoked_certs_purged +
+        results.cancelled_redemptions_purged,
     });
   } catch (err: any) {
     console.error("Auto-purge failed:", err);

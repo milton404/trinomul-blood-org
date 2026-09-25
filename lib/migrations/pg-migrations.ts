@@ -117,6 +117,94 @@ const pgMigrations: PgMigration[] = [
       `);
     },
   },
+  {
+    id: "005_certificates_rewards_reminders",
+    name: "Donation certificates, donor rewards/points, recurring donation reminders",
+    up: async (client) => {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS donation_certificates (
+          id BIGSERIAL PRIMARY KEY,
+          donation_id BIGINT NOT NULL REFERENCES donations(id) ON DELETE CASCADE,
+          donor_id BIGINT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+          certificate_number TEXT UNIQUE NOT NULL,
+          file_url TEXT,
+          file_type TEXT NOT NULL DEFAULT 'png',
+          template_version INTEGER NOT NULL DEFAULT 1,
+          metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+          issued_by BIGINT REFERENCES profiles(id) ON DELETE SET NULL,
+          revoked_at TIMESTAMPTZ,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_donation_certs_donation ON donation_certificates(donation_id);
+        CREATE INDEX IF NOT EXISTS idx_donation_certs_donor ON donation_certificates(donor_id);
+        CREATE INDEX IF NOT EXISTS idx_donation_certs_number ON donation_certificates(certificate_number);
+
+        CREATE TABLE IF NOT EXISTS donor_points (
+          donor_id BIGINT PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+          total_points INTEGER NOT NULL DEFAULT 0,
+          lifetime_points INTEGER NOT NULL DEFAULT 0,
+          tier TEXT NOT NULL DEFAULT 'bronze',
+          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS point_transactions (
+          id BIGSERIAL PRIMARY KEY,
+          donor_id BIGINT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+          donation_id BIGINT REFERENCES donations(id) ON DELETE CASCADE,
+          points INTEGER NOT NULL,
+          reason TEXT NOT NULL,
+          reference_id BIGINT,
+          note TEXT,
+          created_by BIGINT REFERENCES profiles(id) ON DELETE SET NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_point_tx_donor ON point_transactions(donor_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_point_tx_donation ON point_transactions(donation_id);
+
+        CREATE TABLE IF NOT EXISTS rewards (
+          id BIGSERIAL PRIMARY KEY,
+          name_bn TEXT NOT NULL,
+          name_en TEXT NOT NULL,
+          desc_bn TEXT,
+          desc_en TEXT,
+          points_cost INTEGER NOT NULL DEFAULT 0,
+          category TEXT NOT NULL DEFAULT 'other',
+          stock INTEGER NOT NULL DEFAULT -1,
+          active BOOLEAN NOT NULL DEFAULT TRUE,
+          image_url TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+
+        CREATE TABLE IF NOT EXISTS reward_redemptions (
+          id BIGSERIAL PRIMARY KEY,
+          donor_id BIGINT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+          reward_id BIGINT NOT NULL REFERENCES rewards(id) ON DELETE RESTRICT,
+          points_spent INTEGER NOT NULL,
+          status TEXT NOT NULL DEFAULT 'pending',
+          fulfilled_by BIGINT REFERENCES profiles(id) ON DELETE SET NULL,
+          fulfilled_at TIMESTAMPTZ,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_redemptions_donor ON reward_redemptions(donor_id, created_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_redemptions_reward ON reward_redemptions(reward_id);
+
+        CREATE TABLE IF NOT EXISTS donation_reminders (
+          id BIGSERIAL PRIMARY KEY,
+          donor_id BIGINT NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+          donation_id BIGINT NOT NULL REFERENCES donations(id) ON DELETE CASCADE,
+          donation_type TEXT NOT NULL DEFAULT 'whole_blood',
+          eligible_at TIMESTAMPTZ NOT NULL,
+          sent_at TIMESTAMPTZ,
+          channel TEXT,
+          status TEXT NOT NULL DEFAULT 'scheduled',
+          cancelled_reason TEXT,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_reminders_donor ON donation_reminders(donor_id);
+        CREATE INDEX IF NOT EXISTS idx_reminders_eligible ON donation_reminders(status, eligible_at);
+      `);
+    },
+  },
 ];
 
 async function ensureTrackingTable(client: NonNullable<SupabaseAdminClient>): Promise<void> {

@@ -1099,6 +1099,39 @@ export async function serverCreateDonation(donation: Record<string, any>) {
         ],
       );
     }
+
+    try {
+      const { scheduleDonationReminderPg } = await import("@/lib/reminders/scheduler");
+      await scheduleDonationReminderPg({
+        donationId,
+        donorId: donation.donorId,
+        donationType: donation.donationType || "whole_blood",
+        donationDate: donation.donationDate,
+      });
+    } catch (e) {
+      console.error("Failed to schedule donation reminder:", e);
+    }
+
+    try {
+      const { issueCertificateForDonationPg } = await import("@/lib/certificates/issue");
+      await issueCertificateForDonationPg(donationId);
+    } catch (e) {
+      console.error("Failed to issue certificate:", e);
+    }
+
+    if (donation.donorId) {
+      try {
+        const { awardPointsForDonationPg } = await import("@/lib/rewards/points");
+        await awardPointsForDonationPg(
+          donationId,
+          donation.donorId,
+          donation.donationType || "whole_blood",
+        );
+      } catch (e) {
+        console.error("Failed to award points:", e);
+      }
+    }
+
     return donationId;
   }
   return dbCreateDonation(donation);
@@ -1259,6 +1292,32 @@ export async function serverRecordDonationByScan(
       ],
     );
     const donationId = insRows[0].id;
+
+    try {
+      const { scheduleDonationReminderPg } = await import("@/lib/reminders/scheduler");
+      await scheduleDonationReminderPg({
+        donationId,
+        donorId: me.id,
+        donationType: input.donationType || "whole_blood",
+        donationDate,
+      });
+    } catch (e) {
+      console.error("Failed to schedule donation reminder:", e);
+    }
+
+    try {
+      const { issueCertificateForDonationPg } = await import("@/lib/certificates/issue");
+      await issueCertificateForDonationPg(donationId);
+    } catch (e) {
+      console.error("Failed to issue certificate:", e);
+    }
+
+    try {
+      const { awardPointsForDonationPg } = await import("@/lib/rewards/points");
+      await awardPointsForDonationPg(donationId, me.id, input.donationType || "whole_blood");
+    } catch (e) {
+      console.error("Failed to award points:", e);
+    }
 
     await pgQuery(
       `UPDATE profiles
@@ -5780,5 +5839,41 @@ export async function serverPurgeStories(ids: number[]): Promise<PurgeResult> {
   const placeholders = ids.map(() => "?").join(",");
   const info = db.prepare(`DELETE FROM stories WHERE id IN (${placeholders}) AND expires_at < datetime('now')`).run(...ids);
   return { purged: info.changes, skipped: 0, errors: [] };
+}
+
+// ── Donation certificates ─────────────────────────────────────────────
+export async function serverGetMyCertificates() {
+  const me = await getCurrentProfile();
+  if (!me) throw new Error("You must be logged in.");
+  if (!isSupabaseAvailable()) return [];
+  const { getDonorCertificatesPg } = await import("@/lib/certificates/issue");
+  return getDonorCertificatesPg(me.id);
+}
+
+// ── Donor rewards / points ────────────────────────────────────────────
+export async function serverGetMyPoints() {
+  const me = await getCurrentProfile();
+  if (!me) throw new Error("You must be logged in.");
+  if (!isSupabaseAvailable()) return { points: null, transactions: [] };
+  const { getDonorPointsPg, getDonorPointTransactionsPg } = await import("@/lib/rewards/points");
+  const [points, transactions] = await Promise.all([
+    getDonorPointsPg(me.id),
+    getDonorPointTransactionsPg(me.id),
+  ]);
+  return { points, transactions };
+}
+
+export async function serverGetActiveRewards() {
+  if (!isSupabaseAvailable()) return [];
+  const { getActiveRewardsPg } = await import("@/lib/rewards/points");
+  return getActiveRewardsPg();
+}
+
+export async function serverRedeemReward(rewardId: number) {
+  const me = await getCurrentProfile();
+  if (!me) throw new Error("You must be logged in.");
+  if (!isSupabaseAvailable()) return { ok: false, error: "Rewards unavailable" };
+  const { redeemRewardPg } = await import("@/lib/rewards/points");
+  return redeemRewardPg(me.id, rewardId);
 }
 
