@@ -350,16 +350,21 @@ function StatusBanner({
   verificationNote: string | null;
   isBn: boolean;
 }) {
-  const fmtDate = (iso: string | null) => {
+  const fmtDate = (iso: string | Date | null) => {
     if (!iso) return "—";
-    try {
-      return new Date(iso.includes("T") ? iso : iso.replace(" ", "T") + "Z").toLocaleDateString(
-        isBn ? "bn-BD" : "en-US",
-        { day: "numeric", month: "short", year: "numeric" },
-      );
-    } catch {
-      return iso;
-    }
+    const d =
+      iso instanceof Date
+        ? iso
+        : new Date(
+            String(iso).includes("T")
+              ? String(iso)
+              : String(iso).replace(" ", "T") + "Z",
+          );
+    if (Number.isNaN(d.getTime())) return "—";
+    return d.toLocaleDateString(
+      isBn ? "bn-BD" : "en-US",
+      { day: "numeric", month: "short", year: "numeric" },
+    );
   };
 
   if (status === "verified" || isVerified) {
