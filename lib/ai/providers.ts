@@ -6,7 +6,7 @@
  * (insights.ts, user-assistant.ts) which do have "use server".
  *
  * Provider chain (tried in order):
- *  1. DeepSeek V4-Flash          — primary (fast, cheap: ~$0.22/M in, $0.66/M out)
+ *  1. DeepSeek Chat              — primary (fast, cheap, low hallucination)
  *  2. Zhipu GLM-4-Flash          — FREE fallback
  *  3. Rule-based fallback        — handled by callers (regex + DB search)
  */
@@ -41,7 +41,7 @@ const PROVIDERS: ProviderConfig[] = [
     name: "deepseek",
     apiKey: process.env.DEEPSEEK_API_KEY ?? "",
     url: "https://api.deepseek.com/v1/chat/completions",
-    model: "deepseek-v4-flash",
+    model: "deepseek-chat",
   },
   {
     name: "zhipu",

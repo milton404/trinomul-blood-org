@@ -578,7 +578,7 @@ export default function HomePage() {
                 aria-busy={isSearching}
                 noValidate
                 className="relative rounded-2xl sm:rounded-3xl px-2 py-2.5 sm:px-4 sm:py-4
-                           bg-white/95 backdrop-blur-sm
+                           bg-white
                            ring-1 ring-red-950/10
                            shadow-xl shadow-red-950/25 sm:shadow-2xl sm:shadow-red-950/35
                            transition-shadow duration-300"

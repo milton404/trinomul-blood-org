@@ -33,7 +33,7 @@ import { useScrollDirection } from "@/hooks/use-scroll-direction";
 
 export default function Navbar() {
   const t = useTranslations("common");
-  const { user, role, clearAuth } = useAuthStore();
+  const { user, role, clearAuth, isLoading } = useAuthStore();
   const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isTrackOpen, setIsTrackOpen] = useState(false);
@@ -187,7 +187,12 @@ export default function Navbar() {
 
             <span className="w-px h-5 bg-slate-200 hidden sm:block" aria-hidden="true" />
 
-            {user ? (
+            {isLoading ? (
+              <div className="flex items-center gap-1.5 shrink-0" role="group" aria-label="Authentication">
+                <div className="h-7 w-14 rounded-lg bg-slate-100" />
+                <div className="h-7 w-16 rounded-lg bg-slate-100" />
+              </div>
+            ) : user ? (
               <div className="flex items-center gap-1" role="group" aria-label="User menu">
                 <Link
                   href="/profile"

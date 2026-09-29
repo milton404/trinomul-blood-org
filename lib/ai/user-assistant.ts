@@ -35,6 +35,7 @@ import {
 import {
   advanceAssistantWorkflow,
   detectAssistantLanguage,
+  detectReplyLanguage,
   getBloodGroup,
   isBloodAvailabilityQuestion,
   isNearMe,
@@ -139,6 +140,53 @@ const COMPATIBLE_DONORS: Record<string, string[]> = {
 };
 
 const ALL_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"];
+
+// ── LLM response cache (fast reply for repeated guest questions) ────
+
+interface CachedAssistantReply {
+  reply: string;
+  intent: AssistantIntent;
+  provider: string;
+  expiresAt: number;
+}
+
+const responseCache = new Map<string, CachedAssistantReply>();
+const RESPONSE_CACHE_TTL_MS = 60_000;
+const RESPONSE_CACHE_MAX = 100;
+
+function normalizeCacheMessage(message: string): string {
+  return message.trim().toLowerCase().replace(/\s+/g, " ").slice(0, 200);
+}
+
+function getCachedAssistantReply(key: string): CachedAssistantReply | null {
+  const entry = responseCache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    responseCache.delete(key);
+    return null;
+  }
+  return entry;
+}
+
+function setCachedAssistantReply(
+  key: string,
+  reply: string,
+  intent: AssistantIntent,
+  provider: string,
+): void {
+  if (responseCache.size >= RESPONSE_CACHE_MAX) {
+    const now = Date.now();
+    for (const [k, v] of responseCache) {
+      if (now > v.expiresAt) responseCache.delete(k);
+    }
+  }
+  responseCache.set(key, {
+    reply,
+    intent,
+    provider,
+    expiresAt: Date.now() + RESPONSE_CACHE_TTL_MS,
+  });
+}
 
 // ── Lightweight DB context for user-facing prompts ──────────────────
 
@@ -955,9 +1003,28 @@ export async function chatWithAssistant(
       historyText += "";
     }
 
-    const languageDirective = language === "bn"
+    const replyLanguage = detectReplyLanguage(message);
+    const languageDirective = replyLanguage === "bn"
       ? "Reply in Bangla (Bengali script). The user may write in Banglish — always respond in proper Bangla script."
-      : "Reply in English.";
+      : replyLanguage === "banglish"
+        ? "Reply in Banglish — write Bangla using Roman/Latin letters (e.g. 'Ami apnake sahojyo korte pari'), NOT Bangla script. Keep it natural and conversational."
+        : "Reply in English.";
+
+    const cacheKey =
+      !userProfile && !workflowState && !location && (!history || history.length === 0)
+        ? `${replyLanguage}:${normalizeCacheMessage(message)}`
+        : null;
+    if (cacheKey) {
+      const cached = getCachedAssistantReply(cacheKey);
+      if (cached) {
+        return {
+          reply: cached.reply,
+          intent: cached.intent,
+          usingAI: true,
+          provider: cached.provider as AIProvider,
+        };
+      }
+    }
 
     let ragContextText = "";
     try {
@@ -997,7 +1064,7 @@ export async function chatWithAssistant(
         const intent = (parsed.intent ?? "general") as AssistantIntent;
         const reply = parsed.reply ?? result.text;
 
-        if (language === "bn" && !hasBengaliScript(reply)) {
+        if (replyLanguage === "bn" && !hasBengaliScript(reply)) {
           const retryResult = await callLLM(
             `${userMessage}`,
             { jsonMode: true, systemPrompt, temperature: 0.15, maxTokens: 2000, timeoutMs: 30_000 },
@@ -1073,6 +1140,10 @@ export async function chatWithAssistant(
               ),
             };
           }
+        }
+
+        if (cacheKey && intent === "general" && !data) {
+          setCachedAssistantReply(cacheKey, reply, intent, result.provider);
         }
 
         return {

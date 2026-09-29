@@ -61,6 +61,19 @@ export function detectAssistantLanguage(message: string): AssistantLanguage {
   return "en";
 }
 
+/**
+ * Distinguish the user's writing system for the reply:
+ *  - "bn"       → Bangla script (e.g. "রক্ত")
+ *  - "banglish" → Bangla written in Latin letters (e.g. "rokto")
+ *  - "en"       → English
+ * Used to make the assistant answer in the SAME script the user wrote in.
+ */
+export function detectReplyLanguage(message: string): "bn" | "en" | "banglish" {
+  if (/[\u0980-\u09FF]/.test(message)) return "bn";
+  if (BANGLISH_PATTERN.test(message)) return "banglish";
+  return "en";
+}
+
 function text(locale: AssistantLanguage, bangla: string, english: string): string {
   return locale === "bn" ? bangla : english;
 }
