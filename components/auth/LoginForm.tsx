@@ -31,12 +31,30 @@ export default function LoginForm() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { setUser, setRole } = useAuthStore();
+  const { user: authUser, isLoading: authLoading, setUser, setRole } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [selectedRole, setSelectedRole] = useState<string>("");
   const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!authLoading && authUser) {
+      router.replace(
+        authUser.role === "admin" || authUser.role === "super_admin"
+          ? "/admin/dashboard"
+          : "/profile",
+      );
+    }
+  }, [authLoading, authUser, router]);
+
+  if (authLoading || authUser) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 animate-spin text-red-600" />
+      </div>
+    );
+  }
 
   const {
     register,

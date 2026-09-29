@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { ChevronDown, Heart, ShieldCheck, ArrowDown } from "lucide-react";
 import RegisterForm from "@/components/auth/RegisterForm";
@@ -8,6 +8,8 @@ import Navbar from "@/components/common/Navbar";
 import Footer from "@/components/common/Footer";
 import DonorEligibilityChecker from "@/components/donors/DonorEligibilityChecker";
 import { BloodDropLoading } from "@/components/ui/BloodDropLoading";
+import { useAuthStore } from "@/store/authStore";
+import { useRouter } from "@/i18n/routing";
 
 const ELIGIBILITY_STORAGE_KEY = "donor_eligibility_onboarding";
 
@@ -15,6 +17,18 @@ function RegisterContent() {
   const searchParams = useSearchParams();
   const roleParam = (searchParams.get("role") || "").toLowerCase();
   const isDonorFlow = roleParam === "donor";
+  const { user, isLoading } = useAuthStore();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && user) {
+      router.replace(
+        user.role === "admin" || user.role === "super_admin"
+          ? "/admin/dashboard"
+          : "/profile",
+      );
+    }
+  }, [isLoading, user, router]);
 
   // Donor onboarding state — auto-shown for ?role=donor, collapsible.
   const [showEligibility, setShowEligibility] = useState(isDonorFlow);
@@ -35,6 +49,18 @@ function RegisterContent() {
       // ignore storage errors
     }
   };
+
+  if (isLoading || user) {
+    return (
+      <div className="min-h-screen flex flex-col bg-slate-50">
+        <Navbar />
+        <main className="flex-grow flex items-center justify-center py-20 px-4">
+          <BloodDropLoading label="Loading" size={80} />
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-slate-50">
