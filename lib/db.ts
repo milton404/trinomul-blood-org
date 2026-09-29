@@ -866,31 +866,54 @@ export function createProfile(profile: Record<string, any>) {
   return stmt.run(profile).lastInsertRowid as number;
 }
 
+const PROFILE_UPDATABLE_COLUMNS = new Set([
+  "email", "full_name_en", "full_name_bn", "phone", "blood_group", "role",
+  "avatar_url", "district", "upazila", "address", "date_of_birth", "sex",
+  "hospital_name_en", "hospital_name_bn", "license_number", "website",
+  "last_donation_date", "is_active", "weight_kg", "alternative_phone",
+  "whatsapp_number", "preferred_contact", "occupation", "has_chronic_disease",
+  "disease_details", "lat", "lng", "last_donation_type", "organization_id",
+  "show_on_leaderboard", "hb_level", "last_hb_test_date", "union_name",
+  "email_opt_in", "nid_number", "nid_front_url", "nid_back_url",
+  "nid_uploaded_at", "is_verified", "verification_status",
+  "verified_by_admin_id", "verified_at", "verification_note", "last_active_at",
+  "response_count", "response_total_ms", "is_anonymous", "is_approved",
+  "assigned_district", "assigned_upazila", "admin_policy_accepted_at",
+]);
+
 export function updateProfile(id: number, data: Record<string, any>) {
   const db = getDb();
-  const fields = Object.keys(data)
+  const safe = Object.fromEntries(
+    Object.entries(data).filter(([k]) => PROFILE_UPDATABLE_COLUMNS.has(k)),
+  );
+  const fields = Object.keys(safe)
     .map((k) => `${k} = @${k}`)
     .join(", ");
+  if (!fields) {
+    return db
+      .prepare("UPDATE profiles SET updated_at = datetime('now') WHERE id = ?")
+      .run(id).changes;
+  }
   const stmt = db.prepare(
     `UPDATE profiles SET ${fields}, updated_at = datetime('now') WHERE id = @id`,
   );
-  const changes = stmt.run({ ...data, id }).changes;
+  const changes = stmt.run({ ...safe, id }).changes;
 
   // Admin alert: a donor registered/updated with a low Hb reading. Log it
   // so the admin NotificationPanel can surface it (in-app only).
   if (
     changes > 0 &&
-    data.hb_level != null &&
-    data.role !== "patient" &&
-    data.role !== "hospital"
+    safe.hb_level != null &&
+    safe.role !== "patient" &&
+    safe.role !== "hospital"
   ) {
     const profile = db
       .prepare("SELECT sex, role, full_name_en FROM profiles WHERE id = ?")
       .get(id) as any;
     if (profile && profile.role === "donor") {
       const isLow =
-        (profile.sex === "female" && data.hb_level < 12.5) ||
-        (profile.sex !== "female" && data.hb_level < 13.0);
+        (profile.sex === "female" && safe.hb_level < 12.5) ||
+        (profile.sex !== "female" && safe.hb_level < 13.0);
       if (isLow) {
         recordActivityLog({
           actorId: id,
@@ -898,7 +921,7 @@ export function updateProfile(id: number, data: Record<string, any>) {
           action: "low_hb_detected",
           entityType: "profile",
           entityId: String(id),
-          details: `Donor ${profile.full_name_en || `#${id}`} registered with low Hb: ${data.hb_level} g/dL`,
+          details: `Donor ${profile.full_name_en || `#${id}`} registered with low Hb: ${safe.hb_level} g/dL`,
         });
       }
     }
@@ -1817,15 +1840,32 @@ export function createBloodRequest(request: Record<string, any>) {
   return requestId;
 }
 
+const BLOOD_REQUEST_UPDATABLE_COLUMNS = new Set([
+  "requester_id", "requester_type", "patient_name", "patient_age",
+  "blood_group", "units_needed", "urgency_level", "when_needed",
+  "needed_date", "needed_time", "district", "upazila", "lat", "lng",
+  "hospital_name", "hospital_address", "contact_number", "alternative_number",
+  "whatsapp_number", "reason", "status", "donor_id", "donated_at",
+  "ip_address", "user_agent", "organization_id", "archived_at",
+  "archive_reason", "fulfilled_at", "show_fulfilled_badge", "admin_notice",
+  "edited_at", "edit_count", "referrer_profile_id", "referrer_name",
+  "referrer_phone", "patient_hb_level", "union_name", "tracking_code",
+  "current_status", "boosted_at", "view_count",
+]);
+
 export function updateBloodRequest(id: number, data: Record<string, any>) {
   const db = getDb();
-  const fields = Object.keys(data)
+  const safe = Object.fromEntries(
+    Object.entries(data).filter(([k]) => BLOOD_REQUEST_UPDATABLE_COLUMNS.has(k)),
+  );
+  const fields = Object.keys(safe)
     .map((k) => `${k} = @${k}`)
     .join(", ");
+  if (!fields) return 0;
   const stmt = db.prepare(
     `UPDATE blood_requests SET ${fields}, updated_at = datetime('now') WHERE id = @id`,
   );
-  return stmt.run({ ...data, id }).changes;
+  return stmt.run({ ...safe, id }).changes;
 }
 
 export function updateRequestStatus(id: number, status: string) {
@@ -4602,15 +4642,24 @@ export function createOrganization(data: {
   }).lastInsertRowid as number;
 }
 
+const ORGANIZATION_UPDATABLE_COLUMNS = new Set([
+  "name_en", "name_bn", "description", "contact_phone", "contact_email",
+  "district", "is_active",
+]);
+
 export function updateOrganization(id: number, data: Record<string, any>) {
   const db = getDb();
-  const fields = Object.keys(data)
+  const safe = Object.fromEntries(
+    Object.entries(data).filter(([k]) => ORGANIZATION_UPDATABLE_COLUMNS.has(k)),
+  );
+  const fields = Object.keys(safe)
     .map((k) => `${k} = @${k}`)
     .join(", ");
+  if (!fields) return 0;
   const stmt = db.prepare(
     `UPDATE organizations SET ${fields} WHERE id = @id`,
   );
-  return stmt.run({ ...data, id }).changes;
+  return stmt.run({ ...safe, id }).changes;
 }
 
 export function deleteOrganization(id: number) {

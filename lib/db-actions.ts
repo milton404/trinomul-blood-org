@@ -484,6 +484,21 @@ const PROTECTED_PROFILE_FIELDS = [
   "verification_note",
 ];
 
+const PROFILE_UPDATABLE_COLUMNS = new Set([
+  "email", "full_name_en", "full_name_bn", "phone", "blood_group", "role",
+  "avatar_url", "district", "upazila", "address", "date_of_birth", "sex",
+  "hospital_name_en", "hospital_name_bn", "license_number", "website",
+  "last_donation_date", "is_active", "weight_kg", "alternative_phone",
+  "whatsapp_number", "preferred_contact", "occupation", "has_chronic_disease",
+  "disease_details", "lat", "lng", "last_donation_type", "organization_id",
+  "show_on_leaderboard", "hb_level", "last_hb_test_date", "union_name",
+  "email_opt_in", "nid_number", "nid_front_url", "nid_back_url",
+  "nid_uploaded_at", "is_verified", "verification_status",
+  "verified_by_admin_id", "verified_at", "verification_note", "last_active_at",
+  "response_count", "response_total_ms", "is_anonymous", "is_approved",
+  "assigned_district", "assigned_upazila", "admin_policy_accepted_at",
+]);
+
 const PG_BOOLEAN_COLUMNS = new Set([
   "is_active",
   "has_chronic_disease",
@@ -517,7 +532,10 @@ function coerceProfileValue(key: string, value: any): any {
 }
 
 async function updateProfilePg(id: number, data: Record<string, any>) {
-  const keys = Object.keys(data);
+  const filtered = Object.fromEntries(
+    Object.entries(data).filter(([k]) => PROFILE_UPDATABLE_COLUMNS.has(k)),
+  );
+  const keys = Object.keys(filtered);
   if (keys.length === 0) {
     const { rowCount } = await pgQuery(
       "UPDATE profiles SET updated_at = NOW() WHERE id = $1",
@@ -526,7 +544,7 @@ async function updateProfilePg(id: number, data: Record<string, any>) {
     return rowCount || 0;
   }
   const sets = keys.map((k, i) => `${k} = $${i + 1}`);
-  const params = keys.map((k) => coerceProfileValue(k, data[k]));
+  const params = keys.map((k) => coerceProfileValue(k, filtered[k]));
   params.push(id);
   const { rowCount } = await pgQuery(
     `UPDATE profiles SET ${sets.join(", ")}, updated_at = NOW() WHERE id = $${params.length}`,
@@ -534,7 +552,7 @@ async function updateProfilePg(id: number, data: Record<string, any>) {
   );
   const changes = rowCount || 0;
   const coerced = Object.fromEntries(
-    keys.map((k) => [k, coerceProfileValue(k, data[k])]),
+    keys.map((k) => [k, coerceProfileValue(k, filtered[k])]),
   );
 
   if (
@@ -2632,6 +2650,16 @@ export async function serverGetAllOrganizations() {
   return dbGetAllOrganizations();
 }
 
+const ORGANIZATION_UPDATABLE_COLUMNS = new Set([
+  "name_en",
+  "name_bn",
+  "description",
+  "contact_phone",
+  "contact_email",
+  "district",
+  "is_active",
+]);
+
 export async function serverCreateOrganization(data: {
   name_en: string;
   name_bn?: string;
@@ -2641,12 +2669,13 @@ export async function serverCreateOrganization(data: {
   district?: string;
   is_active?: number;
 }) {
+  const ctx = await requireAdmin();
   if (isSupabaseAvailable()) {
     const id = await createOrganizationPg(data);
     try {
       await recordActivityLogPg({
-        actorId: null,
-        actorEmail: null,
+        actorId: ctx.id,
+        actorEmail: ctx.email,
         action: "organization_created",
         entityType: "organization",
         entityId: String(id),
@@ -2660,8 +2689,8 @@ export async function serverCreateOrganization(data: {
   const id = dbCreateOrganization(data);
   try {
     dbRecordActivityLog({
-      actorId: null,
-      actorEmail: null,
+      actorId: ctx.id,
+      actorEmail: ctx.email,
       action: "organization_created",
       entityType: "organization",
       entityId: String(id),
@@ -2674,31 +2703,36 @@ export async function serverCreateOrganization(data: {
 }
 
 export async function serverUpdateOrganization(id: number, data: Record<string, any>) {
+  const ctx = await requireFullAdmin();
+  const safe = Object.fromEntries(
+    Object.entries(data).filter(([k]) => ORGANIZATION_UPDATABLE_COLUMNS.has(k)),
+  );
+  if (Object.keys(safe).length === 0) return 0;
   if (isSupabaseAvailable()) {
-    const result = await updateOrganizationPg(id, data);
+    const result = await updateOrganizationPg(id, safe);
     try {
       await recordActivityLogPg({
-        actorId: null,
-        actorEmail: null,
+        actorId: ctx.id,
+        actorEmail: ctx.email,
         action: "organization_updated",
         entityType: "organization",
         entityId: String(id),
-        details: `Updated organization #${id}: ${Object.keys(data).join(", ")}`,
+        details: `Updated organization #${id}: ${Object.keys(safe).join(", ")}`,
       });
     } catch (e) {
       console.error("Failed to record activity log:", e);
     }
     return result;
   }
-  const result = dbUpdateOrganization(id, data);
+  const result = dbUpdateOrganization(id, safe);
   try {
     dbRecordActivityLog({
-      actorId: null,
-      actorEmail: null,
+      actorId: ctx.id,
+      actorEmail: ctx.email,
       action: "organization_updated",
       entityType: "organization",
       entityId: String(id),
-      details: `Updated organization #${id}: ${Object.keys(data).join(", ")}`,
+      details: `Updated organization #${id}: ${Object.keys(safe).join(", ")}`,
     });
   } catch (e) {
     console.error("Failed to record activity log:", e);

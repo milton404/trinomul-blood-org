@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { timingSafeEqual } from "crypto";
 
 const BCRYPT_ROUNDS = 10;
 
@@ -13,9 +14,13 @@ export async function verifyPassword(
   hash: string,
 ): Promise<boolean> {
   // If the stored value is not a bcrypt hash, it is a legacy plaintext
-  // password — compare directly so users can still log in once.
+  // password — compare with a timing-safe equality so we don't leak info
+  // about the stored value via response timing.
   if (!isBcryptHash(hash)) {
-    return plaintext === hash;
+    const a = Buffer.from(plaintext);
+    const b = Buffer.from(hash);
+    if (a.length !== b.length) return false;
+    return timingSafeEqual(a, b);
   }
   return bcrypt.compare(plaintext, hash);
 }

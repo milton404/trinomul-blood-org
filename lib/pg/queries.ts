@@ -360,14 +360,30 @@ export async function searchBloodRequestsPg(filters?: {
   return { rows, total };
 }
 
+const BLOOD_REQUEST_UPDATABLE_COLUMNS = new Set([
+  "requester_id", "requester_type", "patient_name", "patient_age",
+  "blood_group", "units_needed", "urgency_level", "when_needed",
+  "needed_date", "needed_time", "district", "upazila", "lat", "lng",
+  "hospital_name", "hospital_address", "contact_number", "alternative_number",
+  "whatsapp_number", "reason", "status", "donor_id", "donated_at",
+  "ip_address", "user_agent", "organization_id", "archived_at",
+  "archive_reason", "fulfilled_at", "show_fulfilled_badge", "admin_notice",
+  "edited_at", "edit_count", "referrer_profile_id", "referrer_name",
+  "referrer_phone", "patient_hb_level", "union_name", "tracking_code",
+  "current_status", "boosted_at", "view_count",
+]);
+
 export async function updateBloodRequestPg(id: number, data: Record<string, any>): Promise<number> {
-  const keys = Object.keys(data);
+  const filtered = Object.fromEntries(
+    Object.entries(data).filter(([k]) => BLOOD_REQUEST_UPDATABLE_COLUMNS.has(k)),
+  );
+  const keys = Object.keys(filtered);
   if (keys.length === 0) {
     const { rowCount } = await query("UPDATE blood_requests SET updated_at = NOW() WHERE id = $1", [id]);
     return rowCount || 0;
   }
   const sets = keys.map((k, i) => `${k} = $${i + 1}`);
-  const params = keys.map((k) => data[k]);
+  const params = keys.map((k) => filtered[k]);
   params.push(id);
   const { rowCount } = await query(
     `UPDATE blood_requests SET ${sets.join(", ")}, updated_at = NOW() WHERE id = $${params.length}`,
@@ -1359,11 +1375,19 @@ export async function createOrganizationPg(data: {
   return rows[0].id;
 }
 
+const ORGANIZATION_UPDATABLE_COLUMNS = new Set([
+  "name_en", "name_bn", "description", "contact_phone", "contact_email",
+  "district", "is_active",
+]);
+
 export async function updateOrganizationPg(id: number, data: Record<string, any>): Promise<number> {
-  const keys = Object.keys(data);
+  const filtered = Object.fromEntries(
+    Object.entries(data).filter(([k]) => ORGANIZATION_UPDATABLE_COLUMNS.has(k)),
+  );
+  const keys = Object.keys(filtered);
   if (keys.length === 0) return 0;
   const sets = keys.map((k, i) => `${k} = $${i + 1}`);
-  const params = keys.map((k) => data[k]); params.push(id);
+  const params = keys.map((k) => filtered[k]); params.push(id);
   const { rowCount } = await query(`UPDATE organizations SET ${sets.join(", ")} WHERE id = $${params.length}`, params);
   return rowCount || 0;
 }
