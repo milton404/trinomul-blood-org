@@ -578,9 +578,9 @@ export default function HomePage() {
                 aria-busy={isSearching}
                 noValidate
                 className="relative rounded-2xl sm:rounded-3xl px-2 py-2.5 sm:px-4 sm:py-4
-                           bg-white
-                           ring-1 ring-white/60
-                           shadow-xl shadow-red-950/20 sm:shadow-2xl sm:shadow-red-950/30
+                           bg-white/95 backdrop-blur-sm
+                           ring-1 ring-red-950/10
+                           shadow-xl shadow-red-950/25 sm:shadow-2xl sm:shadow-red-950/35
                            transition-shadow duration-300"
               >
                 {/* Card header */}
@@ -593,9 +593,9 @@ export default function HomePage() {
                       {isBn ? "রক্তদাতা খুঁজুন" : "Find a Blood Donor"}
                     </h2>
                   </div>
-                  <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 text-[10px] font-bold ring-1 ring-violet-200 flex-shrink-0">
-                    <Sparkles className="w-3 h-3" />
-                    {isBn ? "এআই সার্চ" : "AI-powered search"}
+                  <span className="inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 text-[9px] sm:text-[10px] font-bold ring-1 ring-violet-200 flex-shrink-0">
+                    <Sparkles className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                    {isBn ? "এআই সার্চ" : "AI search"}
                   </span>
                 </div>
 
@@ -687,11 +687,7 @@ export default function HomePage() {
                       } py-2 sm:py-2.5 rounded-xl border-2
                                  bg-slate-50/60 text-slate-800 placeholder:text-slate-400 outline-none text-[13px] sm:text-sm font-medium
                                  focus:bg-white focus:ring-4
-                                 hover:border-slate-500 transition-all duration-200 ${
-                                   thinking
-                                     ? "border-slate-400 focus:border-slate-600 focus:ring-slate-200"
-                                     : "border-slate-400 focus:border-slate-600 focus:ring-slate-200"
-                                 }`}
+                                 hover:border-slate-500 transition-all duration-200 border-slate-400 focus:border-slate-600 focus:ring-slate-200`}
                     />
                     {thinking && (
                       <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -738,7 +734,7 @@ export default function HomePage() {
                     ) : (
                       <Search className="w-4 h-4" />
                     )}
-                    <span className="hidden sm:inline">{submitLabel}</span>
+                    <span className="inline">{submitLabel}</span>
                   </button>
                 </div>
 
