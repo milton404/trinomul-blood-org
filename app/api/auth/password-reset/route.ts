@@ -2,6 +2,16 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { validateOrigin, rejectCsrf } from "@/lib/security/csrf";
 import { serverRequestPasswordReset, serverResetPassword } from "@/lib/auth/actions";
+import { z } from "zod";
+
+const passwordResetRequestSchema = z.object({
+  identifier: z.string().min(1),
+});
+
+const passwordResetCompleteSchema = z.object({
+  token: z.string().min(1),
+  newPassword: z.string().min(6),
+});
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +33,11 @@ export async function POST(req: Request) {
     );
 
     const body = await req.json().catch(() => ({}));
-    const identifier = String(body?.identifier ?? "").trim();
+    const parsed = passwordResetRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid input" }, { status: 400 });
+    }
+    const identifier = String(parsed.data.identifier ?? "").trim();
     if (!identifier) {
       return NextResponse.json(
         { error: "Email or phone is required" },
@@ -69,8 +83,12 @@ export async function PUT(req: Request) {
     );
 
     const body = await req.json().catch(() => ({}));
-    const token = String(body?.token ?? "").trim();
-    const newPassword = String(body?.newPassword ?? "");
+    const parsed = passwordResetCompleteSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid input" }, { status: 400 });
+    }
+    const token = String(parsed.data.token ?? "").trim();
+    const newPassword = String(parsed.data.newPassword ?? "");
     if (!token || !newPassword) {
       return NextResponse.json(
         { error: "Reset token and new password are required" },

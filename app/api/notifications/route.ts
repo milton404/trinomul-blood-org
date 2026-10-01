@@ -6,6 +6,11 @@ import {
   serverMarkNotificationRead,
   serverMarkAllNotificationsRead,
 } from "@/lib/db-actions";
+import { z } from "zod";
+
+const markNotificationSchema = z.object({
+  id: z.number().int().positive(),
+});
 
 export const dynamic = "force-dynamic";
 
@@ -41,7 +46,11 @@ export async function POST(req: Request) {
     await enforceRateLimit("notifications-mark", 60, 60 * 1000, 5 * 60 * 1000);
 
     const body = await req.json().catch(() => ({}));
-    const id = Number(body?.id);
+    const parsed = markNotificationSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid input" }, { status: 400 });
+    }
+    const id = parsed.data.id;
     if (!Number.isFinite(id) || id <= 0) {
       return NextResponse.json({ error: "Valid notification id required" }, { status: 400 });
     }

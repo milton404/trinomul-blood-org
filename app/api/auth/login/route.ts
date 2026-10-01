@@ -5,6 +5,17 @@ import { serverLogin } from "@/lib/auth/actions";
 import { createSession } from "@/lib/auth/session";
 import { hashPassword } from "@/lib/auth/password";
 import { getProfileByEmail, createProfile, updateProfile } from "@/lib/db";
+import { z } from "zod";
+
+const loginSchema = z.object({
+  email: z.string().min(1).optional(),
+  identifier: z.string().min(1).optional(),
+  password: z.string().min(1).optional(),
+  fullNameEn: z.string().optional(),
+  fullNameBn: z.string().optional(),
+  phone: z.string().optional(),
+  bloodGroup: z.string().optional(),
+});
 
 export const dynamic = "force-dynamic";
 
@@ -12,11 +23,15 @@ export async function POST(req: Request) {
   if (!validateOrigin(req as unknown as NextRequest)) return rejectCsrf();
   try {
     const body = await req.json();
-    const { email, password, identifier } = body;
+    const parsed = loginSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid input" }, { status: 400 });
+    }
+    const { email, password, identifier } = parsed.data;
 
     // Login path
     if (identifier || email) {
-      const loginId = identifier || email;
+      const loginId = identifier || email || "";
       const pwd = password;
       if (!pwd) {
         return NextResponse.json({ error: "Password is required" }, { status: 400 });
@@ -32,7 +47,7 @@ export async function POST(req: Request) {
     }
 
     // Signup path (create new donor account via mobile)
-    const { fullNameEn, fullNameBn, phone, bloodGroup } = body;
+    const { fullNameEn, fullNameBn, phone, bloodGroup } = parsed.data;
     if (!email || !fullNameEn || !phone) {
       return NextResponse.json(
         { error: "Email, name, and phone are required" },

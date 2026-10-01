@@ -10,6 +10,11 @@
 
 import type { NextRequest } from "next/server";
 import { validateOrigin, rejectCsrf } from "@/lib/security/csrf";
+import { z } from "zod";
+
+const addressCorrectSchema = z.object({
+  query: z.string().optional(),
+});
 
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const ZHIPU_API_KEY = process.env.ZHIPU_API_KEY;
@@ -103,7 +108,12 @@ export async function POST(request: Request) {
       15 * 60 * 1000,
     );
 
-    const { query } = await request.json();
+    const body = await request.json();
+    const parsed = addressCorrectSchema.safeParse(body);
+    if (!parsed.success) {
+      return Response.json({ error: parsed.error.issues[0]?.message || "Invalid input" }, { status: 400 });
+    }
+    const { query } = parsed.data;
 
     if (!query || typeof query !== "string" || query.trim().length < 2) {
       return Response.json({ corrected: null });

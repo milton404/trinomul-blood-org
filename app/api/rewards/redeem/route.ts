@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { validateOrigin, rejectCsrf } from "@/lib/security/csrf";
 import { serverRedeemReward } from "@/lib/db-actions";
+import { z } from "zod";
+
+const redeemSchema = z.object({
+  rewardId: z.number().int().positive(),
+});
 
 export const dynamic = "force-dynamic";
 
@@ -13,7 +18,11 @@ export async function POST(req: Request) {
     await enforceRateLimit("rewards-redeem", 10, 60 * 1000, 5 * 60 * 1000);
 
     const body = await req.json().catch(() => ({}));
-    const rewardId = Number(body?.rewardId);
+    const parsed = redeemSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid input" }, { status: 400 });
+    }
+    const rewardId = parsed.data.rewardId;
     if (!Number.isFinite(rewardId) || rewardId <= 0) {
       return NextResponse.json({ error: "Valid reward id required" }, { status: 400 });
     }

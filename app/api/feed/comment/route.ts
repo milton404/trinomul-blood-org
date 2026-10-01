@@ -3,6 +3,12 @@ import type { NextRequest } from "next/server";
 import { validateOrigin, rejectCsrf } from "@/lib/security/csrf";
 import { serverAddComment, serverGetComments } from "@/lib/db-actions";
 import { getSession } from "@/lib/auth/session";
+import { z } from "zod";
+
+const commentSchema = z.object({
+  postId: z.number().int().positive(),
+  content: z.string().min(1).max(5000),
+});
 
 export const dynamic = "force-dynamic";
 
@@ -47,8 +53,12 @@ export async function POST(req: Request) {
     );
 
     const body = await req.json();
-    const postId = parseInt(body.postId);
-    const content = (body.content || "").trim();
+    const parsed = commentSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid input" }, { status: 400 });
+    }
+    const postId = parsed.data.postId;
+    const content = (parsed.data.content || "").trim();
 
     if (!postId || !content) {
       return NextResponse.json({ error: "Post ID and content required" }, { status: 400 });

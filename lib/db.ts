@@ -1385,13 +1385,16 @@ export function runRequestLifecycleSweep(nowMs: number = Date.now()): number {
          updated_at = datetime('now')
      WHERE id = ? AND status = 'expired' AND archived_at IS NULL`,
   );
+  const deleteTranslationsStmt = db.prepare(
+    "DELETE FROM request_translations WHERE request_id = ?",
+  );
 
   for (const row of expiredVisible) {
     const expiry = computeNeededExpiryMs(row);
     if (Number.isNaN(expiry)) continue;
     if (nowMs > expiry + getRequestGraceMs(row) + EXPIRED_SEAL_DISPLAY_MS) {
       if (archiveExpiredStmt.run(row.id).changes > 0) {
-        db.prepare("DELETE FROM request_translations WHERE request_id = ?").run(row.id);
+        deleteTranslationsStmt.run(row.id);
         archived++;
       }
     }
@@ -1423,7 +1426,7 @@ export function runRequestLifecycleSweep(nowMs: number = Date.now()): number {
       if (nowMs > hideAt) {
         const changes = archiveFulfilledStmt.run(row.id).changes;
         if (changes > 0) {
-          db.prepare("DELETE FROM request_translations WHERE request_id = ?").run(row.id);
+          deleteTranslationsStmt.run(row.id);
           archived += changes;
         }
       }
@@ -3413,7 +3416,7 @@ export function getSocialPostById(id: number) {
         (SELECT COUNT(*) FROM social_post_saves s WHERE s.post_id = p.id) AS save_count
       FROM social_posts p
       LEFT JOIN profiles pr ON pr.id = p.author_id
-      WHERE p.id = ?
+      WHERE p.id = ? AND p.status = 'active'
     `,
     )
     .get(id) as any;

@@ -3,6 +3,11 @@ import type { NextRequest } from "next/server";
 import { validateOrigin, rejectCsrf } from "@/lib/security/csrf";
 import { serverSharePost } from "@/lib/db-actions";
 import { getSession } from "@/lib/auth/session";
+import { z } from "zod";
+
+const shareSchema = z.object({
+  postId: z.number().int().positive(),
+});
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +30,11 @@ export async function POST(req: Request) {
     );
 
     const body = await req.json();
-    const postId = parseInt(body.postId);
+    const parsed = shareSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message || "Invalid input" }, { status: 400 });
+    }
+    const postId = parsed.data.postId;
     if (!postId) {
       return NextResponse.json({ error: "Post ID required" }, { status: 400 });
     }

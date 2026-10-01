@@ -232,6 +232,37 @@ const pgMigrations: PgMigration[] = [
       `);
     },
   },
+  {
+    id: "008_add_missing_indexes",
+    name: "Indexes on FK columns and frequently-filtered columns",
+    up: async (client) => {
+      await client.query(`
+        CREATE INDEX IF NOT EXISTS idx_blood_requests_donor_id ON blood_requests(donor_id);
+        CREATE INDEX IF NOT EXISTS idx_blood_requests_referrer_profile_id ON blood_requests(referrer_profile_id);
+        CREATE INDEX IF NOT EXISTS idx_blood_requests_organization_id ON blood_requests(organization_id);
+        CREATE INDEX IF NOT EXISTS idx_blood_requests_upazila ON blood_requests(upazila);
+        CREATE INDEX IF NOT EXISTS idx_blood_requests_urgency_level ON blood_requests(urgency_level);
+        CREATE INDEX IF NOT EXISTS idx_blood_requests_current_status ON blood_requests(current_status);
+        CREATE INDEX IF NOT EXISTS idx_donations_referrer_profile_id ON donations(referrer_profile_id);
+        CREATE INDEX IF NOT EXISTS idx_donations_donation_date ON donations(donation_date);
+        CREATE INDEX IF NOT EXISTS idx_donations_blood_group ON donations(blood_group);
+        CREATE INDEX IF NOT EXISTS idx_profiles_upazila ON profiles(upazila);
+        CREATE INDEX IF NOT EXISTS idx_profiles_is_approved ON profiles(is_approved);
+        CREATE INDEX IF NOT EXISTS idx_social_posts_related_request_id ON social_posts(related_request_id);
+        CREATE INDEX IF NOT EXISTS idx_social_posts_status ON social_posts(status);
+        CREATE INDEX IF NOT EXISTS idx_social_posts_is_public ON social_posts(is_public);
+        CREATE INDEX IF NOT EXISTS idx_social_post_likes_user_id ON social_post_likes(user_id);
+        CREATE INDEX IF NOT EXISTS idx_social_post_comments_author_id ON social_post_comments(author_id);
+        CREATE INDEX IF NOT EXISTS idx_social_post_shares_user_id ON social_post_shares(user_id);
+        CREATE INDEX IF NOT EXISTS idx_notifications_actor_id ON notifications(actor_id);
+        CREATE INDEX IF NOT EXISTS idx_notifications_post_id ON notifications(post_id);
+        CREATE INDEX IF NOT EXISTS idx_donor_contact_clicks_clicker_user_id ON donor_contact_clicks(clicker_user_id);
+        CREATE INDEX IF NOT EXISTS idx_email_log_request_id ON email_log(request_id);
+        CREATE INDEX IF NOT EXISTS idx_activity_log_actor_id ON activity_log(actor_id);
+        CREATE INDEX IF NOT EXISTS idx_request_edit_history_editor_id ON request_edit_history(editor_id);
+      `);
+    },
+  },
 ];
 
 async function ensureTrackingTable(client: NonNullable<SupabaseAdminClient>): Promise<void> {

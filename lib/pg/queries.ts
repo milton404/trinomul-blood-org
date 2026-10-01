@@ -899,15 +899,21 @@ export async function findMatchingDonorsPg(
 }
 
 export async function recordDonorMatchesPg(requestId: number, matches: any[], method: string = "sms"): Promise<number> {
-  let count = 0;
+  if (matches.length === 0) return 0;
+
+  const valuesClauses: string[] = [];
+  const params: any[] = [];
+  let p = 1;
   for (const m of matches) {
-    await query(
-      "INSERT INTO donor_matches (request_id, donor_id, match_rank, match_score, notification_method) VALUES ($1,$2,$3,$4,$5)",
-      [requestId, m.id, m.match_rank, m.match_score, method],
-    );
-    count++;
+    valuesClauses.push(`($${p++},$${p++},$${p++},$${p++},$${p++})`);
+    params.push(requestId, m.id, m.match_rank, m.match_score, method);
   }
-  return count;
+
+  await query(
+    `INSERT INTO donor_matches (request_id, donor_id, match_rank, match_score, notification_method) VALUES ${valuesClauses.join(",")}`,
+    params,
+  );
+  return matches.length;
 }
 
 export async function updateDonorMatchResponsePg(
@@ -1334,22 +1340,26 @@ export async function getWeeklyStatsPg(weeks: number = 12) {
 }
 
 export async function seedDonorEligibilityDataPg(): Promise<number> {
-  const { rows: donors } = await query("SELECT id FROM profiles WHERE role = 'donor' ORDER BY id");
-  let count = 0;
-  for (const donor of donors as any[]) {
-    const mod = donor.id % 10;
-    const updates: Record<number, { date: string | null; type: string }> = {
-      1: { date: "2025-12-14", type: "whole_blood" }, 2: { date: "2026-02-22", type: "whole_blood" },
-      3: { date: "2026-03-24", type: "platelets" }, 4: { date: "2026-04-03", type: "plasma" },
-      5: { date: null, type: "whole_blood" }, 6: { date: "2026-01-03", type: "whole_blood" },
-      7: { date: "2026-03-14", type: "whole_blood" }, 8: { date: "2026-04-08", type: "platelets" },
-      9: { date: null, type: "whole_blood" }, 0: { date: "2026-03-19", type: "plasma" },
-    };
-    const u = updates[mod];
-    await query("UPDATE profiles SET last_donation_date = $1, last_donation_type = $2 WHERE id = $3", [u.date, u.type, donor.id]);
-    count++;
-  }
-  return count;
+  const { rows: donors } = await query<{ id: number }>("SELECT id FROM profiles WHERE role = 'donor' ORDER BY id");
+  if (donors.length === 0) return 0;
+
+  await query(`
+    UPDATE profiles SET
+      last_donation_date = CASE (id % 10)
+        WHEN 1 THEN '2025-12-14' WHEN 2 THEN '2026-02-22'
+        WHEN 3 THEN '2026-03-24' WHEN 4 THEN '2026-04-03'
+        WHEN 5 THEN NULL WHEN 6 THEN '2026-01-03'
+        WHEN 7 THEN '2026-03-14' WHEN 8 THEN '2026-04-08'
+        WHEN 9 THEN NULL WHEN 0 THEN '2026-03-19'
+      END,
+      last_donation_type = CASE (id % 10)
+        WHEN 3 THEN 'platelets' WHEN 4 THEN 'plasma'
+        WHEN 8 THEN 'platelets' WHEN 0 THEN 'plasma'
+        ELSE 'whole_blood'
+      END
+    WHERE role = 'donor'
+  `);
+  return donors.length;
 }
 
 // ── Organizations ────────────────────────────────────────────────────
@@ -1703,7 +1713,7 @@ export async function getSocialPostByIdPg(id: number) {
        (SELECT COUNT(*) FROM social_post_likes l WHERE l.post_id = p.id) AS like_count,
        (SELECT COUNT(*) FROM social_post_comments c WHERE c.post_id = p.id) AS comment_count,
        (SELECT COUNT(*) FROM social_post_saves s WHERE s.post_id = p.id) AS save_count
-      FROM social_posts p LEFT JOIN profiles pr ON pr.id = p.author_id WHERE p.id = $1`,
+      FROM social_posts p LEFT JOIN profiles pr ON pr.id = p.author_id WHERE p.id = $1 AND p.status = 'active'`,
     [id],
   );
   const row = rows[0] as any;

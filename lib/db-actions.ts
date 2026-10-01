@@ -1179,7 +1179,54 @@ export async function serverCreateDonation(donation: Record<string, any>) {
 
     return donationId;
   }
-  return dbCreateDonation(donation);
+
+  const donationId = dbCreateDonation(donation);
+
+  if (donation.donorId && donation.donationDate) {
+    try {
+      const { getDb } = await import("@/lib/db");
+      const db = getDb();
+      db.prepare(
+        "UPDATE profiles SET show_on_leaderboard = 1 WHERE id = ? AND show_on_leaderboard = 0",
+      ).run(donation.donorId);
+    } catch (e) {
+      console.error("Failed to set show_on_leaderboard:", e);
+    }
+  }
+
+  try {
+    const { scheduleDonationReminder } = await import("@/lib/reminders/scheduler");
+    await scheduleDonationReminder({
+      donationId,
+      donorId: donation.donorId,
+      donationType: donation.donationType || "whole_blood",
+      donationDate: donation.donationDate,
+    });
+  } catch (e) {
+    console.error("Failed to schedule donation reminder:", e);
+  }
+
+  try {
+    const { issueCertificateForDonation } = await import("@/lib/certificates/issue");
+    await issueCertificateForDonation(donationId);
+  } catch (e) {
+    console.error("Failed to issue certificate:", e);
+  }
+
+  if (donation.donorId) {
+    try {
+      const { awardPointsForDonation } = await import("@/lib/rewards/points");
+      await awardPointsForDonation(
+        donationId,
+        donation.donorId,
+        donation.donationType || "whole_blood",
+      );
+    } catch (e) {
+      console.error("Failed to award points:", e);
+    }
+  }
+
+  return donationId;
 }
 
 export async function serverGetDonationsByDonorId(donorId: number, _cacheBuster?: number) {
