@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { validateOrigin, rejectCsrf } from "@/lib/security/csrf";
 import {
   getDonorsWithStats,
   createProfile,
@@ -8,6 +10,7 @@ import {
 import { isSupabaseAvailable } from "@/lib/supabase/client";
 import { getDonorsWithStatsPg } from "@/lib/db-actions";
 import { hashPassword } from "@/lib/auth/password";
+import { createDonorSchema } from "@/lib/validation/schemas";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +36,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  if (!validateOrigin(req as unknown as NextRequest)) return rejectCsrf();
   try {
     const { enforceRateLimit, incrementRateLimit } = await import(
       "@/lib/auth/rateLimit"
@@ -46,7 +50,15 @@ export async function POST(req: Request) {
 
     const body = await req.json();
 
-    const email = body.email;
+    const parsed = createDonorSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || "Invalid input" },
+        { status: 400 },
+      );
+    }
+
+    const email = parsed.data.email;
     if (!email) {
       return NextResponse.json(
         { error: "Email is required" },
@@ -69,36 +81,36 @@ export async function POST(req: Request) {
     const id = createProfile({
       email,
       passwordHash,
-      fullNameEn: body.fullNameEn || "",
-      fullNameBn: body.fullNameBn || body.fullNameEn || "",
-      phone: body.phone || "",
-      bloodGroup: body.bloodGroup || "",
+      fullNameEn: parsed.data.fullNameEn || "",
+      fullNameBn: parsed.data.fullNameBn || parsed.data.fullNameEn || "",
+      phone: parsed.data.phone || "",
+      bloodGroup: parsed.data.bloodGroup || "",
       role: "donor",
-      district: body.district || null,
-      upazila: body.upazila || null,
+      district: parsed.data.district || null,
+      upazila: parsed.data.upazila || null,
       unionName: null,
       hospitalNameEn: null,
       hospitalNameBn: null,
       licenseNumber: null,
       website: null,
-      lat: body.lat ?? null,
-      lng: body.lng ?? null,
+      lat: parsed.data.lat ?? null,
+      lng: parsed.data.lng ?? null,
     });
 
     updateProfile(id, {
-      address: body.address || null,
-      whatsapp_number: body.whatsappNumber || null,
-      sex: body.sex || null,
-      date_of_birth: body.dateOfBirth || null,
-      weight_kg: body.weightKg || null,
-      occupation: body.occupation || null,
-      preferred_contact: body.preferredContact || "call",
-      hb_level: body.hbLevel || null,
-      last_hb_test_date: body.lastHbTestDate || null,
-      last_donation_date: body.lastDonationDate || null,
-      has_chronic_disease: body.hasChronicDisease ? 1 : 0,
-      disease_details: body.diseaseDetails || null,
-      avatar_url: body.avatarUrl || body.avatar_url || null,
+      address: parsed.data.address || null,
+      whatsapp_number: parsed.data.whatsappNumber || null,
+      sex: parsed.data.sex || null,
+      date_of_birth: parsed.data.dateOfBirth || null,
+      weight_kg: parsed.data.weightKg || null,
+      occupation: parsed.data.occupation || null,
+      preferred_contact: parsed.data.preferredContact || "call",
+      hb_level: parsed.data.hbLevel || null,
+      last_hb_test_date: parsed.data.lastHbTestDate || null,
+      last_donation_date: parsed.data.lastDonationDate || null,
+      has_chronic_disease: parsed.data.hasChronicDisease ? 1 : 0,
+      disease_details: parsed.data.diseaseDetails || null,
+      avatar_url: parsed.data.avatarUrl || parsed.data.avatar_url || null,
       is_approved: 0,
       verification_status: "pending",
     });

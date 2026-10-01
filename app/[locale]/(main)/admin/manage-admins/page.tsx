@@ -389,7 +389,7 @@ function AddAdminModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
     setIsLoading(true);
 
     try {
-      await serverCreateAdmin({
+      const result = await serverCreateAdmin({
         email: formData.email,
         password: formData.password,
         fullNameEn: formData.full_name_en,
@@ -403,6 +403,11 @@ function AddAdminModal({ onClose, onSave }: { onClose: () => void; onSave: () =>
             ? formData.assigned_upazila
             : null,
       });
+
+      if (!result.ok) {
+        toast.error(result.error || t('error'));
+        return;
+      }
 
       toast.success(t('admin_created'));
       onSave();

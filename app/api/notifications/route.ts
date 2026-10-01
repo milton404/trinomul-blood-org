@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { validateOrigin, rejectCsrf } from "@/lib/security/csrf";
 import {
   serverGetMyNotifications,
   serverMarkNotificationRead,
@@ -33,6 +35,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  if (!validateOrigin(req as unknown as NextRequest)) return rejectCsrf();
   try {
     const { enforceRateLimit } = await import("@/lib/auth/rateLimit");
     await enforceRateLimit("notifications-mark", 60, 60 * 1000, 5 * 60 * 1000);
@@ -54,7 +57,8 @@ export async function POST(req: Request) {
   }
 }
 
-export async function PUT() {
+export async function PUT(req: NextRequest) {
+  if (!validateOrigin(req)) return rejectCsrf();
   try {
     const { enforceRateLimit } = await import("@/lib/auth/rateLimit");
     await enforceRateLimit("notifications-mark-all", 30, 60 * 1000, 5 * 60 * 1000);

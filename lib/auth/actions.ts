@@ -151,8 +151,9 @@ export async function serverLogin(
     : trimmedIdentifier;
   let profile: any;
   if (usePg) {
-    const col = isEmail(trimmedIdentifier) ? "email" : "phone";
-    const { rows } = await pgQuery(`SELECT * FROM profiles WHERE ${col} = $1`, [lookupValue]);
+    const { rows } = isEmail(trimmedIdentifier)
+      ? await pgQuery("SELECT * FROM profiles WHERE email = $1", [lookupValue])
+      : await pgQuery("SELECT * FROM profiles WHERE phone = $1", [lookupValue]);
     profile = rows[0] || null;
   } else {
     profile = isEmail(trimmedIdentifier)
@@ -257,7 +258,7 @@ export async function serverRegister(input: {
   district?: string;
   upazila?: string;
   address?: string;
-}): Promise<{ user: AuthUser; redirectTo: string; token: string }> {
+}): Promise<{ ok: true; user: AuthUser; redirectTo: string; token: string } | { ok: false; error: string }> {
   const normalizedEmail = input.email.trim().toLowerCase();
   const key = `register:${normalizedEmail}`;
   const usePg = isSupabaseAvailable();
@@ -272,15 +273,15 @@ export async function serverRegister(input: {
     );
     const rl = rlRow.rows[0];
     if (rl?.locked_until && rl.locked_until > Date.now()) {
-      throw new Error("Too many registration attempts. Please try later.");
+      return { ok: false, error: "Too many registration attempts. Please try later." };
     }
     if (rl && rl.attempt_count >= 5) {
-      throw new Error("Too many registration attempts. Please try later.");
+      return { ok: false, error: "Too many registration attempts. Please try later." };
     }
 
     const existing = await pgQuery("SELECT 1 FROM profiles WHERE email = $1", [normalizedEmail]);
     if (existing.rows.length > 0) {
-      throw new Error("An account with this email already exists.");
+      return { ok: false, error: "An account with this email already exists." };
     }
 
     const passwordHash = await hashPassword(input.password);
@@ -317,13 +318,13 @@ export async function serverRegister(input: {
   } else {
     const limit = await checkRateLimit(key, 5, 60 * 60 * 1000);
     if (!limit.allowed) {
-      throw new Error("Too many registration attempts. Please try later.");
+      return { ok: false, error: "Too many registration attempts. Please try later." };
     }
 
     const existing = (await getProfileByEmail(normalizedEmail)) as any;
     if (existing) {
       await recordFailedAttempt(key);
-      throw new Error("An account with this email already exists.");
+      return { ok: false, error: "An account with this email already exists." };
     }
 
     const passwordHash = await hashPassword(input.password);
@@ -369,6 +370,7 @@ export async function serverRegister(input: {
   const token = await createSession(payload, false);
 
   return {
+    ok: true,
     user: {
       id: profileId,
       email: normalizedEmail,
@@ -400,17 +402,17 @@ export async function serverCreateAdmin(input: {
   role?: "admin" | "super_admin";
   assignedDistrict?: string | null;
   assignedUpazila?: string | null;
-}): Promise<number> {
+}): Promise<{ ok: true; id: number } | { ok: false; error: string }> {
   // Only main admins (super_admin / full admin) may create admin accounts.
   const ctx = await requireFullAdmin();
 
   const existing = (await getProfileByEmail(input.email)) as any;
   if (existing) {
-    throw new Error("An account with this email already exists.");
+    return { ok: false, error: "An account with this email already exists." };
   }
 
   if (input.password.length < 6) {
-    throw new Error("Password must be at least 6 characters long.");
+    return { ok: false, error: "Password must be at least 6 characters long." };
   }
 
   const role = input.role || "admin";
@@ -450,7 +452,7 @@ export async function serverCreateAdmin(input: {
     console.error("Failed to record activity log:", e);
   }
 
-  return id;
+  return { ok: true, id };
 }
 
 /** Return the currently authenticated user (from the session cookie), or null. */
@@ -475,11 +477,11 @@ export async function serverGetSession(): Promise<SessionPayload | null> {
  */
 export async function serverRequestPasswordReset(
   identifier: string,
-): Promise<string | null> {
+): Promise<{ ok: true; token: string | null } | { ok: false; error: string }> {
   const key = `reset:${identifier.toLowerCase()}`;
   const limit = await checkRateLimit(key, 3, 60 * 60 * 1000);
   if (!limit.allowed) {
-    throw new Error("Too many reset attempts. Please try later.");
+    return { ok: false, error: "Too many reset attempts. Please try later." };
   }
 
   const profile = isEmail(identifier)
@@ -488,7 +490,7 @@ export async function serverRequestPasswordReset(
 
   if (!profile) {
     // Do not reveal whether the account exists.
-    return null;
+    return { ok: true, token: null };
   }
 
   const token = generateResetToken();
@@ -510,24 +512,24 @@ export async function serverRequestPasswordReset(
     }
   }
 
-  return token;
+  return { ok: true, token };
 }
 
 /** Validate a reset token and set a new password (hashed). */
 export async function serverResetPassword(
   token: string,
   newPassword: string,
-): Promise<void> {
+): Promise<{ ok: true } | { ok: false; error: string }> {
   if (newPassword.length < 6) {
-    throw new Error("Password must be at least 6 characters long.");
+    return { ok: false, error: "Password must be at least 6 characters long." };
   }
 
   const row = getPasswordResetByToken(token);
   if (!row) {
-    throw new Error("Invalid or already-used reset token.");
+    return { ok: false, error: "Invalid or already-used reset token." };
   }
   if (new Date(row.expires_at).getTime() < Date.now()) {
-    throw new Error("This reset token has expired. Please request a new one.");
+    return { ok: false, error: "This reset token has expired. Please request a new one." };
   }
 
   const hashed = await hashPassword(newPassword);
@@ -547,6 +549,8 @@ export async function serverResetPassword(
       /* never block the reset */
     }
   }
+
+  return { ok: true };
 }
 
 function generateResetToken(): string {

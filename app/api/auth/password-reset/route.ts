@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { validateOrigin, rejectCsrf } from "@/lib/security/csrf";
 import { serverRequestPasswordReset, serverResetPassword } from "@/lib/auth/actions";
 
 export const dynamic = "force-dynamic";
@@ -10,6 +12,7 @@ export const dynamic = "force-dynamic";
  */
 
 export async function POST(req: Request) {
+  if (!validateOrigin(req as unknown as NextRequest)) return rejectCsrf();
   try {
     const { enforceRateLimit } = await import("@/lib/auth/rateLimit");
     await enforceRateLimit(
@@ -28,14 +31,18 @@ export async function POST(req: Request) {
       );
     }
 
-    const token = await serverRequestPasswordReset(identifier);
+    const result = await serverRequestPasswordReset(identifier);
+
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: 429 });
+    }
 
     // Never reveal whether the account exists. In non-production only, the
     // token is returned so the mobile/dev flow can finish a reset when email
     // delivery is not configured.
     const payload: Record<string, unknown> = { sent: true };
-    if (process.env.NODE_ENV !== "production" && token) {
-      payload.devToken = token;
+    if (process.env.NODE_ENV !== "production" && result.token) {
+      payload.devToken = result.token;
     }
     return NextResponse.json(payload);
   } catch (err: any) {
@@ -51,6 +58,7 @@ export async function POST(req: Request) {
 }
 
 export async function PUT(req: Request) {
+  if (!validateOrigin(req as unknown as NextRequest)) return rejectCsrf();
   try {
     const { enforceRateLimit } = await import("@/lib/auth/rateLimit");
     await enforceRateLimit(
@@ -70,7 +78,10 @@ export async function PUT(req: Request) {
       );
     }
 
-    await serverResetPassword(token, newPassword);
+    const result = await serverResetPassword(token, newPassword);
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error }, { status: 400 });
+    }
     return NextResponse.json({ ok: true });
   } catch (err: any) {
     if (err?.message?.startsWith("Too many requests")) {

@@ -2,7 +2,7 @@
 // Mirrors the SQLite functions in lib/db.ts but uses the Supabase pool.
 // Pure lifecycle helpers (date math) are imported from lib/db.ts — they
 // never touch getDb(), so importing them is serverless-safe.
-import { query } from "@/lib/supabase/client";
+import { query, withTransaction } from "@/lib/supabase/client";
 import {
   computeNeededExpiryMs,
   isLastChanceRequest,
@@ -213,58 +213,84 @@ export async function createBloodRequestPg(request: Record<string, any>): Promis
     request.upazila,
     request.unionName,
   );
+  const idempotencyKey = request.idempotencyKey?.trim() || null;
 
-  let trackingCode = generateTrackingCode();
-  for (let i = 0; i < 5; i++) {
-    const { rows } = await query(
-      "SELECT 1 FROM blood_requests WHERE tracking_code = $1",
-      [trackingCode],
+  return withTransaction(async (client) => {
+    // Idempotency: a retried submission with the same key returns the original
+    // request instead of creating a duplicate.
+    if (idempotencyKey) {
+      const existing = await client.query(
+        "SELECT id FROM blood_requests WHERE idempotency_key = $1",
+        [idempotencyKey],
+      );
+      if (existing.rows.length > 0) {
+        return (existing.rows[0] as { id: number }).id;
+      }
+    }
+
+    let trackingCode = generateTrackingCode();
+    for (let i = 0; i < 5; i++) {
+      const { rows } = await client.query(
+        "SELECT 1 FROM blood_requests WHERE tracking_code = $1",
+        [trackingCode],
+      );
+      if (rows.length === 0) break;
+      trackingCode = generateTrackingCode();
+    }
+
+    const { rows } = await client.query(
+      `INSERT INTO blood_requests (
+         requester_id, requester_type, patient_name, patient_age, blood_group,
+         units_needed, urgency_level, when_needed, needed_date, needed_time,
+         district, upazila, union_name, lat, lng, hospital_name, hospital_address,
+         contact_number, alternative_number, whatsapp_number, reason,
+         patient_hb_level, status, tracking_code, current_status, ip_address,
+         user_agent, idempotency_key
+       )
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28)
+       RETURNING id`,
+      [
+        request.requesterId ?? null,
+        request.requesterType ?? "guest",
+        request.patientName,
+        request.patientAge ?? null,
+        request.bloodGroup,
+        request.unitsNeeded ?? 1,
+        request.urgencyLevel ?? "normal",
+        request.whenNeeded ?? "today",
+        request.neededDate ?? null,
+        request.neededTime ?? null,
+        request.district ?? null,
+        request.upazila ?? null,
+        request.unionName ?? null,
+        coords.lat,
+        coords.lng,
+        request.hospitalName ?? null,
+        request.hospitalAddress ?? null,
+        request.contactNumber ?? null,
+        request.alternativeNumber ?? null,
+        request.whatsappNumber ?? null,
+        request.reason ?? null,
+        request.patientHbLevel ?? null,
+        request.status ?? "active",
+        trackingCode,
+        "submitted",
+        request.ipAddress ?? null,
+        request.userAgent ?? null,
+        idempotencyKey,
+      ],
     );
-    if (rows.length === 0) break;
-    trackingCode = generateTrackingCode();
-  }
+    const id = (rows[0] as { id: number }).id;
 
-  const { rows } = await query(
-    `INSERT INTO blood_requests (
-       requester_id, requester_type, patient_name, patient_age, blood_group,
-       units_needed, urgency_level, when_needed, needed_date, needed_time,
-       district, upazila, union_name, lat, lng, hospital_name, hospital_address,
-       contact_number, alternative_number, whatsapp_number, reason,
-       patient_hb_level, status, tracking_code, current_status, ip_address, user_agent
-     )
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27)
-     RETURNING id`,
-    [
-      request.requesterId ?? null,
-      request.requesterType ?? "guest",
-      request.patientName,
-      request.patientAge ?? null,
-      request.bloodGroup,
-      request.unitsNeeded ?? 1,
-      request.urgencyLevel ?? "normal",
-      request.whenNeeded ?? "today",
-      request.neededDate ?? null,
-      request.neededTime ?? null,
-      request.district ?? null,
-      request.upazila ?? null,
-      request.unionName ?? null,
-      coords.lat,
-      coords.lng,
-      request.hospitalName ?? null,
-      request.hospitalAddress ?? null,
-      request.contactNumber ?? null,
-      request.alternativeNumber ?? null,
-      request.whatsappNumber ?? null,
-      request.reason ?? null,
-      request.patientHbLevel ?? null,
-      request.status ?? "active",
-      trackingCode,
-      "submitted",
-      request.ipAddress ?? null,
-      request.userAgent ?? null,
-    ],
-  );
-  return (rows[0] as { id: number }).id;
+    // Seed the initial status log so the timeline starts at "Submitted".
+    await client.query(
+      `INSERT INTO request_status_log (request_id, status, changed_by, note)
+       VALUES ($1, $2, $3, $4)`,
+      [id, "submitted", request.requesterType ?? "guest", "Request submitted"],
+    );
+
+    return id;
+  });
 }
 
 // ── Stats ─────────────────────────────────────────────────────────────

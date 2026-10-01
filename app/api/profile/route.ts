@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { validateOrigin, rejectCsrf } from "@/lib/security/csrf";
 import { getSession } from "@/lib/auth/session";
 import { getProfileByEmail } from "@/lib/db";
 import { isSupabaseAvailable, query as pgQuery } from "@/lib/supabase/client";
 import { serverUpdateProfile } from "@/lib/db-actions";
+import { patchProfileSchema } from "@/lib/validation/schemas";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +63,7 @@ export async function GET() {
 }
 
 export async function PATCH(req: Request) {
+  if (!validateOrigin(req as unknown as NextRequest)) return rejectCsrf();
   try {
     const { enforceRateLimit } = await import("@/lib/auth/rateLimit");
     await enforceRateLimit("profile-update", 20, 60 * 1000, 5 * 60 * 1000);
@@ -78,7 +82,15 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "No valid fields to update" }, { status: 400 });
     }
 
-    await serverUpdateProfile(Number(session.sub), data);
+    const parsed = patchProfileSchema.safeParse(data);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || "Invalid input" },
+        { status: 400 },
+      );
+    }
+
+    await serverUpdateProfile(Number(session.sub), parsed.data);
 
     const profile = await loadProfile(session.email);
     return NextResponse.json({ user: profile });

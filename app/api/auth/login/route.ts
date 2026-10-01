@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { validateOrigin, rejectCsrf } from "@/lib/security/csrf";
 import { serverLogin } from "@/lib/auth/actions";
 import { createSession } from "@/lib/auth/session";
 import { hashPassword } from "@/lib/auth/password";
@@ -7,6 +9,7 @@ import { getProfileByEmail, createProfile, updateProfile } from "@/lib/db";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  if (!validateOrigin(req as unknown as NextRequest)) return rejectCsrf();
   try {
     const body = await req.json();
     const { email, password, identifier } = body;

@@ -69,7 +69,11 @@ export default function ResetPasswordForm() {
   const onSubmit = async (values: FormValues) => {
     setIsLoading(true);
     try {
-      await serverResetPassword(token, values.password);
+      const result = await serverResetPassword(token, values.password);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
       setDone(true);
       toast.success(t("reset_success"));
       setTimeout(() => router.push("/login"), 2000);

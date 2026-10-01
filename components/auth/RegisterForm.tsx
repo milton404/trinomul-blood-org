@@ -150,13 +150,21 @@ export default function RegisterForm({ defaultRole }: RegisterFormProps) {
 
       // serverRegister hashes the password with bcrypt and issues a JWT
       // session cookie server-side. No plaintext password is stored.
-      const { user: newUser, redirectTo } = await serverRegister({
+      const result = await serverRegister({
         email: values.email,
         password: values.password,
         fullName: values.fullName,
         phone: values.phone,
         role: values.role,
       });
+
+      if (!result.ok) {
+        setFormError(result.error);
+        toast.error(result.error);
+        return;
+      }
+
+      const { user: newUser, redirectTo } = result;
 
       setUser(newUser as any);
       setRole(newUser.role);

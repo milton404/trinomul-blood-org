@@ -205,6 +205,33 @@ const pgMigrations: PgMigration[] = [
       `);
     },
   },
+  {
+    id: "006_auth_sessions",
+    name: "Session revocation store (jti denylist)",
+    up: async (client) => {
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS auth_sessions (
+          jti TEXT PRIMARY KEY,
+          user_id BIGINT NOT NULL,
+          expires_at TIMESTAMPTZ NOT NULL,
+          revoked_at TIMESTAMPTZ,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        );
+        CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions(user_id, expires_at);
+      `);
+    },
+  },
+  {
+    id: "007_request_idempotency",
+    name: "Idempotency key for retry-safe blood-request creation",
+    up: async (client) => {
+      await client.query(`
+        ALTER TABLE blood_requests ADD COLUMN IF NOT EXISTS idempotency_key TEXT;
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_blood_requests_idempotency_key
+          ON blood_requests(idempotency_key) WHERE idempotency_key IS NOT NULL;
+      `);
+    },
+  },
 ];
 
 async function ensureTrackingTable(client: NonNullable<SupabaseAdminClient>): Promise<void> {

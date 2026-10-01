@@ -2,7 +2,7 @@
 // Supabase is used as managed PostgreSQL. We connect directly with the `pg`
 // driver (raw SQL) because the app uses custom JWT auth — NOT Supabase Auth —
 // so RLS/`auth.uid()` do not apply. Keep this module out of client bundles.
-import { Pool, type PoolConfig, types } from "pg";
+import { Pool, type PoolConfig, type PoolClient, types } from "pg";
 import { createLogger } from "@/lib/logging/logger";
 
 const logger = createLogger("supabase");
@@ -72,6 +72,39 @@ export async function query<T = Record<string, unknown>>(
   }
   const result = await db.query(text, params);
   return { rows: result.rows, rowCount: result.rowCount };
+}
+
+/**
+ * Run a sequence of statements atomically on a single checked-out client.
+ * Commits on success, rolls back and rethrows on any error, and always
+ * releases the client back to the pool.
+ */
+export async function withTransaction<T>(
+  fn: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  const db = getPgPool();
+  if (!db) {
+    throw new Error("DATABASE_URL is not configured");
+  }
+
+  const client = await db.connect();
+  try {
+    await client.query("BEGIN");
+    const result = await fn(client);
+    await client.query("COMMIT");
+    return result;
+  } catch (err) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackErr) {
+      logger.logError(
+        rollbackErr instanceof Error ? rollbackErr : new Error(String(rollbackErr)),
+      );
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export function isSupabaseAvailable(): boolean {

@@ -130,6 +130,7 @@ CREATE TABLE IF NOT EXISTS blood_requests (
   patient_hb_level DOUBLE PRECISION,
   union_name TEXT,
   tracking_code TEXT UNIQUE,
+  idempotency_key TEXT UNIQUE,
   current_status TEXT NOT NULL DEFAULT 'submitted',
   boosted_at TEXT,
   view_count INTEGER NOT NULL DEFAULT 0,
@@ -297,6 +298,17 @@ CREATE TABLE IF NOT EXISTS password_resets (
 );
 
 CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets(token);
+
+-- ── auth_sessions (token revocation denylist) ──────────────────────────────
+CREATE TABLE IF NOT EXISTS auth_sessions (
+  jti TEXT PRIMARY KEY,
+  user_id BIGINT NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  revoked_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions(user_id, expires_at);
 
 -- ── request_status_log ────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS request_status_log (

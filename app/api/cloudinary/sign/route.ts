@@ -36,7 +36,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { validateOrigin, rejectCsrf } from "@/lib/security/csrf";
 import { v2 as cloudinary } from "cloudinary";
+import { getSession } from "@/lib/auth/session";
 
 // ────────────────────────────────────────────────────────────────────────────
 // Configuration
@@ -95,11 +97,22 @@ function isUseCase(u: unknown): u is UseCase {
 // ────────────────────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
+  if (!validateOrigin(req)) return rejectCsrf();
   // ── 0. Gather IP ─────────────────────────────────────────────────────────
   const ip =
     req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     req.headers.get("x-real-ip") ||
     "unknown";
+
+  // ── 0b. Authentication ───────────────────────────────────────────────────
+  // Signing uploads costs money and NID uploads touch PII — require a session.
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json(
+      { error: "Not authenticated" },
+      { status: 401 },
+    );
+  }
 
   // ── 1. Credential check (server-only, never exposed) ─────────────────────
   if (!CLOUD_NAME || !API_KEY || !API_SECRET) {

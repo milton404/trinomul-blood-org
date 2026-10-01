@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
-import { serverGetProfileByEmail } from "@/lib/db-actions";
+import { serverGetCurrentUser } from "@/lib/auth/actions";
 import { useAuthStore } from "@/store/authStore";
 
 export const useAuth = () => {
@@ -12,18 +12,14 @@ export const useAuth = () => {
       try {
         setIsLoading(true);
 
-        const adminProfile = await serverGetProfileByEmail("admin@trinomul.com") as any;
+        const user = await serverGetCurrentUser();
 
-        if (adminProfile) {
-          setUser({
-            id: String(adminProfile.id),
-            email: adminProfile.email,
-            user_metadata: {
-              full_name: adminProfile.full_name_en,
-              role: adminProfile.role,
-            },
-          } as any);
-          setRole(adminProfile.role);
+        if (user) {
+          setUser({ id: user.id, email: user.email, role: user.role });
+          setRole(user.role);
+        } else {
+          setUser(null);
+          setRole(null);
         }
       } catch (error) {
         console.error("Auth error:", error);

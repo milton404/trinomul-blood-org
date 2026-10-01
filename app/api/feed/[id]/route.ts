@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { validateOrigin, rejectCsrf } from "@/lib/security/csrf";
 import { serverDeletePost, serverUpdatePost, serverGetPostById } from "@/lib/db-actions";
 import { getSession } from "@/lib/auth/session";
+import { updatePostSchema } from "@/lib/validation/schemas";
 
 export const dynamic = "force-dynamic";
 
@@ -19,6 +22,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 }
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!validateOrigin(req as unknown as NextRequest)) return rejectCsrf();
   try {
     const session = await getSession();
     if (!session) {
@@ -54,6 +58,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
 }
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  if (!validateOrigin(req as unknown as NextRequest)) return rejectCsrf();
   try {
     const session = await getSession();
     if (!session) {
@@ -74,10 +79,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     const postId = parseInt(id);
     const body = await req.json();
 
+    const parsed = updatePostSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || "Invalid input" },
+        { status: 400 },
+      );
+    }
+
     const changes = await serverUpdatePost(postId, {
-      content: body.content,
-      images: body.images,
-      isPublic: body.isPublic,
+      content: parsed.data.content,
+      images: parsed.data.images,
+      isPublic: parsed.data.isPublic,
     });
 
     if (rateKey) await incrementRateLimit(rateKey, 10 * 60 * 1000);

@@ -8,6 +8,9 @@
  * If both fail, returns null so the client can use rule-based correction.
  */
 
+import type { NextRequest } from "next/server";
+import { validateOrigin, rejectCsrf } from "@/lib/security/csrf";
+
 const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
 const ZHIPU_API_KEY = process.env.ZHIPU_API_KEY;
 
@@ -88,6 +91,7 @@ async function zhipuCorrect(query: string): Promise<string | null> {
 
 // ── Route handler ──
 export async function POST(request: Request) {
+  if (!validateOrigin(request as unknown as NextRequest)) return rejectCsrf();
   try {
     const { enforceRateLimit, incrementRateLimit } = await import(
       "@/lib/auth/rateLimit"

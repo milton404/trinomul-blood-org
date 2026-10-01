@@ -300,28 +300,47 @@ import {
 } from "@/lib/pg/queries";
 
 // Profile actions
+
+/**
+ * Strips sensitive fields (password_hash) from profile rows before they are
+ * returned to client components / API responses. Callers that genuinely need
+ * the hash (login / password verification) query `profiles` directly — never
+ * through these actions.
+ */
+function stripSensitiveProfile<T>(row: T): T {
+  if (!row) return row;
+  if (Array.isArray(row)) {
+    return (row as unknown[]).map(stripSensitiveProfile) as unknown as T;
+  }
+  if (typeof row === "object") {
+    const { password_hash: _omit, ...rest } = row as Record<string, unknown>;
+    return rest as unknown as T;
+  }
+  return row;
+}
+
 export async function serverGetProfileByUserId(userId: number) {
   if (isSupabaseAvailable()) {
     const { rows } = await pgQuery("SELECT * FROM profiles WHERE id = $1", [userId]);
-    return rows[0] || null;
+    return stripSensitiveProfile(rows[0] || null);
   }
-  return getProfileByUserId(userId);
+  return stripSensitiveProfile(getProfileByUserId(userId));
 }
 
 export async function serverGetProfileByEmail(email: string) {
   if (isSupabaseAvailable()) {
     const { rows } = await pgQuery("SELECT * FROM profiles WHERE email = $1", [email]);
-    return rows[0] || null;
+    return stripSensitiveProfile(rows[0] || null);
   }
-  return getProfileByEmail(email);
+  return stripSensitiveProfile(getProfileByEmail(email));
 }
 
 export async function serverGetProfileByPhone(phone: string) {
   if (isSupabaseAvailable()) {
     const { rows } = await pgQuery("SELECT * FROM profiles WHERE phone = $1", [phone]);
-    return rows[0] || null;
+    return stripSensitiveProfile(rows[0] || null);
   }
-  return getProfileByPhone(phone);
+  return stripSensitiveProfile(getProfileByPhone(phone));
 }
 
 /**
@@ -631,8 +650,8 @@ export async function serverUpdateProfile(
 }
 
 export async function serverGetAllProfiles() {
-  if (isSupabaseAvailable()) return getAllProfilesPg();
-  return getAllProfiles();
+  if (isSupabaseAvailable()) return stripSensitiveProfile(await getAllProfilesPg());
+  return stripSensitiveProfile(getAllProfiles());
 }
 
 export async function serverGetProfilesByRole(role: string) {
@@ -641,14 +660,14 @@ export async function serverGetProfilesByRole(role: string) {
       "SELECT * FROM profiles WHERE role = $1 ORDER BY created_at DESC",
       [role],
     );
-    return rows;
+    return stripSensitiveProfile(rows);
   }
-  return getProfilesByRole(role);
+  return stripSensitiveProfile(getProfilesByRole(role));
 }
 
 export async function serverGetProfilesByRoles(roles: string[]) {
-  if (isSupabaseAvailable()) return getProfilesByRolesPg(roles);
-  return getProfilesByRoles(roles);
+  if (isSupabaseAvailable()) return stripSensitiveProfile(await getProfilesByRolesPg(roles));
+  return stripSensitiveProfile(getProfilesByRoles(roles));
 }
 
 /**
@@ -713,8 +732,12 @@ export async function serverSearchProfiles(filters?: {
     }
     scoped.districts = districtMatchValues(ctx.assignedDistrict);
   }
-  if (isSupabaseAvailable()) return searchProfilesPg(scoped);
-  return dbSearchProfiles(scoped);
+  if (isSupabaseAvailable()) {
+    const result = await searchProfilesPg(scoped);
+    return { ...result, rows: stripSensitiveProfile(result.rows) };
+  }
+  const result = dbSearchProfiles(scoped);
+  return { ...result, rows: stripSensitiveProfile(result.rows) };
 }
 
 export async function serverGetAdmins(filters?: {
@@ -724,8 +747,12 @@ export async function serverGetAdmins(filters?: {
   offset?: number;
 }) {
   await requireFullAdmin();
-  if (isSupabaseAvailable()) return getAdminsPg(filters);
-  return dbGetAdmins(filters);
+  if (isSupabaseAvailable()) {
+    const result = await getAdminsPg(filters);
+    return { ...result, rows: stripSensitiveProfile(result.rows) };
+  }
+  const result = dbGetAdmins(filters);
+  return { ...result, rows: stripSensitiveProfile(result.rows) };
 }
 
 // ── Admin context, policy & district assignment ───────────────────────

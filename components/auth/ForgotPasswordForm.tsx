@@ -39,11 +39,15 @@ export default function ForgotPasswordForm() {
     setIsLoading(true);
     setIssuedToken(null);
     try {
-      const token = await serverRequestPasswordReset(values.identifier);
+      const result = await serverRequestPasswordReset(values.identifier);
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
       // Always show the generic success message to avoid user enumeration.
       // In development, surface the token so the flow can be tested end-to-end.
-      if (token) {
-        setIssuedToken(token);
+      if (result.token) {
+        setIssuedToken(result.token);
         toast.success(t("reset_requested"));
       } else {
         // Account not found — still show the same message to avoid leaking

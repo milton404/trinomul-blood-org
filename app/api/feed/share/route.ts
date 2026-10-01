@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { validateOrigin, rejectCsrf } from "@/lib/security/csrf";
 import { serverSharePost } from "@/lib/db-actions";
 import { getSession } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  if (!validateOrigin(req as unknown as NextRequest)) return rejectCsrf();
   try {
     const session = await getSession();
     if (!session) {

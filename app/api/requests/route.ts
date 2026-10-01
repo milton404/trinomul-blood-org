@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { validateOrigin, rejectCsrf } from "@/lib/security/csrf";
 import { isSupabaseAvailable } from "@/lib/supabase/client";
 import {
   getVisibleBloodRequests,
@@ -12,6 +14,7 @@ import {
 } from "@/lib/pg/requests";
 import { getApprovedDonorView } from "@/lib/auth/approved-donor";
 import { coarsenRequestCoords } from "@/lib/privacy/request-coords";
+import { createRequestSchema } from "@/lib/validation/schemas";
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +47,7 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  if (!validateOrigin(req as unknown as NextRequest)) return rejectCsrf();
   try {
     const { enforceRateLimit, incrementRateLimit } = await import(
       "@/lib/auth/rateLimit"
@@ -57,32 +61,41 @@ export async function POST(req: Request) {
 
     const body = await req.json();
 
+    const parsed = createRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || "Invalid input" },
+        { status: 400 },
+      );
+    }
+
     const input = {
-      requesterId: body.requesterId ?? null,
-      requesterType: body.requesterType ?? "guest",
-      patientName: body.patientName,
-      patientAge: body.patientAge ?? null,
-      bloodGroup: body.bloodGroup,
-      unitsNeeded: body.unitsNeeded ?? 1,
-      urgencyLevel: body.urgencyLevel ?? "normal",
-      whenNeeded: body.whenNeeded ?? "today",
-      neededDate: body.neededDate ?? null,
-      neededTime: body.neededTime ?? null,
-      district: body.district,
-      upazila: body.upazila,
-      unionName: body.unionName ?? null,
-      lat: body.lat ?? null,
-      lng: body.lng ?? null,
-      hospitalName: body.hospitalName,
-      hospitalAddress: body.hospitalAddress ?? null,
-      contactNumber: body.contactNumber,
-      alternativeNumber: body.alternativeNumber ?? null,
-      whatsappNumber: body.whatsappNumber ?? null,
-      reason: body.reason ?? null,
-      patientHbLevel: body.patientHbLevel ?? null,
+      requesterId: parsed.data.requesterId ?? null,
+      requesterType: parsed.data.requesterType ?? "guest",
+      patientName: parsed.data.patientName,
+      patientAge: parsed.data.patientAge ?? null,
+      bloodGroup: parsed.data.bloodGroup,
+      unitsNeeded: parsed.data.unitsNeeded ?? 1,
+      urgencyLevel: parsed.data.urgencyLevel ?? "normal",
+      whenNeeded: parsed.data.whenNeeded ?? "today",
+      neededDate: parsed.data.neededDate ?? null,
+      neededTime: parsed.data.neededTime ?? null,
+      district: parsed.data.district,
+      upazila: parsed.data.upazila,
+      unionName: parsed.data.unionName ?? null,
+      lat: parsed.data.lat ?? null,
+      lng: parsed.data.lng ?? null,
+      hospitalName: parsed.data.hospitalName,
+      hospitalAddress: parsed.data.hospitalAddress ?? null,
+      contactNumber: parsed.data.contactNumber,
+      alternativeNumber: parsed.data.alternativeNumber ?? null,
+      whatsappNumber: parsed.data.whatsappNumber ?? null,
+      reason: parsed.data.reason ?? null,
+      patientHbLevel: parsed.data.patientHbLevel ?? null,
       status: "active",
-      ipAddress: body.ipAddress ?? null,
-      userAgent: body.userAgent ?? "mobile-app",
+      ipAddress: parsed.data.ipAddress ?? null,
+      userAgent: parsed.data.userAgent ?? "mobile-app",
+      idempotencyKey: parsed.data.idempotencyKey ?? null,
     };
 
     let requestId: number;

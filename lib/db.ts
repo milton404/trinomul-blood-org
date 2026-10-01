@@ -544,6 +544,21 @@ function initTables(db: Database.Database) {
     "CREATE INDEX IF NOT EXISTS idx_password_resets_token ON password_resets(token)",
   );
 
+  // Session revocation store (denylist). Each signed session has a `jti`;
+  // revoking it here invalidates the token even before it expires.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS auth_sessions (
+      jti TEXT PRIMARY KEY,
+      user_id INTEGER NOT NULL,
+      expires_at TEXT NOT NULL,
+      revoked_at TEXT,
+      created_at TEXT DEFAULT (datetime('now'))
+    )
+  `);
+  db.exec(
+    "CREATE INDEX IF NOT EXISTS idx_auth_sessions_user ON auth_sessions(user_id, expires_at)",
+  );
+
   // Request status log — tracks every status change for a blood request.
   db.exec(`
     CREATE TABLE IF NOT EXISTS request_status_log (
@@ -635,6 +650,13 @@ function initTables(db: Database.Database) {
   try {
     db.exec(`ALTER TABLE blood_requests ADD COLUMN boosted_at TEXT`);
   } catch {}
+  // Idempotency key for retry-safe request creation (client-generated).
+  try {
+    db.exec(`ALTER TABLE blood_requests ADD COLUMN idempotency_key TEXT`);
+  } catch {}
+  db.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS idx_blood_requests_idempotency_key ON blood_requests(idempotency_key) WHERE idempotency_key IS NOT NULL",
+  );
 
   // District-scoped sub-admin support: an `admin` with assigned_district set
   // can only manage that district's donors/requests. Full admins and
@@ -1798,46 +1820,66 @@ export function createBloodRequest(request: Record<string, any>) {
     request.upazila,
     request.unionName,
   );
-  // Generate a unique tracking code for public status tracking.
-  let trackingCode = generateTrackingCode();
-  // Ensure uniqueness (extremely unlikely collision, but be safe)
-  while (
-    db
-      .prepare("SELECT id FROM blood_requests WHERE tracking_code = ?")
-      .get(trackingCode)
-  ) {
-    trackingCode = generateTrackingCode();
-  }
-  const stmt = db.prepare(`
-    INSERT INTO blood_requests (requester_id, requester_type, patient_name, patient_age, blood_group, units_needed, urgency_level, when_needed, needed_date, needed_time, district, upazila, union_name, lat, lng, hospital_name, hospital_address, contact_number, alternative_number, whatsapp_number, reason, patient_hb_level, status, tracking_code, current_status, ip_address, user_agent)
-    VALUES (@requesterId, @requesterType, @patientName, @patientAge, @bloodGroup, @unitsNeeded, @urgencyLevel, @whenNeeded, @neededDate, @neededTime, @district, @upazila, @unionName, @lat, @lng, @hospitalName, @hospitalAddress, @contactNumber, @alternativeNumber, @whatsappNumber, @reason, @patientHbLevel, @status, @trackingCode, @currentStatus, @ipAddress, @userAgent)
-  `);
-  const requestId = stmt.run({
-    ...request,
-    requesterId: request.requesterId ?? null,
-    whatsappNumber: request.whatsappNumber ?? null,
-    patientHbLevel: request.patientHbLevel ?? null,
-    ipAddress: request.ipAddress ?? null,
-    userAgent: request.userAgent ?? null,
-    unionName: request.unionName ?? null,
-    lat: coords.lat,
-    lng: coords.lng,
-    trackingCode,
-    currentStatus: "submitted",
-  }).lastInsertRowid as number;
+  const idempotencyKey = request.idempotencyKey?.trim() || null;
 
-  // Seed the initial status log entry so the timeline starts at "Submitted".
-  db.prepare(
-    `INSERT INTO request_status_log (request_id, status, changed_by, note)
-     VALUES (?, ?, ?, ?)`,
-  ).run(
-    requestId,
-    "submitted",
-    request.requesterType || "guest",
-    "Request submitted",
-  );
+  // Atomic: the request row and its initial status-log entry are committed
+  // together, or not at all. `Database#transaction` auto-begins/commits and
+  // rolls back if the callback throws.
+  const create = db.transaction((): number => {
+    // Idempotency: a retried submission with the same key returns the
+    // original request instead of creating a duplicate.
+    if (idempotencyKey) {
+      const existing = db
+        .prepare("SELECT id FROM blood_requests WHERE idempotency_key = ?")
+        .get(idempotencyKey) as { id: number } | undefined;
+      if (existing) return existing.id;
+    }
 
-  return requestId;
+    // Generate a unique tracking code for public status tracking.
+    let trackingCode = generateTrackingCode();
+    // Ensure uniqueness (extremely unlikely collision, but be safe)
+    while (
+      db
+        .prepare("SELECT id FROM blood_requests WHERE tracking_code = ?")
+        .get(trackingCode)
+    ) {
+      trackingCode = generateTrackingCode();
+    }
+
+    const stmt = db.prepare(`
+      INSERT INTO blood_requests (requester_id, requester_type, patient_name, patient_age, blood_group, units_needed, urgency_level, when_needed, needed_date, needed_time, district, upazila, union_name, lat, lng, hospital_name, hospital_address, contact_number, alternative_number, whatsapp_number, reason, patient_hb_level, status, tracking_code, current_status, ip_address, user_agent, idempotency_key)
+      VALUES (@requesterId, @requesterType, @patientName, @patientAge, @bloodGroup, @unitsNeeded, @urgencyLevel, @whenNeeded, @neededDate, @neededTime, @district, @upazila, @unionName, @lat, @lng, @hospitalName, @hospitalAddress, @contactNumber, @alternativeNumber, @whatsappNumber, @reason, @patientHbLevel, @status, @trackingCode, @currentStatus, @ipAddress, @userAgent, @idempotencyKey)
+    `);
+    const requestId = stmt.run({
+      ...request,
+      requesterId: request.requesterId ?? null,
+      whatsappNumber: request.whatsappNumber ?? null,
+      patientHbLevel: request.patientHbLevel ?? null,
+      ipAddress: request.ipAddress ?? null,
+      userAgent: request.userAgent ?? null,
+      unionName: request.unionName ?? null,
+      lat: coords.lat,
+      lng: coords.lng,
+      trackingCode,
+      currentStatus: "submitted",
+      idempotencyKey,
+    }).lastInsertRowid as number;
+
+    // Seed the initial status log entry so the timeline starts at "Submitted".
+    db.prepare(
+      `INSERT INTO request_status_log (request_id, status, changed_by, note)
+       VALUES (?, ?, ?, ?)`,
+    ).run(
+      requestId,
+      "submitted",
+      request.requesterType || "guest",
+      "Request submitted",
+    );
+
+    return requestId;
+  });
+
+  return create();
 }
 
 const BLOOD_REQUEST_UPDATABLE_COLUMNS = new Set([

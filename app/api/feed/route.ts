@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import { validateOrigin, rejectCsrf } from "@/lib/security/csrf";
 import {
   serverGetFeed,
   serverCreatePost,
@@ -6,6 +8,7 @@ import {
   serverUpdatePost,
 } from "@/lib/db-actions";
 import { getSession } from "@/lib/auth/session";
+import { createPostSchema } from "@/lib/validation/schemas";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +34,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  if (!validateOrigin(req as unknown as NextRequest)) return rejectCsrf();
   try {
     const session = await getSession();
     if (!session) {
@@ -48,11 +52,20 @@ export async function POST(req: Request) {
     );
 
     const body = await req.json();
-    const content = body.content || "";
-    const images = Array.isArray(body.images) ? body.images.slice(0, 6) : [];
-    const postType = body.postType || "general";
-    const relatedRequestId = body.relatedRequestId || null;
-    const isPublic = body.isPublic !== false;
+
+    const parsed = createPostSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || "Invalid input" },
+        { status: 400 },
+      );
+    }
+
+    const content = parsed.data.content || "";
+    const images = parsed.data.images.slice(0, 6);
+    const postType = parsed.data.postType || "general";
+    const relatedRequestId = parsed.data.relatedRequestId || null;
+    const isPublic = parsed.data.isPublic !== false;
 
     if (!content.trim() && images.length === 0) {
       return NextResponse.json({ error: "Post cannot be empty" }, { status: 400 });

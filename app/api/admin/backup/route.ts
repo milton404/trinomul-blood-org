@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/lib/auth/session";
 import { query as pgQuery, isSupabaseAvailable } from "@/lib/supabase/client";
+import { checkRateLimit, incrementRateLimit } from "@/lib/auth/rateLimit";
 
 export const dynamic = "force-dynamic";
 
@@ -58,6 +59,15 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
+  const backupRateKey = `backup:${adminUser.id}`;
+  const backupLimit = await checkRateLimit(backupRateKey, 5, 60 * 60 * 1000, 15 * 60 * 1000);
+  if (!backupLimit.allowed) {
+    return NextResponse.json(
+      { error: "Too many backup exports. Please wait 15 minutes." },
+      { status: 429 },
+    );
+  }
+
   const url = new URL(request.url);
   const format = url.searchParams.get("format") || "json";
 
@@ -92,6 +102,8 @@ export async function GET(request: Request) {
   } catch (e) {
     console.error("Failed to log backup:", e);
   }
+
+  await incrementRateLimit(backupRateKey, 60 * 60 * 1000);
 
   const date = new Date().toISOString().slice(0, 10);
   const filename = `trinomul-backup-${date}.json`;

@@ -3,6 +3,32 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import LoginForm from "@/components/auth/LoginForm";
 
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(),
+}));
+
+vi.mock("@/lib/auth/actions", () => ({
+  serverLogin: vi.fn(),
+  serverGetCurrentUser: vi.fn(),
+}));
+
+vi.mock("@/components/providers/AuthProvider", () => ({
+  saveSession: vi.fn(),
+  AuthProvider: ({ children }: { children: React.ReactNode }) => children,
+}));
+
+vi.mock("@/store/authStore", () => ({
+  useAuthStore: () => ({
+    user: null,
+    role: null,
+    isLoading: false,
+    setUser: vi.fn(),
+    setRole: vi.fn(),
+    setIsLoading: vi.fn(),
+    clearAuth: vi.fn(),
+  }),
+}));
+
 describe("LoginForm", () => {
   beforeEach(() => {
     vi.clearAllMocks();

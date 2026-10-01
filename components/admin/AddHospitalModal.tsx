@@ -45,7 +45,7 @@ export default function AddHospitalModal({ onClose, onSave }: AddHospitalModalPr
     setIsLoading(true);
     try {
       // serverRegister properly hashes the password with bcrypt.
-      await serverRegister({
+      const result = await serverRegister({
         email: formData.email,
         password: formData.password,
         fullName: formData.hospital_name_en || formData.hospital_name_bn,
@@ -59,6 +59,10 @@ export default function AddHospitalModal({ onClose, onSave }: AddHospitalModalPr
         upazila: formData.upazila,
         address: formData.address,
       });
+      if (!result.ok) {
+        toast.error(result.error);
+        return;
+      }
       toast.success(t('hospital_created'));
       onSave();
     } catch (error: any) {
