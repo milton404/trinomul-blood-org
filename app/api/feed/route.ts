@@ -74,7 +74,7 @@ export async function POST(req: Request) {
     const id = await serverCreatePost({
       content,
       images,
-      postType,
+      postType: postType as "admin_announcement" | "donation_update" | "general",
       relatedRequestId,
       isPublic,
     });

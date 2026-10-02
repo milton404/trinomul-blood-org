@@ -1194,37 +1194,6 @@ export async function serverCreateDonation(donation: Record<string, any>) {
     }
   }
 
-  try {
-    const { scheduleDonationReminder } = await import("@/lib/reminders/scheduler");
-    await scheduleDonationReminder({
-      donationId,
-      donorId: donation.donorId,
-      donationType: donation.donationType || "whole_blood",
-      donationDate: donation.donationDate,
-    });
-  } catch (e) {
-    console.error("Failed to schedule donation reminder:", e);
-  }
-
-  try {
-    const { issueCertificateForDonation } = await import("@/lib/certificates/issue");
-    await issueCertificateForDonation(donationId);
-  } catch (e) {
-    console.error("Failed to issue certificate:", e);
-  }
-
-  if (donation.donorId) {
-    try {
-      const { awardPointsForDonation } = await import("@/lib/rewards/points");
-      await awardPointsForDonation(
-        donationId,
-        donation.donorId,
-        donation.donationType || "whole_blood",
-      );
-    } catch (e) {
-      console.error("Failed to award points:", e);
-    }
-  }
 
   return donationId;
 }

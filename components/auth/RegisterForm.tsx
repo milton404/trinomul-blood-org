@@ -159,7 +159,7 @@ export default function RegisterForm({ defaultRole }: RegisterFormProps) {
       });
 
       if (!result.ok) {
-        setFormError(result.error);
+
         toast.error(result.error);
         return;
       }
